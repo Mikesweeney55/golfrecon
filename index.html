@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>GolfRecon v13.4 Beta</title>
+  <title>GolfRecon v13.5 Beta</title>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
   <style>
@@ -506,7 +506,7 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
     <header class="topbar">
       <div class="topbar-left">
         <div class="gr-brand" aria-label="GolfRecon"><div class="gr-mark"><span class="gr-cross">GR</span><span class="gr-flag">⚑</span></div><div class="gr-word"><strong>GOLFRECON</strong><small>KNOW YOUR GAME. PLAY SMARTER.</small></div></div>
-        <div class="brand-meta"><span>v13.4 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-meta"><span>v13.5 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
       <div class="giq-logo" aria-label="GR">
@@ -1184,6 +1184,7 @@ async function loadOsmCourse(c){
   const geo=await geocodeGolfCourse(c);
   const q=`[out:json][timeout:25];
 (
+ node(around:2800,${geo.lat},${geo.lon})["golf"~"^(tee|green)$"];
  way(around:2800,${geo.lat},${geo.lon})["golf"~"^(hole|fairway|green|bunker|tee|water_hazard|lateral_water_hazard)$"];
  relation(around:2800,${geo.lat},${geo.lon})["golf"~"^(hole|fairway|green|bunker|tee|water_hazard|lateral_water_hazard)$"];
  way(around:2200,${geo.lat},${geo.lon})["natural"="water"];
@@ -1196,26 +1197,105 @@ out geom tags;`;
   coursePreviewCache.set(key,result);
   return result;
 }
-function selectedHoleGeometry(courseData,hole){
-  const elements=courseData?.elements||[];
-  const holes=elements.filter(e=>String(e?.tags?.golf||'').toLowerCase()==='hole' && osmElementPoints(e).length>=2);
-  let holeEl=holes.find(e=>osmHoleNumber(e)===Number(hole));
-  if(!holeEl){
-    const numbered=holes.filter(e=>osmHoleNumber(e)!=null).sort((a,b)=>osmHoleNumber(a)-osmHoleNumber(b));
-    holeEl=numbered.find(e=>osmHoleNumber(e)===Number(hole));
+function osmQuickCentroid(el){
+  const pts=osmElementPoints(el);if(!pts.length)return null;
+  return [pts.reduce((a,p)=>a+p[0],0)/pts.length,pts.reduce((a,p)=>a+p[1],0)/pts.length];
+}
+function syntheticHoleElement(hole,start,end,source='inferred'){
+  if(!start||!end)return null;
+  return {type:'way',id:`synthetic-hole-${hole}`,tags:{golf:'hole',ref:String(hole),synthetic:source},geometry:[{lon:start[0],lat:start[1]},{lon:end[0],lat:end[1]}]};
+}
+function nearestFeatureToElement(anchor,candidates,maxMeters=140){
+  const ap=osmElementPoints(anchor);if(!ap.length)return null;
+  let best=null,bestD=Infinity;
+  for(const c of candidates){
+    const cp=osmElementPoints(c);if(!cp.length)continue;
+    const d=distanceToHole(cp,ap);
+    if(d<bestD && d<=maxMeters){best=c;bestD=d}
   }
-  if(!holeEl && holes.length>=Number(hole))holeEl=holes[Number(hole)-1];
+  return best;
+}
+function farEndFeature(anchor,candidates,guide=null){
+  const a=osmQuickCentroid(anchor);if(!a)return null;
+  const gp=guide?osmElementPoints(guide):null;
+  const ranked=[];
+  for(const c of candidates){
+    const cp=osmElementPoints(c),cc=osmQuickCentroid(c);if(!cp.length||!cc)continue;
+    const d=pointDistanceMeters(a,cc);
+    if(d<65||d>760)continue;
+    const guideD=gp?.length?distanceToHole(cp,gp):0;
+    if(gp?.length && guideD>145)continue;
+    // Prefer the far end of the same fairway; this avoids pairing a tee with the previous green / next tee nearby.
+    ranked.push({c,score:d-guideD*2});
+  }
+  ranked.sort((x,y)=>y.score-x.score);
+  return ranked[0]?.c||null;
+}
+function bestTeeGreenPair(tees,greens,guide){
+  const gp=osmElementPoints(guide);let best=null,bestScore=-Infinity;
+  for(const t of tees){
+    const tp=osmElementPoints(t),tc=osmQuickCentroid(t);if(!tp.length||!tc)continue;
+    if(distanceToHole(tp,gp)>145)continue;
+    for(const g of greens){
+      const gpts=osmElementPoints(g),gc=osmQuickCentroid(g);if(!gpts.length||!gc)continue;
+      if(distanceToHole(gpts,gp)>145)continue;
+      const d=pointDistanceMeters(tc,gc);if(d<65||d>760)continue;
+      if(d>bestScore){bestScore=d;best={tee:t,green:g}}
+    }
+  }
+  return best;
+}
+function selectedHoleGeometry(courseData,hole){
+  const elements=courseData?.elements||[],target=Number(hole);
+  const kind=e=>String(e?.tags?.golf||'').toLowerCase();
+  const holes=elements.filter(e=>kind(e)==='hole' && osmElementPoints(e).length>=2);
+  const tees=elements.filter(e=>kind(e)==='tee' && osmElementPoints(e).length);
+  const greens=elements.filter(e=>kind(e)==='green' && osmElementPoints(e).length);
+  const fairways=elements.filter(e=>kind(e)==='fairway' && osmElementPoints(e).length>=2);
+
+  let holeEl=holes.find(e=>osmHoleNumber(e)===target);
+
+  // Many community-mapped courses number the tee/green/fairway but omit the golf=hole path.
+  if(!holeEl){
+    let tee=tees.find(e=>osmHoleNumber(e)===target)||null;
+    let green=greens.find(e=>osmHoleNumber(e)===target)||null;
+    let fairway=fairways.find(e=>osmHoleNumber(e)===target)||null;
+
+    if(tee&&!fairway)fairway=nearestFeatureToElement(tee,fairways,125);
+    if(green&&!fairway)fairway=nearestFeatureToElement(green,fairways,125);
+
+    if(tee&&!green)green=farEndFeature(tee,greens,fairway);
+    if(green&&!tee)tee=farEndFeature(green,tees,fairway);
+
+    if((!tee||!green)&&fairway){
+      const pair=bestTeeGreenPair(tees,greens,fairway);
+      tee=tee||pair?.tee||null;
+      green=green||pair?.green||null;
+    }
+
+    if(tee&&green){
+      const t=osmQuickCentroid(tee),g=osmQuickCentroid(green);
+      holeEl=syntheticHoleElement(target,t,g,'tee-green-fallback');
+    }
+  }
+
+  // Keep the old fallback only when OSM actually returned an apparently complete set of hole ways.
+  // Do not guess Hole 12 from the 12th arbitrary OSM element on sparsely mapped courses.
+  if(!holeEl && holes.length>=18){
+    const ordered=holes.slice().sort((a,b)=>(Number(a.id)||0)-(Number(b.id)||0));
+    holeEl=ordered[target-1]||null;
+  }
   if(!holeEl)return null;
-  const holePts=osmElementPoints(holeEl);
+
+  const holePts=osmElementPoints(holeEl);if(holePts.length<2)return null;
   const nearby=elements.filter(e=>{
-    if(e===holeEl)return true;
-    const pts=osmElementPoints(e);
-    if(!pts.length)return false;
-    const kind=osmFeatureKind(e);
-    const limit=kind==='water'?135:105;
+    const pts=osmElementPoints(e);if(!pts.length)return false;
+    const featureKind=osmFeatureKind(e);
+    const limit=featureKind==='water'?145:115;
     return distanceToHole(pts,holePts)<=limit;
   });
-  return {holeEl,holePts,elements:nearby};
+  if(!nearby.includes(holeEl))nearby.push(holeEl);
+  return {holeEl,holePts,elements:nearby,inferred:Boolean(holeEl?.tags?.synthetic)};
 }
 function osmHoleSvg(geom){
   if(!geom?.holePts?.length)return '';
@@ -1551,7 +1631,7 @@ async function ensureCoursePreviewLoaded(courseId,hole){
     const courseData=await loadOsmCourse(c);
     const geom=selectedHoleGeometry(courseData,hole);
     coursePreviewCache.set(key,{courseData,geom});
-    if(!geom)state.coursePreviewError='OpenStreetMap does not have mapped hole geometry for this hole yet.';
+    if(!geom)state.coursePreviewError='The free course map does not have enough tee/green/hole data to locate this hole yet.';
   }catch(e){
     state.coursePreviewError=e.message||String(e);
     coursePreviewCache.set(key,{courseData:null,geom:null,error:state.coursePreviewError});
