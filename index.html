@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>GolfRecon v13.1 Beta</title>
+  <title>GolfRecon v13.2 Beta</title>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
   <style>
@@ -498,7 +498,7 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
     <header class="topbar">
       <div class="topbar-left">
         <div class="gr-brand" aria-label="GolfRecon"><div class="gr-mark"><span class="gr-cross">GR</span><span class="gr-flag">⚑</span></div><div class="gr-word"><strong>GOLFRECON</strong><small>KNOW YOUR GAME. PLAY SMARTER.</small></div></div>
-        <div class="brand-meta"><span>v13.1 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-meta"><span>v13.2 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
       <div class="giq-logo" aria-label="GR">
@@ -1432,7 +1432,12 @@ function buildCoursePreviewGeoJSON(geom){
   const ctx=orientedHoleContext(geom);if(!ctx)return null;
   const fairway=primaryFairwayElement(geom,ctx);
   const center=fairwayCenterLine(fairway,ctx.start,ctx.end);
-  const playLine=center.length?center:[];
+  const fairwayMid=fairway?elementCentroid(fairway):null;
+  let playLine=center.length?center:(fairwayMid?[ctx.start,fairwayMid,ctx.end]:[ctx.start,ctx.end]);
+  if(playLine.length){
+    if(pointDistanceMeters(playLine[0],ctx.start)>12)playLine=[ctx.start,...playLine];
+    if(pointDistanceMeters(playLine[playLine.length-1],ctx.end)>12)playLine=[...playLine,ctx.end];
+  }
   const focus=focusedPreviewElements(geom,ctx,fairway,playLine);
   const features=[];focus.forEach(el=>features.push(...elementFeatures(el)));
   if(playLine.length)features.push({type:'Feature',properties:{kind:'playline'},geometry:{type:'LineString',coordinates:playLine}});
@@ -1448,7 +1453,13 @@ function previewBounds(points){
 }
 function fitCoursePreviewMap(extraZoom=true){
   if(!coursePreviewMapInstance||!coursePreviewMapFocusBounds)return;
-  try{const camera=coursePreviewMapInstance.cameraForBounds(coursePreviewMapFocusBounds,{padding:{top:24,bottom:24,left:22,right:22}});if(camera){if(extraZoom)camera.zoom=Math.min(19.5,(camera.zoom||18)+0.35);coursePreviewMapInstance.jumpTo(camera)}}catch{}
+  try{
+    const camera=coursePreviewMapInstance.cameraForBounds(coursePreviewMapFocusBounds,{padding:{top:54,bottom:54,left:48,right:48}});
+    if(camera){
+      if(extraZoom)camera.zoom=Math.max(14,Math.min(19,(camera.zoom||18)-0.18));
+      coursePreviewMapInstance.jumpTo(camera);
+    }
+  }catch{}
 }
 window.resetCoursePreviewMap=()=>fitCoursePreviewMap(false);
 function initInteractiveCourseMap(){
@@ -1716,6 +1727,27 @@ function courseMemorySection(courseId){
   <div class="hole-grid">${mem.length?mem.map(renderHoleCard).join(''):'<div class="card muted">No hole-by-hole memory yet for this course.</div>'}</div>`;
 }
 
+function previewPolylineYards(points){
+  if(!Array.isArray(points)||points.length<2)return null;
+  let meters=0;
+  for(let i=1;i<points.length;i++)meters+=pointDistanceMeters(points[i-1],points[i]);
+  return meters>0?Math.round(meters/0.9144):null;
+}
+function previewHoleYardage(c,hole,built){
+  const nums=(c?.holeNumbers||[]).map(Number),idx=Math.max(0,nums.indexOf(Number(hole)));
+  const arrays=[c?.yardages,c?.holeYardages,c?.hole_yardages];
+  for(const arr of arrays){
+    const v=Number(arr?.[idx]);
+    if(Number.isFinite(v)&&v>0)return {value:Math.round(v),approx:false};
+  }
+  const hv=c?.holes?.find?.(x=>Number(x?.hole??x?.number??x?.hole_number)===Number(hole));
+  const direct=Number(hv?.yardage??hv?.yards??hv?.distance);
+  if(Number.isFinite(direct)&&direct>0)return {value:Math.round(direct),approx:false};
+  const pts=built?.playLine?.length?built.playLine:built?.ctx?.path;
+  const approx=previewPolylineYards(pts);
+  return approx?{value:approx,approx:true}:null;
+}
+
 function coursePreviewView(){
   const c=course(state.selectedCourseId);
   if(!c)return `<div class="card">Course not found.</div>`;
@@ -1733,6 +1765,12 @@ function coursePreviewView(){
   const mb=mapboxToken();
   const mapReady=Boolean(mb&&cached?.geom);
   const mapBody=mapReady?`<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`:`<div class="preview-map-empty"><div><strong>${state.coursePreviewLoading?`Loading Hole ${hole}…`:(!mb?'Mapbox token required':'Hole geometry not available yet')}</strong><span>${safeText(!mb?'Set your Mapbox token above to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
+  const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
+  const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
+  const holePar=h?.par??c.pars?.[holeIdx]??'—';
+  const holeHcp=c.handicaps?.[holeIdx]??'—';
+  const holeYd=previewHoleYardage(c,hole,titleBuilt);
+  const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
   const insight=h?usefulHoleInsight(h):'';
   const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
   return `
@@ -1749,7 +1787,7 @@ function coursePreviewView(){
       <div>
         <div class="course-preview-map">
           <div class="preview-map-head">
-            <div class="preview-hole-title"><strong>Hole ${hole}</strong><span>Par ${h?.par??c.pars?.[holes.map(Number).indexOf(hole)]??'—'} · Mapbox interactive satellite + GolfRecon overlay</span></div>
+            <div class="preview-hole-title"><strong>Hole ${hole}</strong><span>Par ${holePar} · ${yardageText} · HCP ${holeHcp}</span></div>
             ${h?`<span class="risk-dot preview-risk" title="${riskLabel(h)}">${riskLetter(h)}</span>`:''}
           </div>
           <div id="coursePreviewMapBody">${mapBody}</div>
