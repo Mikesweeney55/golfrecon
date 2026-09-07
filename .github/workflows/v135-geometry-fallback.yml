@@ -1,0 +1,32 @@
+name: Build GolfRecon v13.5 Geometry Fallback
+
+on:
+  push:
+    branches: [v13.5-geometry-fallback]
+    paths:
+      - scripts/patch_v135.py
+      - .github/workflows/v135-geometry-fallback.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v13.5-geometry-fallback
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply and validate v13.5 patch
+        run: python scripts/patch_v135.py
+      - name: Commit v13.5
+        run: |
+          git config user.name "github-actions-bot"
+          git config user.email "actions@github.com"
+          git add index.html
+          git commit -m "GolfRecon v13.5 — Improve hole geometry coverage" || exit 0
+          git push origin HEAD:v13.5-geometry-fallback
