@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>GolfRecon v13.6 Beta</title>
+  <title>GolfRecon v13.7 Beta</title>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
   <style>
@@ -525,6 +525,67 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
   .game-key-pill{font-size:8px;padding:4px 6px}
 }
 
+
+/* v13.7 tighter sticky Pregame header */
+.pregame-hero{
+  padding:10px 14px 9px;
+  border-radius:17px;
+  margin-bottom:12px!important;
+}
+.pregame-hero-head{
+  grid-template-columns:minmax(0,1fr) minmax(200px,280px);
+  align-items:end;
+  gap:12px;
+}
+.pregame-title-line{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  flex-wrap:wrap;
+  min-width:0;
+}
+.pregame-hero h2{
+  font-size:23px;
+  margin:2px 0 0;
+  white-space:nowrap;
+}
+.pregame-course-meta{
+  margin:0!important;
+  font-size:10px;
+  line-height:1.15;
+  white-space:nowrap;
+}
+.pregame-course-picker{
+  align-self:end;
+  margin-bottom:-2px;
+}
+.pregame-course-picker span{font-size:7px}
+.pregame-course-select{
+  height:32px;
+  padding:4px 30px 4px 9px;
+  border-radius:10px;
+  font-size:10px;
+}
+.pregame-hero .course-stat-lines{
+  margin-top:5px;
+  border-radius:10px;
+  padding:0 8px;
+}
+.pregame-hero .course-stat-row{padding:4px 0}
+.pregame-hero .course-stat strong{font-size:12px}
+.pregame-hero .course-stat span,.pregame-hero .course-stat-row .row-label{font-size:7px}
+@media(max-width:640px){
+  .pregame-hero{padding:9px 10px 8px}
+  .pregame-hero-head{grid-template-columns:1fr;gap:4px}
+  .pregame-title-line{gap:7px}
+  .pregame-hero h2{font-size:20px}
+  .pregame-course-meta{font-size:9px;white-space:normal}
+  .pregame-course-picker{grid-template-columns:40px minmax(0,1fr);margin-bottom:0}
+  .pregame-course-select{height:30px}
+  .pregame-hero .course-stat-lines{margin-top:4px}
+  .pregame-hero .course-stat-row{padding:4px 0}
+}
+
 </style>
 </head>
 <body>
@@ -559,7 +620,7 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
     <header class="topbar">
       <div class="topbar-left">
         <div class="gr-brand" aria-label="GolfRecon"><div class="gr-mark"><span class="gr-cross">GR</span><span class="gr-flag">⚑</span></div><div class="gr-word"><strong>GOLFRECON</strong><small>KNOW YOUR GAME. PLAY SMARTER.</small></div></div>
-        <div class="brand-meta"><span>v13.6 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-meta"><span>v13.7 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
       <div class="giq-logo" aria-label="GR">
@@ -1907,10 +1968,15 @@ function pregame(){
     <section class="hero pregame-hero">
       <div class="hero-copy">
         <div class="pregame-hero-head">
-          <div class="pregame-hero-title"><div class="eyebrow">TOMORROW'S PREGAME</div><h2>${c.name}</h2></div>
+          <div class="pregame-hero-title">
+            <div class="eyebrow">TOMORROW'S PREGAME</div>
+            <div class="pregame-title-line">
+              <h2>${c.name}</h2>
+              <span class="muted pregame-course-meta">${c.tees} tees · Par ${c.par??'—'} · ${c.rating??'—'}/${c.slope??'—'} · ${rounds.length} round${rounds.length===1?'':'s'} in memory</span>
+            </div>
+          </div>
           <label class="pregame-course-picker"><span>COURSE</span><select class="pregame-course-select" aria-label="Pregame course" onchange="setGlobalCourse(this.value)">${courseDropdownOptions(c.id)}</select></label>
         </div>
-        <p class="muted pregame-course-meta">${c.tees} tees · Par ${c.par??'—'} · ${c.rating??'—'}/${c.slope??'—'} · ${rounds.length} round${rounds.length===1?'':'s'} in memory</p>
         <div class="course-stat-lines">
           <div class="course-stat-row">
             <div class="row-label">Last</div>
