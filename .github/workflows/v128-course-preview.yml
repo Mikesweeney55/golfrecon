@@ -1,0 +1,32 @@
+name: Build GolfRecon v12.8 Course Preview
+
+on:
+  push:
+    branches: [v12.8-course-preview]
+    paths:
+      - scripts/patch_v128.py
+      - .github/workflows/v128-course-preview.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v12.8-course-preview
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply and validate v12.8 patch
+        run: python scripts/patch_v128.py
+      - name: Commit v12.8
+        run: |
+          git config user.name "github-actions-bot"
+          git config user.email "actions@github.com"
+          git add index.html
+          git commit -m "Add Course Preview for v12.8" || exit 0
+          git push origin HEAD:v12.8-course-preview
