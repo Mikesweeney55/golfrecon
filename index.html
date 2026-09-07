@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>GolfRecon v13.3 Beta</title>
+  <title>GolfRecon v13.4 Beta</title>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
   <style>
@@ -464,6 +464,14 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .preview-read-card{min-height:88px}
 @media(max-width:760px){.course-preview-map{height:430px;min-height:430px}.preview-map-tools{align-items:flex-start;flex-direction:column}.preview-map-tools button{align-self:flex-start}}
 
+
+/* v13.4 embedded Pregame Hole Insights */
+.pregame-hole-insights{scroll-margin-top:110px}
+.pregame-hole-insights .section-head{margin-bottom:10px}
+.pregame-hole-insights .hole-selector{margin-bottom:10px}
+.pregame-hole-insights .preview-hero-grid{margin-top:0}
+.pregame-hole-insights .mapbox-missing{margin-bottom:10px}
+
 </style>
 </head>
 <body>
@@ -498,7 +506,7 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
     <header class="topbar">
       <div class="topbar-left">
         <div class="gr-brand" aria-label="GolfRecon"><div class="gr-mark"><span class="gr-cross">GR</span><span class="gr-flag">⚑</span></div><div class="gr-word"><strong>GOLFRECON</strong><small>KNOW YOUR GAME. PLAY SMARTER.</small></div></div>
-        <div class="brand-meta"><span>v13.3 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-meta"><span>v13.4 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
       <div class="giq-logo" aria-label="GR">
@@ -670,7 +678,7 @@ let pendingImport=null;
 
 const db = {player:{id:null,name:"Golfer",username:"",handicap:null},swingThoughts:{driver:[],irons:[],chipping:[],putting:[]},courses:[],rounds:[],puttingDetails:[],clubStats:[]};
 
-let state = {view:'pregame', selectedCourseId:'four-oaks-white-18-holes', roundStat:'score', roundFilter:'18', roundCourseId:'four-oaks-white-18-holes', selectedRoundId:null, gameCourseId:'four-oaks-white-18-holes', gameRoundLimit:'all', puttingCourse:'all', pregameChats:{}, chatBusy:false, coursePreviewHole:1, coursePreviewReturnView:'pregame', coursePreviewLoading:false, coursePreviewError:null};
+let state = {view:'pregame', selectedCourseId:'four-oaks-white-18-holes', roundStat:'score', roundFilter:'18', roundCourseId:'four-oaks-white-18-holes', selectedRoundId:null, gameCourseId:'four-oaks-white-18-holes', gameRoundLimit:'all', puttingCourse:'all', pregameChats:{}, chatBusy:false, coursePreviewHole:1, coursePreviewReturnView:'pregame', coursePreviewLoading:false, coursePreviewError:null, coursePreviewShowAll:false, coursePreviewCourseId:null};
 const app = document.getElementById('app');
 const coursePreviewCache=new Map();
 const course = id => db.courses.find(c=>c.id===id);
@@ -1506,7 +1514,7 @@ function fitCoursePreviewMap(extraZoom=true){
 }
 window.resetCoursePreviewMap=()=>fitCoursePreviewMap(false);
 function initInteractiveCourseMap(){
-  if(state.view!=='coursePreview')return;
+  if(!['pregame','coursePreview'].includes(state.view))return;
   const container=document.getElementById('coursePreviewMap'),token=mapboxToken();if(!container||!token||!window.mapboxgl)return;
   const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);if(!cached?.geom)return;
   const built=buildCoursePreviewGeoJSON(cached.geom);if(!built)return;
@@ -1533,7 +1541,7 @@ function initInteractiveCourseMap(){
   });
 }
 async function ensureCoursePreviewLoaded(courseId,hole){
-  const c=course(courseId); if(!c||state.view!=='coursePreview')return;
+  const c=course(courseId); if(!c||!['pregame','coursePreview'].includes(state.view))return;
   const key=`preview:${courseId}:${hole}`;
   if(coursePreviewCache.has(key)||state.coursePreviewLoading)return;
   state.coursePreviewLoading=true;state.coursePreviewError=null;
@@ -1549,23 +1557,30 @@ async function ensureCoursePreviewLoaded(courseId,hole){
     coursePreviewCache.set(key,{courseData:null,geom:null,error:state.coursePreviewError});
   }finally{
     state.coursePreviewLoading=false;
-    if(state.view==='coursePreview')render();
+    if(state.view==='pregame'||state.view==='coursePreview')render();
   }
 }
 window.openHolePreview=(hole,courseId=state.selectedCourseId)=>{
   if(!course(courseId))return;
-  if(state.view!=='coursePreview')state.coursePreviewReturnView=state.view;
   state.selectedCourseId=courseId;
   state.gameCourseId=courseId;
   state.roundCourseId=courseId;
+  state.coursePreviewCourseId=courseId;
   state.coursePreviewHole=Number(hole)||1;
   state.coursePreviewError=null;
-  state.view='coursePreview';
+  state.view='pregame';
   refreshGlobalCourseSelector();
   render();
+  requestAnimationFrame(()=>document.getElementById('pregameHoleInsights')?.scrollIntoView({behavior:'smooth',block:'start'}));
 };
-window.closeCoursePreview=()=>{state.view=state.coursePreviewReturnView||'pregame';render()};
-window.selectCoursePreviewHole=hole=>{state.coursePreviewHole=Number(hole)||1;state.coursePreviewError=null;render()};
+window.closeCoursePreview=()=>{state.view='pregame';render()};
+window.selectCoursePreviewHole=hole=>{
+  state.coursePreviewCourseId=state.selectedCourseId;
+  state.coursePreviewHole=Number(hole)||1;
+  state.coursePreviewError=null;
+  render();
+  requestAnimationFrame(()=>document.getElementById('pregameHoleInsights')?.scrollIntoView({behavior:'smooth',block:'start'}));
+};
 
 function chatText(s){
   const escaped=safeText(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
@@ -1677,6 +1692,79 @@ async function sendPregameChat(question){
     render();
   }
 }
+function pregameHoleInsightsHtml(c,priority=[]){
+  const holes=(c.holeNumbers?.length?c.holeNumbers.slice():c.pars?.map((_,i)=>i+1)||[]);
+  if(!holes.length)holes.push(...Array.from({length:18},(_,i)=>i+1));
+  if(state.coursePreviewCourseId!==c.id){
+    state.coursePreviewCourseId=c.id;
+    state.coursePreviewHole=Number(priority?.[0]?.hole)||Number(holes[0])||1;
+    state.coursePreviewShowAll=false;
+    state.coursePreviewError=null;
+  }
+  let hole=Number(state.coursePreviewHole)||Number(holes[0])||1;
+  if(!holes.map(Number).includes(hole))hole=Number(priority?.[0]?.hole)||Number(holes[0])||1;
+  state.coursePreviewHole=hole;
+  const mem=holeMemory(c.id),h=mem.find(x=>Number(x.hole)===hole);
+  const last=h?holeLastRound(c.id,hole):null;
+  const cached=coursePreviewCache.get(`preview:${c.id}:${hole}`);
+  const avgScore=h?.avgScore;
+  const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
+  const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is loading the golf-course data for this hole.';
+  const mb=mapboxToken();
+  const mapReady=Boolean(mb&&cached?.geom);
+  const waiting=!cached&&!state.coursePreviewError;
+  const mapBody=mapReady
+    ? `<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`
+    : `<div class="preview-map-empty"><div><strong>${state.coursePreviewLoading||waiting?`Loading Hole ${hole}…`:(!mb?'Mapbox token required':'Hole geometry not available yet')}</strong><span>${safeText(!mb?'Set your Mapbox token to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
+  const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
+  const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
+  const holePar=h?.par??c.pars?.[holeIdx]??'—';
+  const holeHcp=c.handicaps?.[holeIdx]??'—';
+  const holeYd=previewHoleYardage(c,hole,titleBuilt);
+  const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
+  const insight=h?usefulHoleInsight(h):'';
+  const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
+  return `
+    <section id="pregameHoleInsights" class="pregame-hole-insights">
+      <div class="section-head">
+        <div><div class="eyebrow">HOLE INSIGHTS</div><h2>Hole ${hole}</h2></div>
+        <button class="button secondary" type="button" onclick="toggleCoursePreviewHoles()">${state.coursePreviewShowAll?'Hide holes':'Show all holes'}</button>
+      </div>
+      ${!mb?`<div class="mapbox-missing">Satellite view needs your Mapbox public token. <button type="button" class="hole-preview-btn" onclick="configureMapboxToken()">Set Mapbox token</button></div>`:''}
+      ${state.coursePreviewShowAll?`<div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>`:''}
+      <div class="preview-hero-grid">
+        <div>
+          <div class="course-preview-map">
+            <div class="preview-map-head">
+              <div class="preview-hole-title"><strong>Hole ${hole}</strong><span>Par ${holePar} · ${yardageText} · HCP ${holeHcp}</span></div>
+              ${h?`<span class="risk-dot preview-risk" title="${riskLabel(h)}">${riskLetter(h)}</span>`:''}
+            </div>
+            <div id="coursePreviewMapBody">${mapBody}</div>
+          </div>
+          <div class="preview-map-tools"><span>Drag to pan · scroll or pinch to zoom</span><button type="button" onclick="resetCoursePreviewMap()">Fit hole</button></div>
+          <div class="preview-attribution">Satellite imagery © Mapbox / providers · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
+        </div>
+        <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
+          ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
+          ${stat('Rounds',h?.played??'—')}
+          ${stat('Avg score',avgScore==null?'—':avgScore.toFixed(1))}
+          ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`)}
+          ${stat('Double+',h?.doubleRate==null?'—':h.doubleRate+'%')}
+          ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'))}
+          ${stat('GIR',h?.gir==null?'—':h.gir+'%')}
+          ${stat('Avg putts',h?.putts==null?'—':h.putts.toFixed(1))}
+          ${stat('Last score',last?.score??'—')}
+          <div class="preview-read-card"><div class="eyebrow">GOLFRECON READ</div><p>${safeText(insight||'More history will sharpen the hole-specific read.')}</p></div>
+        </aside>
+      </div>
+    </section>`;
+}
+window.toggleCoursePreviewHoles=()=>{
+  state.coursePreviewShowAll=!state.coursePreviewShowAll;
+  render();
+  requestAnimationFrame(()=>document.getElementById('pregameHoleInsights')?.scrollIntoView({behavior:'smooth',block:'start'}));
+};
+
 function pregame(){
   const c=course(state.selectedCourseId), rounds=roundsFor(c.id), priority=priorityHoles(c.id);
   const latest=rounds[0], keys=deepPregameInsights(c.id);
@@ -1713,7 +1801,9 @@ function pregame(){
 
     ${pregameChatHtml(c)}
 
-    <div class="section-head"><div><div class="eyebrow">COURSE MEMORY</div><h2>Priority holes</h2></div><button class="button secondary" onclick="openCourseMemory()">See all</button></div>
+    ${pregameHoleInsightsHtml(c,priority)}
+
+    <div class="section-head"><div><div class="eyebrow">COURSE MEMORY</div><h2>Priority holes</h2></div></div>
     <div class="risk-legend"><span class="chip"><span class="risk-dot">L</span> Low risk</span><span class="chip"><span class="risk-dot" style="background:var(--warning);color:#2a2200">M</span> Medium risk</span><span class="chip"><span class="risk-dot" style="background:var(--danger);color:#fff">H</span> High risk</span></div>
     <div class="hole-grid">${priority.map(h=>renderHoleCard(h,true)).join('')}</div>
 
@@ -2092,7 +2182,7 @@ function selectRoundFromBar(id){
 }
 function render(){
  destroyCoursePreviewMap();
- app.innerHTML=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():state.view==='coursePreview'?coursePreviewView():myGame();
+ app.innerHTML=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():myGame();
  document.querySelectorAll('[data-hole-preview]').forEach(b=>b.addEventListener('click',e=>{
    e.preventDefault();e.stopPropagation();openHolePreview(Number(b.dataset.holePreview),state.selectedCourseId);
  }));
@@ -2140,10 +2230,11 @@ function render(){
 
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===state.view));
  if(state.view==='rounds')requestAnimationFrame(()=>document.querySelectorAll('.round-chart-wrap').forEach(w=>w.scrollLeft=w.scrollWidth));
- if(state.view==='pregame')requestAnimationFrame(()=>{const l=document.getElementById('pregameChatLog');if(l)l.scrollTop=l.scrollHeight});
- if(state.view==='coursePreview'){
-   requestAnimationFrame(()=>{ensureCoursePreviewLoaded(state.selectedCourseId,state.coursePreviewHole);requestAnimationFrame(initInteractiveCourseMap);});
- }
+ if(state.view==='pregame')requestAnimationFrame(()=>{
+   const l=document.getElementById('pregameChatLog');if(l)l.scrollTop=l.scrollHeight;
+   ensureCoursePreviewLoaded(state.selectedCourseId,state.coursePreviewHole);
+   requestAnimationFrame(initInteractiveCourseMap);
+ });
 
 }
 window.setView = v => {state.view=v; render();};
