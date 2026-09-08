@@ -1,0 +1,32 @@
+name: Build Golf Recon v14.1 Visual Refresh
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/patch_v141_visual.py
+      - .github/workflows/v141-golf-recon-visual.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply and validate Golf Recon v14.1
+        run: python scripts/patch_v141_visual.py
+      - name: Commit v14.1 UI
+        run: |
+          git config user.name "github-actions-bot"
+          git config user.email "actions@github.com"
+          git add index.html
+          git commit -m "Golf Recon v14.1 — deeper visual conversion" || exit 0
+          git push origin HEAD:main
