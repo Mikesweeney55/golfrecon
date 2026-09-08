@@ -3,9 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Golf Recon v14.1 Beta</title>
-  <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
+  <title>Golf Recon v14.2 Beta</title>
   <style>
 :root{
   --bg:#0d1412;
@@ -102,7 +100,7 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .bar-col[data-round-bar]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:700px){.round-row.round-summary{grid-template-columns:minmax(150px,1fr) .35fr .55fr}}
 
-/* GolfRecon mobile heat map v2: non-overlapping distance bands */
+/* Golf Recon mobile heat map v2: non-overlapping distance bands */
 .heat-map-grid{display:grid;gap:8px;margin-top:14px}
 .heat-band{display:grid;grid-template-columns:78px minmax(0,1fr) auto;align-items:center;gap:8px;min-height:58px;padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.16);color:#0e1714;font-weight:800}
 .heat-band .band-label{font-size:16px;white-space:nowrap}
@@ -279,11 +277,6 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .course-dropdown-wrap::after{content:'⌄';position:absolute;right:14px;top:50%;transform:translateY(-54%);pointer-events:none;color:var(--accent);font-size:18px;font-weight:900}
 .edit-round-btn{border:1px solid var(--line);background:#16251f;color:var(--text);border-radius:999px;padding:6px 9px;font-size:10px;font-weight:850;white-space:nowrap}
 .edit-round-btn:hover{border-color:rgba(184,234,104,.45)}
-.round-status-row{margin-top:6px}
-.round-status{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:9px;font-weight:900;letter-spacing:.01em;border:1px solid var(--line)}
-.round-status.complete{color:var(--accent);background:rgba(184,234,104,.07);border-color:rgba(184,234,104,.22)}
-.round-status.warn{color:#ffd66b;background:rgba(255,214,107,.07);border-color:rgba(255,214,107,.22)}
-.round-status.missing{color:#ff9b96;background:rgba(255,59,48,.07);border-color:rgba(255,59,48,.20)}
 .round-summary.has-edit{grid-template-columns:minmax(150px,1fr) .30fr .48fr auto}
 .edit-form{display:grid;gap:11px}
 .edit-form label{display:grid;gap:5px;font-size:11px;color:var(--muted);font-weight:800}
@@ -385,584 +378,502 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .groups-hero{padding:20px}.groups-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.group-feature{padding:14px}.group-feature h3{font-size:13px;margin:5px 0}.coming-badge{display:inline-block;border:1px solid rgba(184,234,104,.25);color:var(--accent);border-radius:999px;padding:4px 7px;font-size:9px;font-weight:900}
 @media(max-width:640px){.swing-grid,.groups-grid{grid-template-columns:1fr}.user-chip{display:none}.user-tools{gap:3px}.mini-link{font-size:9px}}
 
-.gr-brand{display:flex;align-items:center;gap:10px;justify-self:start}.gr-mark{width:48px;height:48px;border:2px solid var(--accent);border-radius:50%;display:grid;place-items:center;position:relative;background:#102019;box-shadow:inset 0 0 0 3px #102019,0 0 0 1px rgba(184,234,104,.2)}.gr-mark:before,.gr-mark:after{content:"";position:absolute;background:var(--accent);opacity:.55}.gr-mark:before{width:1px;height:100%;left:50%}.gr-mark:after{height:1px;width:100%;top:50%}.gr-cross{font-size:17px;font-weight:950;letter-spacing:-.06em;color:#f5f7f6;z-index:1}.gr-flag{position:absolute;font-size:10px;color:var(--accent);right:4px;top:4px;z-index:2}.gr-word{display:grid;line-height:1}.gr-word strong{font-size:16px;letter-spacing:.08em}.gr-word small{font-size:7px;letter-spacing:.12em;color:var(--accent);margin-top:5px;font-weight:850}@media(max-width:520px){.gr-word small{display:none}.gr-word strong{font-size:13px}.gr-mark{width:42px;height:42px}}
 
-/* v12.8 Course Preview */
-.hole-preview-btn,.hole-ref-link{border:1px solid rgba(184,234,104,.28);background:rgba(184,234,104,.07);color:var(--accent);border-radius:999px;font:inherit;font-size:10px;font-weight:850;padding:5px 8px;cursor:pointer;white-space:nowrap}
-.hole-preview-btn:hover,.hole-ref-link:hover{background:rgba(184,234,104,.14)}
+.hole-preview-btn,.hole-ref-link{border:1px solid rgba(184,234,104,.26);background:rgba(184,234,104,.07);color:var(--accent);border-radius:999px;font:inherit;font-size:10px;font-weight:850;padding:5px 8px;cursor:pointer;white-space:nowrap}
+.hole-preview-btn:hover,.hole-ref-link:hover{background:rgba(184,234,104,.13)}
 .hole-ref-link{display:inline;padding:2px 6px;margin:0 1px;vertical-align:baseline}
 .preview-page-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
 .preview-back{border:0;background:none;color:var(--muted);font-size:11px;font-weight:850;padding:6px 0;cursor:pointer}
 .hole-selector{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none}.hole-selector::-webkit-scrollbar{display:none}
-.hole-selector button{flex:0 0 auto;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-weight:900;cursor:pointer}
-.hole-selector button.active{border-color:rgba(184,234,104,.58);background:rgba(184,234,104,.12);color:var(--accent)}
-.course-preview-map{position:relative;min-height:440px;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:radial-gradient(circle at 50% 32%,#274432 0,#13251b 48%,#0c1711 100%);box-shadow:inset 0 0 70px rgba(0,0,0,.20)}
-.course-preview-map svg{display:block;width:100%;height:440px}
+.hole-selector button{flex:0 0 auto;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-weight:900;cursor:pointer}
+.hole-selector button.active{border-color:rgba(184,234,104,.55);background:rgba(184,234,104,.11);color:var(--accent)}
+.course-preview-map{position:relative;min-height:430px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#15271d,#0d1913);box-shadow:inset 0 0 60px rgba(0,0,0,.16)}
+.course-preview-map svg{display:block;width:100%;height:430px}
 .preview-map-head{position:absolute;z-index:2;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
-.preview-hole-title{background:rgba(7,16,12,.84);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px 11px}
+.preview-hole-title{background:rgba(7,16,12,.82);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px 11px}
 .preview-hole-title strong{font-size:18px;display:block}.preview-hole-title span{font-size:10px;color:var(--muted)}
 .preview-risk{pointer-events:none}
-.osm-fairway{fill:#47785a;stroke:#7ca787;stroke-width:1.2}.osm-green{fill:#86ad70;stroke:#c7e5a3;stroke-width:1.5}.osm-bunker{fill:#c8b98e;stroke:#f1dfaa;stroke-width:1.1}.osm-water{fill:#416d86;stroke:#76abc8;stroke-width:1.2}.osm-tee{fill:#729460;stroke:#bad89e;stroke-width:1.2}.osm-hole-line{fill:none;stroke:#d7f5b7;stroke-width:2.4;stroke-dasharray:7 5;opacity:.9}.osm-other{fill:#315541;stroke:#5f7e69;stroke-width:1;opacity:.55}.osm-pin{fill:#d7f5b7;stroke:#08110d;stroke-width:2}.osm-tee-dot{fill:#b8ea68;stroke:#08110d;stroke-width:2}
-.preview-map-empty{min-height:440px;display:grid;place-items:center;text-align:center;padding:42px 24px}.preview-map-empty strong{display:block;font-size:17px;margin-bottom:6px}.preview-map-empty span{font-size:11px;color:var(--muted);max-width:350px}
-.preview-attribution{font-size:9px;color:var(--muted);margin:6px 4px 0;text-align:right}.preview-attribution a{color:inherit}
+.geometry-fairway{fill:#47785a;stroke:#7ca787;stroke-width:1.2}.geometry-green{fill:#83aa6f;stroke:#c2df9c;stroke-width:1.4}.geometry-bunker{fill:#c8b98e;stroke:#f0dfaa;stroke-width:1.2}.geometry-water{fill:#426c85;stroke:#76a9c6;stroke-width:1.2}.geometry-tee{fill:#6f915f;stroke:#b8d59b;stroke-width:1.2}.geometry-hole{fill:#365843;stroke:#66816f;stroke-width:1}.geometry-line{fill:none;stroke:#9fc5a7;stroke-width:2;stroke-dasharray:4 3}.geometry-point{fill:#d7f5b7;stroke:#08110d;stroke-width:1.5}
+.preview-map-empty{min-height:430px;display:grid;place-items:center;text-align:center;padding:42px 24px}.preview-map-empty strong{display:block;font-size:17px;margin-bottom:6px}.preview-map-empty span{font-size:11px;color:var(--muted);max-width:320px}
+.preview-attribution{font-size:9px;color:var(--muted);margin:6px 4px 0;text-align:right}
 .preview-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.preview-stat{padding:12px;text-align:center}.preview-stat strong{display:block;font-size:20px}.preview-stat span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
-.preview-current-card>.hole-card{outline:1px solid rgba(184,234,104,.48);box-shadow:0 0 0 2px rgba(184,234,104,.07)}
-.preview-osm-note{font-size:10px;color:var(--muted);margin-top:7px}
-button.score-box{font:inherit;color:inherit;padding:0;cursor:pointer}
-button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
+.preview-current-card{outline:1px solid rgba(184,234,104,.35)}
+.preview-provider{font-size:10px;color:var(--muted);margin-top:5px}
 @media(max-width:640px){.course-preview-map,.course-preview-map svg,.preview-map-empty{min-height:360px;height:360px}.preview-stat-grid{grid-template-columns:repeat(2,1fr)}}
 
 
-/* v12.9 Satellite Course Preview */
-.satellite-stack{position:absolute;inset:0;overflow:hidden;background:#101410}
-.satellite-tile{position:absolute;width:256px;height:256px;max-width:none;pointer-events:none;user-select:none;-webkit-user-drag:none}
-.satellite-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
-.sat-fairway{fill:rgba(184,234,104,.055);stroke:rgba(184,234,104,.68);stroke-width:2.2;vector-effect:non-scaling-stroke}
-.sat-green{fill:rgba(184,234,104,.18);stroke:rgba(211,255,145,.95);stroke-width:2.5;vector-effect:non-scaling-stroke}
-.sat-bunker{fill:rgba(255,212,0,.12);stroke:rgba(255,224,111,.92);stroke-width:2;vector-effect:non-scaling-stroke}
-.sat-water{fill:rgba(68,169,238,.11);stroke:rgba(103,194,255,.86);stroke-width:2;vector-effect:non-scaling-stroke}
-.sat-tee{fill:rgba(184,234,104,.14);stroke:rgba(184,234,104,.92);stroke-width:2.2;vector-effect:non-scaling-stroke}
-.sat-other{fill:transparent;stroke:rgba(255,255,255,.22);stroke-width:1.2;vector-effect:non-scaling-stroke}
-.sat-hole-line{fill:none;stroke:#d7ff9f;stroke-width:3;stroke-dasharray:8 6;vector-effect:non-scaling-stroke;filter:drop-shadow(0 1px 2px rgba(0,0,0,.85))}
-.sat-tee-dot{fill:#b8ea68;stroke:#08110d;stroke-width:2.5;vector-effect:non-scaling-stroke}.sat-pin{fill:#fff;stroke:#08110d;stroke-width:2.5;vector-effect:non-scaling-stroke}
-.sat-label{fill:#fff;font-size:12px;font-weight:900;paint-order:stroke;stroke:#07100c;stroke-width:4px;stroke-linejoin:round}
-.satellite-north{position:absolute;right:10px;bottom:10px;z-index:2;background:rgba(5,12,9,.74);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:5px 7px;color:#fff;font-size:10px;font-weight:900;backdrop-filter:blur(5px)}
-.preview-map-head{z-index:3}
-
-
-/* v13.0 Mapbox Course Preview */
-.preview-hero-grid{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:12px;align-items:stretch}
-.preview-hero-grid .course-preview-map{min-width:0}
-.preview-stats-column{display:flex;flex-direction:column;gap:7px;min-width:0}
-.preview-side-card{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:42px}
-.preview-side-card strong{font-size:17px;line-height:1}.preview-side-card span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:right}
-.preview-side-card.risk-card{min-height:48px}.preview-side-card.risk-card strong{display:flex;align-items:center;gap:8px;font-size:14px}
-.preview-read-card{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-top:1px;flex:1;min-height:92px;overflow:hidden}
-.preview-read-card .eyebrow{font-size:9px}.preview-read-card p{font-size:11px;line-height:1.35;margin:6px 0 0;color:#dce6e1}
-.mapbox-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 9px;font-size:10px;color:var(--muted)}
-.mapbox-row button{border:1px solid var(--line);background:#13211b;color:var(--text);border-radius:999px;padding:5px 9px;font-size:10px;font-weight:800}
-.mapbox-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;background:var(--warning)}.mapbox-dot.ready{background:var(--good)}
-.mapbox-missing{border:1px solid rgba(255,212,0,.32);background:rgba(255,212,0,.06);border-radius:12px;padding:8px 10px;font-size:10px;color:#eadf9d;margin-bottom:9px}
-.satellite-stack.mapbox-live:after{content:'MAPBOX SATELLITE';position:absolute;left:10px;bottom:10px;z-index:2;background:rgba(5,12,9,.72);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:4px 7px;color:#fff;font-size:9px;font-weight:900;letter-spacing:.04em;backdrop-filter:blur(5px)}
-@media(max-width:760px){.preview-hero-grid{grid-template-columns:1fr}.preview-stats-column{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.preview-read-card{grid-column:1/-1}.preview-side-card{min-height:48px}.course-preview-map,.course-preview-map svg,.preview-map-empty{min-height:390px;height:390px}}
-
-
-/* v13.1 Interactive Course Preview */
-.course-preview-map{height:520px;min-height:520px}
-#coursePreviewMap{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-.course-preview-map .mapboxgl-map{font:inherit}
-.course-preview-map .mapboxgl-ctrl-top-right{top:76px;right:6px}
-.course-preview-map .mapboxgl-ctrl-group{border-radius:11px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.35)}
-.course-preview-map .mapboxgl-ctrl button{width:34px;height:34px}
-.course-preview-map .mapboxgl-ctrl-attrib{background:rgba(5,12,9,.72);color:#dce6e1}
-.course-preview-map .mapboxgl-ctrl-attrib a{color:#dce6e1}
-.preview-map-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:10px;color:var(--muted)}
-.preview-map-tools button{border:1px solid var(--line);background:#13211b;color:var(--text);border-radius:999px;padding:6px 10px;font-size:10px;font-weight:850}
-.preview-map-tools span{min-width:0}
-.preview-hero-grid{grid-template-columns:minmax(0,1fr) 258px}
-.preview-side-card{min-height:41px}
-.preview-read-card{min-height:88px}
-@media(max-width:760px){.course-preview-map{height:430px;min-height:430px}.preview-map-tools{align-items:flex-start;flex-direction:column}.preview-map-tools button{align-self:flex-start}}
-
-
-/* v13.4 embedded Pregame Hole Insights */
-.pregame-hole-insights{scroll-margin-top:110px}
-.pregame-hole-insights .section-head{margin-bottom:10px}
-.pregame-hole-insights .hole-selector{margin-bottom:10px}
-.pregame-hole-insights .preview-hero-grid{margin-top:0}
-.pregame-hole-insights .mapbox-missing{margin-bottom:10px}
-
-
-/* v13.6 Pregame sticky command header */
-.pregame-hero{
-  position:sticky;top:8px;z-index:24;
-  margin:0 0 16px!important;padding:15px 18px 14px;
-  border-radius:20px;
-  background:linear-gradient(145deg,rgba(27,42,36,.97),rgba(17,26,23,.97));
-  backdrop-filter:blur(15px);-webkit-backdrop-filter:blur(15px);
-  box-shadow:0 12px 30px rgba(0,0,0,.34),0 0 0 1px rgba(184,234,104,.04);
-}
-.pregame-hero .hero-copy{max-width:none}
-.pregame-hero-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,300px);align-items:end;gap:16px}
-.pregame-hero-title{min-width:0}
-.pregame-hero .eyebrow{font-size:9px;letter-spacing:.14em}
-.pregame-hero h2{font-size:26px;line-height:1.02;margin:3px 0 0}
-.pregame-course-picker{display:grid;gap:4px;min-width:0}
-.pregame-course-picker span{font-size:8px;letter-spacing:.13em;font-weight:900;color:var(--accent)}
-.pregame-course-select{width:100%;height:36px;padding:6px 34px 6px 10px;border-radius:11px;border:1px solid rgba(184,234,104,.28);background:#102019;color:var(--text);font-size:11px;font-weight:800}
-.pregame-course-meta{margin:7px 0 0!important;font-size:11px;line-height:1.25}
-.pregame-hero .course-stat-lines{margin-top:9px;border-radius:12px;padding:0 9px}
-.pregame-hero .course-stat-row{padding:6px 0}
-.pregame-hero .course-stat strong{font-size:13px}
-.pregame-hero .course-stat span,.pregame-hero .course-stat-row .row-label{font-size:8px}
-
-/* v13.6 compact Game Keys */
-.game-keys-card{margin:14px 0 10px;padding:13px 16px 11px}
-.game-keys-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px}
-.game-keys-title h2{font-size:17px;line-height:1.1;margin:0}
-.game-keys-title .eyebrow{font-size:9px}
-.game-keys-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
-.game-key-column{min-width:0}
-.game-key-group{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08)}
-.game-key-column .game-key-group:last-child{border-bottom:0}
-.game-key-group strong{font-size:10px;display:block;margin-bottom:4px}
-.game-key-list{margin-top:0;display:flex;gap:5px;flex-wrap:wrap}
-.game-key-pill{font-size:9px;padding:4px 7px;line-height:1.2}
-@media(max-width:640px){
-  .pregame-hero{top:4px;padding:12px 12px 11px;border-radius:17px}
-  .pregame-hero-head{grid-template-columns:1fr;gap:7px;align-items:start}
-  .pregame-hero h2{font-size:23px}
-  .pregame-course-picker{grid-template-columns:44px minmax(0,1fr);align-items:center;gap:6px}
-  .pregame-course-picker span{font-size:7px}
-  .pregame-course-select{height:33px;font-size:10px}
-  .pregame-course-meta{font-size:10px;margin-top:5px!important}
-  .pregame-hero .course-stat-lines{margin-top:7px}
-  .pregame-hero .course-stat-row{padding:5px 0}
-  .game-keys-card{padding:12px 13px 10px}
-  .game-keys-title{display:block;margin-bottom:5px}.game-keys-title h2{font-size:16px;margin-top:2px}
-  .game-keys-grid{grid-template-columns:1fr 1fr;gap:0 12px}
-  .game-key-group{padding:6px 0}
-  .game-key-pill{font-size:8px;padding:4px 6px}
-}
-
-
-/* v13.7 tighter sticky Pregame header */
-.pregame-hero{
-  padding:10px 14px 9px;
-  border-radius:17px;
-  margin-bottom:12px!important;
-}
-.pregame-hero-head{
-  grid-template-columns:minmax(0,1fr) minmax(200px,280px);
-  align-items:end;
-  gap:12px;
-}
-.pregame-title-line{
-  display:flex;
-  align-items:baseline;
-  gap:10px;
-  flex-wrap:wrap;
-  min-width:0;
-}
-.pregame-hero h2{
-  font-size:23px;
-  margin:2px 0 0;
-  white-space:nowrap;
-}
-.pregame-course-meta{
-  margin:0!important;
-  font-size:10px;
-  line-height:1.15;
-  white-space:nowrap;
-}
-.pregame-course-picker{
-  align-self:end;
-  margin-bottom:-2px;
-}
-.pregame-course-picker span{font-size:7px}
-.pregame-course-select{
-  height:32px;
-  padding:4px 30px 4px 9px;
-  border-radius:10px;
-  font-size:10px;
-}
-.pregame-hero .course-stat-lines{
-  margin-top:5px;
-  border-radius:10px;
-  padding:0 8px;
-}
-.pregame-hero .course-stat-row{padding:4px 0}
-.pregame-hero .course-stat strong{font-size:12px}
-.pregame-hero .course-stat span,.pregame-hero .course-stat-row .row-label{font-size:7px}
-@media(max-width:640px){
-  .pregame-hero{padding:9px 10px 8px}
-  .pregame-hero-head{grid-template-columns:1fr;gap:4px}
-  .pregame-title-line{gap:7px}
-  .pregame-hero h2{font-size:20px}
-  .pregame-course-meta{font-size:9px;white-space:normal}
-  .pregame-course-picker{grid-template-columns:40px minmax(0,1fr);margin-bottom:0}
-  .pregame-course-select{height:30px}
-  .pregame-hero .course-stat-lines{margin-top:4px}
-  .pregame-hero .course-stat-row{padding:4px 0}
-}
+button.score-box{font:inherit;color:inherit;padding:0;cursor:pointer}
+button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 
 
 
-/* =========================================================
-   GOLF RECON v14 — Data-Tech + Recon visual system
-   ========================================================= */
+/* v14 Golf Recon visual system overrides */
 :root{
-  --bg:#050d0b;
-  --panel:#0b1713;
-  --panel2:#10211a;
-  --line:#234235;
+  --bg:#07110e;
+  --panel:#0f1a16;
+  --panel2:#15241f;
+  --line:#284238;
   --text:#f4f8f5;
-  --muted:#95ada2;
-  --accent:#baff67;
-  --accent2:#38c9ff;
-  --warning:#ffd400;
-  --danger:#ff4d4f;
-  --good:#35dc72;
+  --muted:#9cb1a7;
+  --accent:#b9f36a;
+  --accent2:#53b7ff;
   --shadow:0 18px 42px rgba(0,0,0,.34);
 }
-html{background:#050d0b}
+html{background:var(--bg)}
 body{
-  min-height:100vh;
   background:
-    radial-gradient(circle at 18% -8%,rgba(107,211,145,.18),transparent 30%),
-    radial-gradient(circle at 108% 6%,rgba(56,201,255,.11),transparent 27%),
-    linear-gradient(180deg,#07120e 0%,#050d0b 52%,#040a08 100%);
+    radial-gradient(circle at 18% -8%, rgba(94,201,134,.16), transparent 32%),
+    radial-gradient(circle at 108% 8%, rgba(83,183,255,.12), transparent 26%),
+    linear-gradient(180deg,#08120f 0%,#07110e 42%,#050d0b 100%);
   color:var(--text);
   position:relative;
   overflow-x:hidden;
 }
 body::before{
   content:'';
-  position:fixed;inset:0;z-index:0;pointer-events:none;
+  position:fixed;
+  inset:0;
+  pointer-events:none;
   background-image:
-    linear-gradient(rgba(138,221,176,.03) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(138,221,176,.03) 1px,transparent 1px),
-    repeating-radial-gradient(circle at 12% 28%,transparent 0 34px,rgba(186,255,103,.028) 34px 35px,transparent 35px 69px),
-    repeating-radial-gradient(circle at 86% 70%,transparent 0 42px,rgba(56,201,255,.021) 42px 43px,transparent 43px 85px);
-  background-size:28px 28px,28px 28px,auto,auto;
-  opacity:.7;
+    linear-gradient(rgba(146,235,192,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(146,235,192,.035) 1px, transparent 1px),
+    radial-gradient(circle at 12% 24%, rgba(185,243,106,.05), transparent 24%),
+    radial-gradient(circle at 88% 76%, rgba(83,183,255,.05), transparent 28%);
+  background-size:26px 26px,26px 26px,auto,auto;
+  opacity:.34;
+  mix-blend-mode:screen;
 }
 body::after{
-  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:linear-gradient(90deg,rgba(186,255,103,.018),transparent 28%,transparent 72%,rgba(56,201,255,.015));
+  content:'';
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background:
+    repeating-radial-gradient(circle at 18% 30%, transparent 0 28px, rgba(185,243,106,.03) 28px 30px, transparent 30px 60px),
+    repeating-radial-gradient(circle at 76% 66%, transparent 0 34px, rgba(83,183,255,.025) 34px 36px, transparent 36px 72px);
+  opacity:.28;
 }
-.app-shell,.auth-screen{position:relative;z-index:1}
-.app-shell{max-width:1040px;padding-top:14px}
-
-.topbar{margin-bottom:16px;min-height:62px}
-.gr-brand{gap:11px}
-.gr-mark{
-  width:52px;height:52px;border-radius:17px!important;
-  border:1px solid rgba(186,255,103,.56)!important;
-  background:linear-gradient(145deg,rgba(25,54,38,.97),rgba(7,21,15,.97))!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 0 22px rgba(186,255,103,.10)!important;
-  overflow:visible;
+.app-shell{max-width:1040px;position:relative;z-index:1}
+.card,.hero,.global-course-bar,.dialog-card,.bottom-nav,.auth-card{
+  border-color:rgba(169,220,195,.16)!important;
+  background:linear-gradient(180deg,rgba(12,21,18,.94),rgba(10,18,15,.92))!important;
+  box-shadow:
+    0 16px 38px rgba(0,0,0,.32),
+    inset 0 1px 0 rgba(255,255,255,.03),
+    0 0 0 1px rgba(123,203,163,.03),
+    0 0 18px rgba(185,243,106,.04)!important;
 }
-.gr-mark:before{height:72%!important;top:14%!important;left:50%!important;opacity:.55!important;box-shadow:0 0 8px rgba(186,255,103,.35)}
-.gr-mark:after{width:72%!important;left:14%!important;top:50%!important;opacity:.55!important;box-shadow:0 0 8px rgba(186,255,103,.35)}
-.gr-cross{font-size:18px!important;letter-spacing:-.09em!important;text-shadow:0 0 14px rgba(255,255,255,.13)}
-.gr-flag{right:-4px!important;top:-6px!important;color:var(--accent)!important;font-size:13px!important;text-shadow:0 0 10px rgba(186,255,103,.55)}
-.gr-word strong{font-size:17px!important;letter-spacing:.13em!important;text-shadow:0 0 14px rgba(186,255,103,.10)}
-.gr-word small{font-size:7px!important;letter-spacing:.19em!important;color:#a9c1b5!important;margin-top:6px!important}
-.brand-meta{margin-top:6px!important;gap:6px!important}
+.hero{
+  background:
+    linear-gradient(145deg,rgba(18,30,25,.97),rgba(10,17,15,.93))!important;
+  position:relative;
+  overflow:hidden;
+}
+.hero::after,.global-course-bar::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(120deg,transparent 0, rgba(185,243,106,.04) 45%, transparent 70%);
+}
+.topbar{margin-bottom:18px}
+.brand-title{
+  font-size:20px;
+  text-transform:uppercase;
+  letter-spacing:.22em;
+  color:#eef8f3;
+  text-shadow:0 0 16px rgba(185,243,106,.12);
+}
+.brand-meta{gap:6px}
 .giq-logo{
-  border:1px solid rgba(186,255,103,.13);border-radius:16px;
-  background:linear-gradient(180deg,rgba(16,38,28,.72),rgba(6,18,13,.35));
-  padding:8px 14px 11px!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025),0 0 25px rgba(186,255,103,.04);
+  font-size:40px;
+  letter-spacing:-1px;
+  gap:4px;
+  align-items:flex-end;
+  padding:4px 10px 10px;
+  filter:drop-shadow(0 0 12px rgba(185,243,106,.18));
 }
-.giq-logo::after{background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent)!important}
-
-.card,.hero,.global-course-bar,.dialog-card,.auth-card,.direction-card,.course-stat-lines,.chat-msg.assistant{
-  background:linear-gradient(180deg,rgba(10,24,18,.965),rgba(7,17,13,.955))!important;
-  border-color:rgba(138,206,169,.18)!important;
-  box-shadow:0 15px 34px rgba(0,0,0,.27),inset 0 1px 0 rgba(255,255,255,.025),0 0 0 1px rgba(186,255,103,.018)!important;
+.giq-logo::before{
+  content:'';
+  position:absolute;
+  inset:-6px -10px 0;
+  border-radius:18px;
+  background:radial-gradient(circle at 50% 0, rgba(83,183,255,.08), transparent 62%);
+  z-index:-1;
 }
-.card,.hero,.global-course-bar{position:relative}
-.card::before,.hero::before,.global-course-bar::before{
-  content:'';position:absolute;width:18px;height:18px;left:-1px;top:-1px;pointer-events:none;
-  border-left:2px solid rgba(186,255,103,.45);border-top:2px solid rgba(186,255,103,.45);border-radius:inherit 0 0 0;
-  opacity:.75;
+.giq-logo::after{
+  left:10%;
+  right:10%;
+  bottom:1px;
+  height:2px;
+  background:linear-gradient(90deg,transparent,rgba(185,243,106,.9),rgba(83,183,255,.7),transparent);
+  box-shadow:0 0 10px rgba(185,243,106,.32);
 }
-.hero{overflow:visible}
-.section-head .eyebrow,.eyebrow{color:var(--accent)!important;text-shadow:0 0 12px rgba(186,255,103,.14)}
-.section-head h2{letter-spacing:-.025em}
-.muted{color:var(--muted)}
-
-.global-course-select,.pregame-course-select,.course-dropdown,.target-select,.chat-input,.edit-form input,.edit-form select,input,select,textarea{
-  background:#091712!important;border-color:rgba(157,215,186,.22)!important;color:var(--text)!important;
+.giq-g{color:#f4f8f5}
+.giq-q{color:var(--accent);position:relative}
+.giq-q::after{
+  content:'';
+  position:absolute;
+  width:11px;
+  height:3px;
+  background:var(--accent2);
+  right:-5px;
+  bottom:-5px;
+  transform:rotate(38deg);
+  border-radius:999px;
+  box-shadow:0 0 7px rgba(83,183,255,.4);
 }
-.global-course-select:focus,.pregame-course-select:focus,.course-dropdown:focus,.chat-input:focus,input:focus,select:focus,textarea:focus{
-  border-color:rgba(186,255,103,.62)!important;
-  box-shadow:0 0 0 2px rgba(186,255,103,.075),0 0 18px rgba(186,255,103,.06)!important;
+.global-course-bar{
+  border-color:rgba(185,243,106,.18)!important;
+  box-shadow:0 14px 32px rgba(0,0,0,.24),0 0 0 1px rgba(185,243,106,.04),0 0 24px rgba(185,243,106,.05)!important;
 }
-.button.primary{background:linear-gradient(180deg,#c9ff78,#9ee85b)!important;color:#10200f!important;box-shadow:0 0 20px rgba(186,255,103,.13)!important}
-.button.secondary,.filter-tab,.game-tab,.stat-tab,.course-pill,.putting-round,.game-round-btn,.chat-prompt,.chat-clear,.scope-toggle .filter-tab{
-  background:linear-gradient(180deg,rgba(18,37,29,.95),rgba(10,24,18,.95))!important;border-color:rgba(133,196,163,.20)!important;
+.global-course-select,.course-dropdown,.target-select,.chat-input,.edit-form input,.edit-form select{
+  background:#101c18!important;
+  border-color:rgba(185,243,106,.22)!important;
 }
-.filter-tab.active,.game-tab.active,.stat-tab.active,.course-pill.active,.putting-round.active,.game-round-btn.active{
-  background:linear-gradient(180deg,rgba(186,255,103,.20),rgba(52,103,67,.28))!important;
-  color:#eaffd3!important;border-color:rgba(186,255,103,.55)!important;box-shadow:0 0 18px rgba(186,255,103,.07)!important;
+.button.primary{
+  background:linear-gradient(180deg,#c6fb73,#99dc58)!important;
+  color:#122014!important;
+  box-shadow:0 0 18px rgba(185,243,106,.16);
 }
-
-.pregame-hero{
-  top:6px!important;
-  background:linear-gradient(150deg,rgba(12,29,21,.985),rgba(6,18,13,.98))!important;
-  border-color:rgba(186,255,103,.24)!important;
-  box-shadow:0 18px 38px rgba(0,0,0,.38),0 0 22px rgba(186,255,103,.05)!important;
+.button.secondary,.mini-link,.chat-prompt,.stat-tab,.course-pill,.game-round-btn,.filter-tab,.chat-clear{
+  box-shadow:0 0 0 1px rgba(255,255,255,.02),0 0 12px rgba(83,183,255,.03);
 }
-.pregame-hero .course-stat-lines{background:rgba(4,14,10,.50)!important}
-.pregame-course-select{border-color:rgba(186,255,103,.30)!important}
-
-.bar{background:linear-gradient(180deg,var(--accent),#62d79b,var(--accent2))!important;box-shadow:0 0 12px rgba(56,201,255,.08)}
-.chart-card,.tendency-card{overflow:hidden}
-.chart-head strong{letter-spacing:-.02em}
-.badge{background:#10241b!important;border:1px solid rgba(143,205,173,.15)}
-.game-key-pill{background:rgba(186,255,103,.055)!important;border-color:rgba(186,255,103,.25)!important;color:#e5f7dc!important}
-.game-keys-card{border-color:rgba(186,255,103,.17)!important}
-.direction-center{background:linear-gradient(145deg,#217fea,#39c9ff)!important;box-shadow:0 0 20px rgba(56,201,255,.12)}
-.direction-ring{border-color:rgba(56,201,255,.15)!important}
-
-.hole-card{background:linear-gradient(180deg,rgba(13,30,22,.97),rgba(8,20,15,.97))!important}
-.hole-preview-btn,.hole-ref-link{background:rgba(186,255,103,.065)!important;border-color:rgba(186,255,103,.28)!important}
-
-.chat-msg.assistant{border-left:2px solid rgba(186,255,103,.42)!important}
-.chat-msg.user{background:linear-gradient(180deg,rgba(39,69,51,.97),rgba(25,48,35,.96))!important;border-color:rgba(186,255,103,.20)!important}
-.chat-msg.assistant strong,.chat-section{color:var(--accent)!important}
-
-.bottom-nav{
-  background:rgba(5,14,10,.96)!important;
-  border-color:rgba(159,214,185,.25)!important;outline:1px solid rgba(255,255,255,.04)!important;
-  box-shadow:0 14px 34px rgba(0,0,0,.43),0 0 20px rgba(186,255,103,.06)!important;
-}
-.nav-item{transition:background .18s ease,color .18s ease,box-shadow .18s ease}
 .nav-item.active{
-  background:linear-gradient(180deg,rgba(186,255,103,.16),rgba(56,201,255,.055))!important;
-  color:#efffe9!important;box-shadow:inset 0 0 0 1px rgba(186,255,103,.22),0 0 17px rgba(186,255,103,.055)!important;
+  background:linear-gradient(180deg,rgba(185,243,106,.16),rgba(83,183,255,.06))!important;
+  color:var(--text)!important;
+  box-shadow:inset 0 0 0 1px rgba(185,243,106,.2),0 0 16px rgba(185,243,106,.08);
 }
-.nav-item.active span{filter:drop-shadow(0 0 6px rgba(186,255,103,.24))}
-.groups-hero{background:linear-gradient(145deg,rgba(13,31,22,.98),rgba(7,19,14,.97))!important}
-.coming-badge{background:rgba(186,255,103,.055);border-color:rgba(186,255,103,.30)!important}
-.auth-screen{background:radial-gradient(circle at 50% 0,rgba(56,201,255,.07),transparent 34%),radial-gradient(circle at 25% 18%,rgba(186,255,103,.08),transparent 28%),linear-gradient(180deg,#07120e,#050d0b)!important}
-
-@media(max-width:700px){
-  .app-shell{padding:10px 10px 98px}.topbar{margin-bottom:12px}
-  .gr-mark{width:43px;height:43px;border-radius:13px!important}
-  .gr-word strong{font-size:13px!important;letter-spacing:.10em!important}
-  .gr-word small{display:none!important}
-  .giq-logo{font-size:28px!important;padding:7px 8px 9px!important}
-  .card{border-radius:16px}.hero{border-radius:18px}
+.bottom-nav{
+  background:rgba(8,16,13,.94)!important;
+  border-color:rgba(185,243,106,.18)!important;
+  outline:1px solid rgba(255,255,255,.08)!important;
+  box-shadow:0 14px 30px rgba(0,0,0,.42),0 0 0 1px rgba(185,243,106,.08),0 0 18px rgba(185,243,106,.08)!important;
+}
+.section-head h2,.hero h2{letter-spacing:-.03em}
+.eyebrow{color:#cbff78;text-shadow:0 0 12px rgba(185,243,106,.14)}
+.metric,.score-big,.hole-number,.hole-score{color:#f5f9f6}
+.chat-msg.user{background:linear-gradient(180deg,rgba(40,64,49,.95),rgba(30,48,38,.92));border-color:rgba(185,243,106,.18)}
+.chat-msg.assistant{background:linear-gradient(180deg,rgba(18,31,26,.94),rgba(14,24,20,.92))}
+.auth-screen{background:radial-gradient(circle at 50% 0, rgba(83,183,255,.08), transparent 40%), linear-gradient(180deg,#08120f,#07110e)}
+@media(max-width:560px){
+  .brand-title{font-size:16px;letter-spacing:.16em}
+  .giq-logo{font-size:32px;padding:4px 4px 8px}
 }
 
 
-
-/* =========================================================
-   GOLF RECON v14.1 — deeper visual conversion
-   ========================================================= */
+/* v14.1 deeper visual conversion */
 :root{
-  --bg:#030806;
-  --panel:#0b1511;
-  --panel2:#102019;
-  --line:#28483a;
-  --text:#f3f8f5;
-  --muted:#9fb4ab;
-  --accent:#c7ff66;
-  --accent2:#43b4ff;
-  --accent3:#79ffd2;
-  --shadow:0 20px 46px rgba(0,0,0,.44);
+  --bg:#040a08;
+  --panel:#0d1613;
+  --panel2:#12211c;
+  --panel3:#172a23;
+  --line:#234137;
+  --line-soft:rgba(180,244,116,.14);
+  --text:#f2f7f5;
+  --muted:#9eb3ab;
+  --accent:#c4ff63;
+  --accent2:#4da7ff;
+  --accent3:#77ffd1;
+  --shadow:0 18px 42px rgba(0,0,0,.42);
 }
-html{background:#030806}
 body{
+  font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at 14% -5%,rgba(121,255,210,.13),transparent 25%),
-    radial-gradient(circle at 96% 2%,rgba(67,180,255,.12),transparent 23%),
-    radial-gradient(circle at 72% 86%,rgba(199,255,102,.08),transparent 29%),
-    linear-gradient(180deg,#06100c 0%,#030806 54%,#020604 100%)!important;
-  color:var(--text);
-  position:relative;
-  overflow-x:hidden;
+    radial-gradient(circle at 14% -6%, rgba(115,255,209,.11), transparent 24%),
+    radial-gradient(circle at 94% 2%, rgba(77,167,255,.10), transparent 22%),
+    radial-gradient(circle at 75% 82%, rgba(196,255,99,.07), transparent 28%),
+    linear-gradient(180deg,#06100d 0%, #040a08 48%, #030806 100%);
 }
 body::before{
   content:'';
   position:fixed;
   inset:0;
   pointer-events:none;
-  z-index:0;
   background-image:
-    linear-gradient(rgba(199,255,102,.044) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(199,255,102,.044) 1px,transparent 1px),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='620' height='620' viewBox='0 0 620 620'%3E%3Cg fill='none' stroke='%2379ffd2' stroke-opacity='.075' stroke-width='1.2'%3E%3Cpath d='M-20 130 C70 70 135 165 225 115 S385 35 505 115 S650 145 705 85'/%3E%3Cpath d='M-25 170 C65 110 145 200 235 150 S395 70 520 150 S650 180 710 120'/%3E%3Cpath d='M-30 210 C55 150 150 235 250 188 S420 110 540 190 S670 215 725 165'/%3E%3Cpath d='M-20 405 C65 350 135 435 230 388 S395 315 505 385 S650 425 710 365'/%3E%3Cpath d='M-15 445 C70 390 150 475 245 425 S410 355 530 425 S655 465 720 405'/%3E%3C/g%3E%3C/svg%3E");
-  background-size:34px 34px,34px 34px,620px 620px;
-  opacity:.64;
+    linear-gradient(rgba(196,255,99,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(196,255,99,.045) 1px, transparent 1px),
+    radial-gradient(circle at 16% 24%, rgba(196,255,99,.06), transparent 22%),
+    radial-gradient(circle at 76% 72%, rgba(77,167,255,.055), transparent 24%);
+  background-size:34px 34px,34px 34px,auto,auto;
+  opacity:.26;
+  mix-blend-mode:screen;
 }
 body::after{
   content:'';
   position:fixed;
   inset:0;
   pointer-events:none;
-  z-index:0;
   background:
-    repeating-radial-gradient(circle at 12% 20%,transparent 0 38px,rgba(199,255,102,.026) 38px 40px,transparent 40px 78px),
-    repeating-radial-gradient(circle at 83% 73%,transparent 0 48px,rgba(67,180,255,.024) 48px 50px,transparent 50px 96px);
-  opacity:.42;
+    repeating-radial-gradient(circle at 12% 18%, transparent 0 36px, rgba(196,255,99,.03) 36px 38px, transparent 38px 76px),
+    repeating-radial-gradient(circle at 82% 74%, transparent 0 44px, rgba(77,167,255,.028) 44px 46px, transparent 46px 88px),
+    linear-gradient(transparent 0, rgba(255,255,255,.015) 50%, transparent 100%);
+  opacity:.3;
 }
-.app-shell,.auth-gate{position:relative;z-index:1}
-.app-shell{max-width:1180px;padding:16px 20px 108px}
-
+.app-shell{max-width:1180px;padding:18px 20px 106px;position:relative;z-index:1}
 .topbar{
-  min-height:76px;
-  padding:13px 18px;
+  background:linear-gradient(180deg, rgba(14,25,21,.93), rgba(8,15,12,.92));
+  border:1px solid var(--line-soft);
+  border-radius:22px;
+  padding:14px 18px;
+  box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03), 0 0 30px rgba(77,167,255,.06);
   margin-bottom:14px;
-  border:1px solid rgba(199,255,102,.17);
-  border-radius:16px;
-  background:
-    linear-gradient(110deg,rgba(15,30,23,.97),rgba(8,16,13,.96) 58%,rgba(10,24,26,.94));
-  box-shadow:0 20px 44px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.03),0 0 28px rgba(67,180,255,.055);
   overflow:hidden;
 }
 .topbar::before{
   content:'';
-  position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(90deg,transparent,rgba(199,255,102,.045),transparent 46%,rgba(67,180,255,.035),transparent);
-}
-.topbar::after{
-  content:'';position:absolute;left:18px;right:18px;bottom:0;height:1px;pointer-events:none;
-  background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);opacity:.55;
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(90deg, transparent, rgba(196,255,99,.035), transparent),
+    linear-gradient(180deg, rgba(77,167,255,.04), transparent 24%);
+  pointer-events:none;
 }
 .topbar-left,.topbar-right,.giq-logo{position:relative;z-index:1}
-.gr-brand{gap:12px}
-.gr-mark{
-  width:56px!important;height:56px!important;border-radius:12px!important;
-  border:1px solid rgba(199,255,102,.62)!important;
-  background:linear-gradient(145deg,rgba(24,54,38,.98),rgba(6,20,14,.98))!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.045),0 0 22px rgba(199,255,102,.12)!important;
+.brand-title{
+  font-size:28px;
+  line-height:1;
+  letter-spacing:.3em;
+  font-weight:950;
+  text-transform:uppercase;
+  color:#f4fbf6;
 }
-.gr-mark:before{box-shadow:0 0 8px rgba(199,255,102,.35)}
-.gr-mark:after{box-shadow:0 0 8px rgba(199,255,102,.35)}
-.gr-cross{font-size:19px!important}
-.gr-flag{color:var(--accent2)!important;text-shadow:0 0 10px rgba(67,180,255,.5)}
-.gr-word strong{font-size:20px!important;letter-spacing:.15em!important;color:#f5faf7}
-.gr-word small{font-size:7px!important;letter-spacing:.22em!important;color:#9eb4aa!important}
-.brand-meta{margin-top:6px!important;letter-spacing:.10em;text-transform:uppercase}
+.brand-meta{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:7px;
+  color:var(--muted);
+  text-transform:uppercase;
+  font-size:11px;
+  letter-spacing:.12em;
+}
 .giq-logo{
-  font-size:42px!important;
-  border:1px solid rgba(199,255,102,.15)!important;
-  border-radius:12px!important;
-  background:linear-gradient(180deg,rgba(18,40,29,.78),rgba(5,17,12,.48))!important;
-  padding:7px 14px 10px!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025),0 0 24px rgba(199,255,102,.045)!important;
+  font-size:48px;
+  font-weight:1000;
+  letter-spacing:-2px;
+  padding:6px 16px 10px;
+  position:relative;
 }
-.giq-logo::after{background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent)!important}
-
+.giq-logo::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  border:1px solid rgba(196,255,99,.16);
+  border-radius:16px;
+  clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  background:linear-gradient(180deg, rgba(77,167,255,.06), rgba(196,255,99,.03));
+}
+.giq-g,.giq-q{position:relative;z-index:1}
+.giq-g{color:#eff6f1;text-shadow:0 0 18px rgba(255,255,255,.08)}
+.giq-q{color:var(--accent);text-shadow:0 0 18px rgba(196,255,99,.26)}
+.giq-q::after{background:var(--accent2)!important; box-shadow:0 0 10px rgba(77,167,255,.45)!important}
+.user-chip{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#d3efe0}
+.mini-link,.topbar-right .button.secondary{
+  background:rgba(17,30,25,.9)!important;
+  border:1px solid rgba(196,255,99,.16)!important;
+  color:#eff6f1!important;
+}
 .global-course-bar{
-  top:7px!important;
-  margin-bottom:18px!important;
-  padding:12px 14px!important;
-  border-radius:14px!important;
-  background:linear-gradient(180deg,rgba(14,29,22,.965),rgba(7,18,13,.965))!important;
-  border-color:rgba(199,255,102,.19)!important;
-  box-shadow:0 16px 36px rgba(0,0,0,.31),0 0 26px rgba(199,255,102,.05)!important;
+  position:sticky;
+  top:8px;
+  z-index:10;
+  padding:14px 16px;
+  border-radius:22px;
+  margin-bottom:16px;
+  background:linear-gradient(180deg, rgba(16,30,25,.94), rgba(10,19,16,.94))!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.28), 0 0 0 1px rgba(196,255,99,.05), 0 0 26px rgba(196,255,99,.06)!important;
 }
-.global-course-label strong{font-size:16px!important;letter-spacing:-.01em}
-.global-course-select{height:40px;border-radius:10px!important;background:#0d1d17!important;border-color:rgba(199,255,102,.22)!important}
-
-.card,.hero,.chart-card,.dialog-card,.auth-card,.direction-card,.tendency-card,.hole-card,.course-stat-lines,.chat-msg.assistant{
-  background:linear-gradient(180deg,rgba(13,25,20,.975),rgba(8,16,13,.965))!important;
-  border-color:rgba(165,220,192,.15)!important;
-  border-radius:14px!important;
-  box-shadow:0 18px 42px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.025),0 0 22px rgba(67,180,255,.03)!important;
+.global-course-label .eyebrow{font-size:10px;letter-spacing:.18em;margin-bottom:2px;display:block}
+.global-course-label strong{font-size:20px;letter-spacing:-.02em}
+.global-course-select{height:44px;border-radius:14px;padding:0 14px;font-weight:800;background:#11211c!important}
+.card,.hero,.chart-card,.dialog-card,.auth-card,.direction-card,.tendency-card,.hole-card,.putting-panel,.profile-card,.global-course-bar{
+  position:relative;
+  background:linear-gradient(180deg, rgba(15,26,22,.96), rgba(11,19,16,.94))!important;
+  border:1px solid rgba(196,255,99,.13)!important;
+  border-radius:22px!important;
+  box-shadow:0 18px 40px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.025), 0 0 24px rgba(77,167,255,.04)!important;
+  overflow:hidden;
 }
-.card,.hero,.chart-card,.dialog-card,.auth-card,.direction-card,.tendency-card,.hole-card{overflow:hidden}
-.card::before,.hero::before,.chart-card::before,.dialog-card::before,.auth-card::before,.direction-card::before,.tendency-card::before,.hole-card::before{
-  content:'';position:absolute;left:0;top:0;width:34px;height:34px;pointer-events:none;
-  border-left:2px solid rgba(199,255,102,.5);border-top:2px solid rgba(199,255,102,.5);
-}
-.card::after,.hero::after,.chart-card::after,.dialog-card::after,.auth-card::after,.direction-card::after,.tendency-card::after,.hole-card::after{
-  content:'';position:absolute;right:0;bottom:0;width:34px;height:34px;pointer-events:none;
-  border-right:1px solid rgba(67,180,255,.36);border-bottom:1px solid rgba(67,180,255,.36);
-}
-.hero{
-  padding:24px 25px!important;
+.card::before,.hero::before,.chart-card::before,.dialog-card::before,.auth-card::before,.direction-card::before,.tendency-card::before,.hole-card::before,.global-course-bar::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  pointer-events:none;
   background:
-    linear-gradient(120deg,rgba(17,36,27,.98),rgba(8,18,13,.97) 58%,rgba(9,22,24,.96))!important;
+    linear-gradient(135deg, rgba(196,255,99,.12), transparent 18%),
+    linear-gradient(315deg, rgba(77,167,255,.09), transparent 18%);
+  mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);
+  -webkit-mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);
+  padding:1px;
 }
-.hero h2{font-size:38px;letter-spacing:-.045em}
-.eyebrow{color:var(--accent)!important;letter-spacing:.20em;text-shadow:0 0 12px rgba(199,255,102,.12)}
-.section-head{margin:27px 0 11px;padding-bottom:9px;border-bottom:1px solid rgba(199,255,102,.11)}
-.section-head h2{font-size:23px;letter-spacing:-.035em}
-.muted{color:#a4b9b0!important}
-.metric{font-size:34px;letter-spacing:-.055em}
-.metric-label{letter-spacing:.14em}
-
-.button{border-radius:10px!important;font-weight:900!important;letter-spacing:.02em}
-.button.primary{background:linear-gradient(180deg,#d2ff7c,#a9eb5d)!important;color:#0d1b11!important;box-shadow:0 0 22px rgba(199,255,102,.12)!important}
-.button.secondary,.mini-link{background:linear-gradient(180deg,rgba(20,36,29,.98),rgba(12,24,19,.98))!important;border-color:rgba(199,255,102,.14)!important;color:#eef7f2!important}
-input,select,textarea,.chat-input,.target-select,.pregame-course-select{
-  background:#0c1b15!important;border-color:rgba(199,255,102,.16)!important;border-radius:10px!important;color:#eef7f2!important;
+.card::after,.hero::after,.chart-card::after,.dialog-card::after,.auth-card::after,.direction-card::after,.tendency-card::after,.hole-card::after,.global-course-bar::after{
+  content:'';
+  position:absolute;
+  inset:12px;
+  border:1px solid rgba(255,255,255,.035);
+  border-radius:16px;
+  pointer-events:none;
+  clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
 }
-input:focus,select:focus,textarea:focus,.chat-input:focus,.pregame-course-select:focus{border-color:rgba(199,255,102,.58)!important;box-shadow:0 0 0 2px rgba(199,255,102,.07)!important}
-
-.pregame-hero{
-  background:linear-gradient(120deg,rgba(14,31,23,.99),rgba(7,17,12,.985) 62%,rgba(8,21,22,.98))!important;
-  border-color:rgba(199,255,102,.20)!important;
-  box-shadow:0 18px 40px rgba(0,0,0,.36),0 0 24px rgba(199,255,102,.045)!important;
+.hero{padding:28px 28px 24px}
+.hero h2{font-size:42px;letter-spacing:-.04em;margin-bottom:10px}
+.hero .muted{max-width:68ch;color:#aec5bb}
+.eyebrow{
+  color:var(--accent);
+  text-transform:uppercase;
+  letter-spacing:.22em;
+  font-weight:900;
 }
-.pregame-hero .course-stat-lines{background:rgba(4,13,9,.5)!important}
-.course-stat-row{border-bottom-color:rgba(199,255,102,.075)!important}
-.game-keys-card{background:linear-gradient(180deg,rgba(11,24,18,.96),rgba(7,16,12,.96))!important}
-.game-key-pill{background:rgba(199,255,102,.055)!important;border-color:rgba(199,255,102,.23)!important;color:#e7f7dd!important}
-
-.chart-card{padding:16px 14px 12px!important}
-.chart-head strong{font-size:20px;letter-spacing:-.025em}
-.round-chart{height:264px!important;gap:8px!important;border-bottom-color:rgba(199,255,102,.11)!important}
-.bar{background:linear-gradient(180deg,var(--accent),#72dfaa,var(--accent2))!important;box-shadow:0 0 16px rgba(67,180,255,.08)!important}
-.bar-value{color:#f4faf6!important}
-.stat-tab,.course-pill,.putting-course,.filter-tab,.game-round-btn,.chat-prompt,.chat-clear,.badge{
-  background:#0d1d17!important;border-color:rgba(199,255,102,.12)!important;color:#eaf3ef!important;border-radius:999px!important;
+.section-head{
+  margin:28px 0 12px;
+  padding-bottom:10px;
+  border-bottom:1px solid rgba(196,255,99,.12);
+}
+.section-head h2{
+  font-size:24px;
+  letter-spacing:-.04em;
+}
+.section-head p,.muted{color:#a5bab1}
+.metric{font-size:34px;letter-spacing:-.06em}
+.metric-label{letter-spacing:.16em;color:#8ea79c}
+.button{border-radius:14px;padding:11px 16px;font-weight:900;letter-spacing:.02em}
+.button.primary{
+  background:linear-gradient(180deg, #d4ff81, #b9ef63)!important;
+  color:#102017!important;
+  box-shadow:0 0 26px rgba(196,255,99,.14);
+}
+.button.secondary{
+  background:linear-gradient(180deg, rgba(19,34,28,.98), rgba(15,25,21,.98))!important;
+  color:#edf6f2!important;
+  border:1px solid rgba(196,255,99,.14)!important;
+}
+input,select,textarea,.chat-input,.target-select,.global-course-select{
+  color:#f1f7f4!important;
+  background:rgba(17,31,26,.94)!important;
+  border:1px solid rgba(196,255,99,.14)!important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.02), 0 0 0 1px rgba(77,167,255,.02);
+}
+.bottom-nav{
+  width:min(860px,calc(100% - 28px));
+  background:rgba(10,18,15,.95)!important;
+  border:1px solid rgba(196,255,99,.18)!important;
+  border-radius:22px;
+  padding:8px;
+  box-shadow:0 18px 34px rgba(0,0,0,.46), 0 0 0 1px rgba(255,255,255,.05), 0 0 24px rgba(196,255,99,.07)!important;
+}
+.nav-item{padding:10px 6px;color:#8ea79c}
+.nav-item span{font-size:20px;margin-bottom:2px}
+.nav-item small{font-size:11px;text-transform:uppercase;letter-spacing:.12em}
+.nav-item.active{
+  background:linear-gradient(180deg, rgba(196,255,99,.16), rgba(77,167,255,.08))!important;
+  color:#f4fbf6!important;
+  box-shadow:inset 0 0 0 1px rgba(196,255,99,.18), 0 0 18px rgba(196,255,99,.08);
+}
+.chart-card{padding:18px 16px 14px}
+.chart-head strong{font-size:20px;letter-spacing:-.03em}
+.round-chart{height:270px;border-bottom-color:rgba(196,255,99,.14);gap:10px}
+.bar-col{width:42px;flex-basis:42px}
+.bar{width:30px;border-radius:11px 11px 3px 3px;background:linear-gradient(180deg, rgba(196,255,99,1), rgba(77,167,255,.86))!important;box-shadow:0 0 18px rgba(196,255,99,.08)}
+.bar-value{font-size:12px;color:#f3faf6;text-shadow:0 1px 6px rgba(0,0,0,.55)}
+.bar-label{font-size:10px;color:#9ab0a8}
+.bar-label strong{font-size:11px;color:#edf5f1}
+.stat-tab,.course-pill,.putting-course,.filter-tab,.game-round-btn,.chat-prompt,.chat-clear,.stat-chip,.badge{
+  background:rgba(17,31,26,.92)!important;
+  border:1px solid rgba(196,255,99,.12)!important;
+  color:#edf6f2!important;
 }
 .stat-tab.active,.course-pill.active,.putting-course.active,.filter-tab.active,.game-round-btn.active{
-  background:linear-gradient(180deg,rgba(199,255,102,.18),rgba(67,180,255,.065))!important;
-  border-color:rgba(199,255,102,.34)!important;color:#f5fff8!important;box-shadow:0 0 16px rgba(199,255,102,.055)!important;
+  background:linear-gradient(180deg, rgba(196,255,99,.18), rgba(77,167,255,.08))!important;
+  border-color:rgba(196,255,99,.24)!important;
+  color:#f6fff9!important;
 }
-.direction-card{background:radial-gradient(circle at 50% 50%,rgba(67,180,255,.055),rgba(8,17,13,.97) 58%)!important}
-.direction-center{background:linear-gradient(145deg,#2d7adf,#48c7ff)!important;box-shadow:0 0 22px rgba(67,180,255,.14)!important}
-.direction-ring{border-color:rgba(67,180,255,.15)!important}
-
-.hole-card{background:linear-gradient(180deg,rgba(12,28,20,.98),rgba(7,17,12,.98))!important;border-width:1px!important}
-.hole-card.risk-low{box-shadow:inset 0 0 0 1px rgba(35,197,82,.18),0 0 18px rgba(35,197,82,.035)!important}
-.hole-card.risk-medium{box-shadow:inset 0 0 0 1px rgba(255,212,0,.17),0 0 18px rgba(255,212,0,.035)!important}
-.hole-card.risk-high{box-shadow:inset 0 0 0 1px rgba(255,77,79,.20),0 0 18px rgba(255,77,79,.045)!important}
-.hole-preview-btn,.hole-ref-link{background:rgba(199,255,102,.06)!important;border-color:rgba(199,255,102,.25)!important}
-
-.chat-msg.assistant{border-left:2px solid rgba(199,255,102,.46)!important;background:linear-gradient(180deg,rgba(10,22,17,.98),rgba(7,16,12,.98))!important}
-.chat-msg.user{background:linear-gradient(180deg,rgba(34,63,46,.97),rgba(21,41,30,.97))!important;border-color:rgba(199,255,102,.18)!important}
-.chat-msg.assistant strong,.chat-section{color:var(--accent)!important}
-
-.bottom-nav{
-  width:min(820px,calc(100% - 28px))!important;
-  background:rgba(5,13,9,.965)!important;
-  border-color:rgba(199,255,102,.19)!important;
-  border-radius:16px!important;
-  padding:8px!important;
-  box-shadow:0 18px 36px rgba(0,0,0,.46),0 0 24px rgba(199,255,102,.055)!important;
+.hole-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.hole-card{padding:15px 15px 14px;border-width:1px!important}
+.hole-card.risk-low{box-shadow:inset 0 0 0 1px rgba(35,197,82,.16), 0 0 18px rgba(35,197,82,.04)!important}
+.hole-card.risk-medium{box-shadow:inset 0 0 0 1px rgba(255,212,0,.16), 0 0 18px rgba(255,212,0,.04)!important}
+.hole-card.risk-high{box-shadow:inset 0 0 0 1px rgba(255,77,79,.18), 0 0 18px rgba(255,77,79,.05)!important}
+.risk-dot{box-shadow:0 0 14px rgba(255,255,255,.08)}
+.score-strip{gap:6px;padding-top:10px}
+.score-box{min-width:38px;height:38px;color:#f5fbf7}
+.score-box.par{background:rgba(255,255,255,.02);border-radius:12px}
+.hole-stat-row,.course-stat-row{gap:6px;padding:10px 0}
+.hole-stat strong,.course-stat strong{font-size:15px}
+.hole-stat span,.course-stat span{font-size:10px}
+.chat-msg.user{background:linear-gradient(180deg, rgba(24,43,35,.97), rgba(18,31,26,.96))!important}
+.chat-msg.assistant{background:linear-gradient(180deg, rgba(13,24,20,.98), rgba(9,17,14,.97))!important}
+.auth-gate{background:radial-gradient(circle at 50% 0%, rgba(77,167,255,.12), transparent 28%), linear-gradient(180deg, #07110e, #040906)!important}
+.auth-card{max-width:470px;padding:30px 28px 24px}
+.auth-logo{
+  display:inline-flex;
+  gap:4px;
+  align-items:flex-end;
+  font-size:58px;
+  letter-spacing:-3px;
+  margin-bottom:14px;
+  text-shadow:0 0 18px rgba(196,255,99,.16);
 }
-.nav-item{padding:9px 5px!important;border-radius:10px!important}
-.nav-item small{text-transform:uppercase;letter-spacing:.10em;font-size:10px!important}
-.nav-item.active{background:linear-gradient(180deg,rgba(199,255,102,.17),rgba(67,180,255,.06))!important;color:#f5fff8!important;box-shadow:inset 0 0 0 1px rgba(199,255,102,.19),0 0 15px rgba(199,255,102,.05)!important}
-
-.auth-gate{background:radial-gradient(circle at 50% 0,rgba(67,180,255,.11),transparent 30%),radial-gradient(circle at 20% 20%,rgba(199,255,102,.07),transparent 24%),linear-gradient(180deg,#06100c,#030806)!important}
-.auth-card{max-width:470px;padding:30px 28px!important}
-.auth-logo{font-size:58px!important;letter-spacing:-3px!important;margin-bottom:15px!important;text-shadow:0 0 20px rgba(199,255,102,.14)}
-
-@media(max-width:760px){
-  .app-shell{padding:10px 10px 100px!important}
-  .topbar{grid-template-columns:minmax(0,1fr) auto!important;padding:10px 11px!important;border-radius:12px!important;min-height:62px!important}
-  .topbar-left{min-width:0}
-  .topbar-right{grid-column:2;grid-row:1;align-self:center}
-  .giq-logo{display:none!important}
-  .gr-mark{width:44px!important;height:44px!important;border-radius:10px!important}
-  .gr-word strong{font-size:14px!important;letter-spacing:.12em!important}
-  .gr-word small{display:none!important}
-  .brand-meta{font-size:8px!important;margin-top:4px!important}
-  .global-course-bar{top:4px!important;padding:9px 10px!important;border-radius:11px!important}
-  .card,.hero,.chart-card,.dialog-card,.auth-card,.direction-card,.tendency-card,.hole-card{border-radius:12px!important}
-  .hero{padding:18px!important}
-  .hero h2{font-size:30px!important}
-  .section-head{margin-top:22px!important}
-  .section-head h2{font-size:20px!important}
-  .hole-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-  .round-chart{height:238px!important}
+.auth-logo .accent{color:var(--accent)}
+.auth-submit{width:100%;margin-top:8px}
+.import-card,.dialog-card{backdrop-filter:blur(12px)}
+@media (min-width: 1024px){
+  .grid.two{grid-template-columns:1.15fr .85fr}
 }
-@media(max-width:520px){
-  .hole-grid{grid-template-columns:1fr!important}
-  .gr-brand{gap:8px!important}
-  .topbar-right .button{font-size:10px!important;padding:7px 9px!important}
+@media (max-width: 900px){
+  .app-shell{max-width:100%;padding:16px 14px 104px}
+  .topbar{grid-template-columns:1fr;justify-items:start;gap:10px;padding:16px}
+  .giq-logo{font-size:40px;padding:4px 12px 8px}
+  .brand-title{font-size:23px;letter-spacing:.22em}
+  .global-course-bar{top:6px}
 }
+@media (max-width: 700px){
+  .hero h2{font-size:34px}
+  .section-head h2{font-size:21px}
+  .hole-grid{grid-template-columns:1fr}
+  .round-chart{height:248px}
+}
+
+
+
+/* v14.2 component redesign */
+.topbar{padding:16px 20px 14px;border-radius:24px;clip-path:polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px));}
+.topbar::after{content:'';position:absolute;inset:14px;border:1px solid rgba(255,255,255,.04);pointer-events:none;clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));}
+.topbar-left{display:flex;flex-direction:column;gap:8px}
+.brand-title{font-size:30px;letter-spacing:.34em;text-shadow:0 0 28px rgba(196,255,99,.08)}
+.brand-meta span:first-child{padding:3px 9px;border:1px solid rgba(196,255,99,.14);border-radius:999px;background:rgba(17,31,26,.75)}
+.giq-logo{min-width:114px;justify-content:center;text-align:center}
+.giq-logo::before{box-shadow:inset 0 0 0 1px rgba(77,167,255,.08),0 0 18px rgba(77,167,255,.08)}
+.giq-logo .giq-g,.giq-logo .giq-q{font-size:54px}
+.global-course-bar{padding:12px 16px 14px;clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));}
+.global-course-label strong{display:block;font-size:22px;margin-top:1px}
+.global-course-select-wrap{position:relative}
+.global-course-select-wrap::before{content:'SELECT COURSE';position:absolute;left:14px;top:-9px;padding:0 8px;background:#0f1c18;color:#93b7aa;font-size:9px;letter-spacing:.18em;z-index:1}
+main#app{display:block}
+.hero{display:block;padding:24px 24px 20px;clip-path:polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));}
+.hero-copy{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 22px;align-items:start}
+.hero-copy > .eyebrow,.hero-copy > h2,.hero-copy > p{grid-column:1}
+.hero-copy > h2{font-size:38px;line-height:1.02;margin:0}
+.hero-copy > p{margin:0;color:#b3cac1}
+.course-stat-lines{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.course-stat-row{background:linear-gradient(180deg,rgba(17,31,26,.86),rgba(12,22,18,.92));border:1px solid rgba(196,255,99,.10);border-radius:16px;padding:10px 12px;justify-content:space-between}
+.row-label{min-width:42px;font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#d8ffc1}
+.course-stat{padding:0 2px;text-align:center}.course-stat strong{font-size:24px;line-height:1}.course-stat span{font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.section-head{display:flex;justify-content:space-between;align-items:end;gap:12px;padding-left:14px;position:relative}
+.section-head::before{content:'';position:absolute;left:0;top:4px;bottom:10px;width:3px;border-radius:999px;background:linear-gradient(180deg,var(--accent),var(--accent2))}
+.section-head h2{font-size:26px}
+.grid.two{gap:18px}
+.game-keys-card,.tendency-card,.chat-card,.chart-card,.card{clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));}
+.game-key-group,.direction-card,.putting-summary,.practice-item,.group-feature,.round-row,.hole-card,.swing-card,.chat-prompt{clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));}
+.game-key-group,.group-feature,.practice-item,.direction-card,.round-row,.swing-card{background:linear-gradient(180deg,rgba(17,31,26,.9),rgba(13,24,20,.94));border:1px solid rgba(196,255,99,.08)}
+.chart-card{padding:20px 18px 18px}.chart-head{padding-bottom:10px;border-bottom:1px solid rgba(196,255,99,.12);margin-bottom:10px}.chart-head strong{font-size:22px}.chart-summary{color:#b9cec6}
+.bar-track{width:34px;border-radius:12px 12px 4px 4px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.04)}
+.bar{width:100%;border-radius:11px 11px 3px 3px!important}
+.bottom-nav{padding:10px 10px 8px;clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));}
+.nav-item{gap:4px;border-radius:14px;min-height:60px}.nav-item span{font-size:18px;font-weight:900}.nav-item small{font-size:10px;letter-spacing:.2em}
+.hole-card{padding:14px 14px 13px}.hole-top{margin-bottom:8px}.hole-number{font-size:13px;letter-spacing:.14em;text-transform:uppercase}.preview-risk{font-size:10px}
+.score-strip{flex-wrap:wrap}.score-box{min-width:34px;height:34px;font-size:14px}.preview-stat-grid{gap:10px}.preview-stat{background:rgba(17,31,26,.75);border:1px solid rgba(196,255,99,.08);border-radius:14px;padding:10px}
+.chat-log{background:rgba(7,14,11,.52);border:1px solid rgba(196,255,99,.08);border-radius:16px;padding:14px}
+@media (max-width: 900px){.hero-copy{grid-template-columns:1fr}.course-stat-lines{grid-template-columns:1fr}.brand-title{font-size:24px;letter-spacing:.22em}.global-course-label strong{font-size:18px}.hero-copy>h2{font-size:30px}}
 
 </style>
 </head>
@@ -990,19 +901,19 @@ input:focus,select:focus,textarea:focus,.chat-input:focus,.pregame-course-select
       </form>
 
       <button id="authModeToggle" class="auth-link" type="button">New to Golf Recon? Create account</button>
-      <div class="auth-foot">Beta accounts keep each golfer's rounds and stats separate.</div>
+      <div class="auth-foot">Beta accounts keep each golfer's rounds, insights, and platoons separate.</div>
     </div>
   </div>
 
   <div id="appShell" class="app-shell" style="display:none">
     <header class="topbar">
       <div class="topbar-left">
-        <div class="gr-brand" aria-label="Golf Recon"><div class="gr-mark"><span class="gr-cross">GR</span><span class="gr-flag">⌖</span></div><div class="gr-word"><strong>GOLF RECON</strong><small>SCOUT · PLAN · PLAY · IMPROVE</small></div></div>
-        <div class="brand-meta"><span>v14.1 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-title">Golf Recon</div>
+        <div class="brand-meta"><span>v14.2 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
-      <div class="giq-logo" aria-label="GR">
-        <span class="giq-g">G</span><span style="color:var(--accent)">R</span>
+      <div class="giq-logo" aria-label="Golf Recon">
+        <span class="giq-g">G</span><span class="giq-q">R</span>
       </div>
 
       <div class="topbar-right">
@@ -1029,10 +940,10 @@ input:focus,select:focus,textarea:focus,.chat-input:focus,.pregame-course-select
     <main id="app"></main>
 
     <nav class="bottom-nav">
-      <button data-view="pregame" class="nav-item active"><span>⛳</span><small>Pregame</small></button>
-      <button data-view="rounds" class="nav-item"><span>📊</span><small>Rounds</small></button>
-      <button data-view="groups" class="nav-item"><span>👥</span><small>Platoons</small></button>
-      <button data-view="game" class="nav-item"><span>🏌️</span><small>My Game</small></button>
+      <button data-view="pregame" class="nav-item active"><span>◎</span><small>Pregame</small></button>
+      <button data-view="rounds" class="nav-item"><span>▥</span><small>Rounds</small></button>
+      <button data-view="groups" class="nav-item"><span>◫</span><small>Platoons</small></button>
+      <button data-view="game" class="nav-item"><span>⌖</span><small>My Game</small></button>
     </nav>
   </div>
 
@@ -1139,7 +1050,7 @@ input:focus,select:focus,textarea:focus,.chat-input:focus,.pregame-course-select
           <span>Scorecard, stats, putting, or miss-pattern screens</span>
         </label>
         <div id="backfillFileList" class="file-list"></div>
-        <div class="backfill-note">GolfRecon will only fill fields that are currently blank. Existing round data will not be replaced.</div>
+        <div class="backfill-note">Golf Recon will only fill fields that are currently blank. Existing round data will not be replaced.</div>
         <div id="backfillStatus" class="import-status"></div>
         <div class="dialog-actions">
           <button id="analyzeBackfill" class="button primary" type="button">Analyze Screenshots</button>
@@ -1162,7 +1073,7 @@ input:focus,select:focus,textarea:focus,.chat-input:focus,.pregame-course-select
 const SUPABASE_URL='https://vqpqyxamqiamblpcxqxg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_iH2PBfgEpQ4ZhJ-x410_0Q_wqkw3yvg';
 
-const AUTH_STORAGE_KEY='golfreconAuthSessionV1';
+const AUTH_STORAGE_KEY='golfiqAuthSessionV1';
 let authSession=null;
 let authMode='signin';
 
@@ -1170,7 +1081,7 @@ let pendingImport=null;
 
 const db = {player:{id:null,name:"Golfer",username:"",handicap:null},swingThoughts:{driver:[],irons:[],chipping:[],putting:[]},courses:[],rounds:[],puttingDetails:[],clubStats:[]};
 
-let state = {view:'pregame', selectedCourseId:'four-oaks-white-18-holes', roundStat:'score', roundFilter:'18', roundCourseId:'four-oaks-white-18-holes', selectedRoundId:null, gameCourseId:'four-oaks-white-18-holes', gameRoundLimit:'all', puttingCourse:'all', pregameChats:{}, chatBusy:false, coursePreviewHole:1, coursePreviewReturnView:'pregame', coursePreviewLoading:false, coursePreviewError:null, coursePreviewShowAll:false, coursePreviewCourseId:null};
+let state = {view:'pregame', selectedCourseId:'four-oaks-white-18-holes', roundStat:'score', roundFilter:'18', roundCourseId:'four-oaks-white-18-holes', selectedRoundId:null, gameCourseId:'four-oaks-white-18-holes', gameRoundLimit:'all', puttingCourse:'all', pregameChats:{}, chatBusy:false, coursePreviewHole:1, coursePreviewReturnView:'pregame', coursePreviewLoading:false, coursePreviewError:null};
 const app = document.getElementById('app');
 const coursePreviewCache=new Map();
 const course = id => db.courses.find(c=>c.id===id);
@@ -1279,25 +1190,6 @@ function puttingForCourse(c){
 function puttingCourseOptions(){
   return [...new Set(db.puttingDetails.map(p=>p.course))].sort((a,b)=>a.localeCompare(b));
 }
-function applyDirectionalDataFromImports(imports){
-  for(const row of (imports||[])){
-    const pr=row?.parsed?.round||row?.parsed;
-    if(!pr)continue;
-    let r=db.rounds.find(x=>String(x.supabaseImportId||'')===String(row.id||''));
-    if(!r){
-      r=db.rounds.find(x=>{
-        const c=course(x.courseId);
-        return String(x.date||'')===String(pr.date||'') && Number(x.gross)===Number(pr.gross_score??pr.gross) && normalizeCourseName(c?.name||c?.baseName)===normalizeCourseName(pr.course_name);
-      });
-    }
-    if(!r)continue;
-    const fd=pr.fairway_distribution;
-    if(fd)r.fairwayDistribution={hitPct:Number(fd.hit_pct)||0,missLeftPct:Number(fd.left_pct)||0,missRightPct:Number(fd.right_pct)||0,missShortPct:Number(fd.short_pct)||0,missLongPct:Number(fd.long_pct)||0,missFairwaysHitPct:Number(fd.other_pct)||0};
-    const gd=pr.gir_distribution;
-    if(gd)r.girDistribution={hitPct:Number(gd.hit_pct)||0,missShortPct:Number(gd.short_pct)||0,missLeftPct:Number(gd.left_pct)||0,missRightPct:Number(gd.right_pct)||0,missLongPct:Number(gd.long_pct)||0,missGirPct:Number(gd.other_pct)||0,noChancePct:Number(gd.no_chance_pct)||0};
-  }
-}
-
 function weightedDistribution(courseId,key){
   const rs=roundsFor(courseId).filter(r=>r[key]);
   if(!rs.length)return null;
@@ -1441,32 +1333,20 @@ function refreshGlobalCourseSelector(){
   const c=course(state.selectedCourseId);
   if(label)label.textContent=c?courseMenuLabel(c):'No course selected';
 }
-async function setGlobalCourse(id){
+function setGlobalCourse(id){
   if(!db.courses.some(c=>c.id===id))return;
   state.selectedCourseId=id;
   state.gameCourseId=id;
   state.roundCourseId=id;
   state.selectedRoundId=null;
-  try{localStorage.setItem('golfreconSelectedCourseId',id)}catch{}
+  try{localStorage.setItem('golfiqSelectedCourseId',id)}catch{}
   refreshGlobalCourseSelector();
-  render();
-
-  try{
-    const data=await callImportFunction({action:'bootstrap'});
-    db.player=data.player||db.player;
-    db.swingThoughts=data.swingThoughts||db.swingThoughts;
-    db.courses=data.courses||db.courses;
-    db.rounds=data.rounds||db.rounds;
-    db.puttingDetails=data.puttingDetails||db.puttingDetails;
-    db.clubStats=data.clubStats||db.clubStats;
-    try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){console.warn('Directional import hydration failed',e)}
-    if(!db.courses.some(c=>c.id===id)) state.selectedCourseId=db.courses[0]?.id||null;
-    if(state.gameCourseId!=='all') state.gameCourseId=state.selectedCourseId;
-    if(state.roundCourseId!=='all') state.roundCourseId=state.selectedCourseId;
-    refreshGlobalCourseSelector();
+  if(state.view==='coursePreview'){
+    state.coursePreviewHole=Number(course(id)?.holeNumbers?.[0])||1;
     render();
-  }catch(e){
-    console.warn('Course refresh failed; using current synced data',e);
+    loadCoursePreview(id,state.coursePreviewHole);
+  }else{
+    render();
   }
 }
 
@@ -1589,569 +1469,107 @@ function priorityHoles(courseId){
 function safeText(s){
   return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-const OSM_NOMINATIM='https://nominatim.openstreetmap.org/search';
-const OSM_OVERPASS='https://overpass-api.de/api/interpreter';
-
-function cleanCourseForMap(name){
-  return String(name||'')
-    .replace(/[—–]\s*(Blue|Green)\b.*$/i,'')
-    .replace(/\b(Front|Back)\s*9\b/ig,'')
-    .replace(/\b(9|18)\s*holes?\b/ig,'')
-    .replace(/\bScot\.\b/ig,'Scottish')
-    .replace(/\s+/g,' ').trim();
-}
 function holeLinkifyHtml(htmlText){
   return String(htmlText||'')
     .replace(/\bHole\s+([1-9]|[12]\d|3[0-6])\b/gi,(m,n)=>`<button class="hole-ref-link" type="button" data-hole-preview="${n}">${m} ↗</button>`)
     .replace(/(^|[\s(>])#([1-9]|[12]\d|3[0-6])\b/g,(m,p,n)=>`${p}<button class="hole-ref-link" type="button" data-hole-preview="${n}">#${n} ↗</button>`);
 }
-function holeLinkifyPlain(v){return holeLinkifyHtml(safeText(v))}
-function osmElementPoints(el){
-  const pts=[];
-  const add=g=>{if(Array.isArray(g))g.forEach(p=>{if(Number.isFinite(Number(p?.lat))&&Number.isFinite(Number(p?.lon)))pts.push([Number(p.lon),Number(p.lat)])})};
-  add(el?.geometry);
-  (el?.members||[]).forEach(m=>add(m?.geometry));
-  if(!pts.length && Number.isFinite(Number(el?.lon))&&Number.isFinite(Number(el?.lat)))pts.push([Number(el.lon),Number(el.lat)]);
-  return pts;
+function holeLinkifyPlain(s){return holeLinkifyHtml(safeText(s))}
+function geometryKind(feature){
+  const p=feature?.properties||{};
+  const raw=String(p.type||p.feature_type||p.golf||p.kind||p.class||p.category||p.natural||p.landuse||'').toLowerCase();
+  if(raw.includes('green'))return 'green';
+  if(raw.includes('bunker')||raw.includes('sand'))return 'bunker';
+  if(raw.includes('water')||raw.includes('pond')||raw.includes('lake')||raw.includes('stream'))return 'water';
+  if(raw.includes('tee'))return 'tee';
+  if(raw.includes('fairway'))return 'fairway';
+  return 'hole';
 }
-function osmHoleNumber(el){
-  const t=el?.tags||{};
-  for(const v of [t.ref,t.hole,t.number,t['golf:hole'],t.name]){
-    const m=String(v||'').match(/(?:hole\s*)?(\d{1,2})\b/i);
-    if(m)return Number(m[1]);
+function flattenCoords(node,out=[]){
+  if(!Array.isArray(node))return out;
+  if(node.length>=2 && Number.isFinite(Number(node[0])) && Number.isFinite(Number(node[1]))){
+    out.push([Number(node[0]),Number(node[1])]); return out;
   }
-  return null;
+  node.forEach(x=>flattenCoords(x,out));
+  return out;
 }
-function osmFeatureKind(el){
-  const t=el?.tags||{},g=String(t.golf||'').toLowerCase();
-  if(g==='fairway')return 'fairway';
-  if(g==='green')return 'green';
-  if(g==='bunker')return 'bunker';
-  if(g==='tee')return 'tee';
-  if(g==='water_hazard'||g==='lateral_water_hazard'||t.natural==='water'||t.water)return 'water';
-  return 'other';
-}
-function pointDistanceMeters(a,b){
-  const lat=((a[1]+b[1])/2)*Math.PI/180;
-  const dx=(a[0]-b[0])*111320*Math.cos(lat),dy=(a[1]-b[1])*110540;
-  return Math.hypot(dx,dy);
-}
-function distanceToHole(points,holePts){
-  let best=Infinity;
-  for(const p of points)for(const h of holePts)best=Math.min(best,pointDistanceMeters(p,h));
-  return best;
-}
-async function osmFetchJson(url,opts={}){
-  const r=await fetch(url,{...opts,headers:{Accept:'application/json',...(opts.headers||{})}});
-  if(!r.ok)throw new Error(`Course map service returned ${r.status}`);
-  return r.json();
-}
-async function geocodeGolfCourse(c){
-  const key=`geo:${c.id}`;
-  if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
-  const base=cleanCourseForMap(c.baseName||c.name);
-  const tries=[`${base} golf course`,base];
-  let candidates=[];
-  for(const q of tries){
-    const url=`${OSM_NOMINATIM}?format=jsonv2&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`;
-    const data=await osmFetchJson(url);
-    if(Array.isArray(data)&&data.length){candidates=data;break}
-  }
-  if(!candidates.length)throw new Error('Course location was not found in OpenStreetMap.');
-  const score=x=>{
-    const d=String(x.display_name||'');
-    const nameScore=typeof courseNameScore==='function'?courseNameScore(base,d):0;
-    const golfBonus=/golf|country club/i.test(d)?15:0;
-    return nameScore+golfBonus;
-  };
-  candidates.sort((a,b)=>score(b)-score(a));
-  const best=candidates[0];
-  const result={lat:Number(best.lat),lon:Number(best.lon),displayName:best.display_name};
-  coursePreviewCache.set(key,result);
-  return result;
-}
-async function loadOsmCourse(c){
-  const key=`osm:${c.id}`;
-  if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
-  const geo=await geocodeGolfCourse(c);
-  const q=`[out:json][timeout:25];
-(
- node(around:2800,${geo.lat},${geo.lon})["golf"~"^(tee|green)$"];
- way(around:2800,${geo.lat},${geo.lon})["golf"~"^(hole|fairway|green|bunker|tee|water_hazard|lateral_water_hazard)$"];
- relation(around:2800,${geo.lat},${geo.lon})["golf"~"^(hole|fairway|green|bunker|tee|water_hazard|lateral_water_hazard)$"];
- way(around:2200,${geo.lat},${geo.lon})["natural"="water"];
- relation(around:2200,${geo.lat},${geo.lon})["natural"="water"];
-);
-out geom tags;`;
-  const data=await osmFetchJson(OSM_OVERPASS,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:`data=${encodeURIComponent(q)}`});
-  const elements=Array.isArray(data?.elements)?data.elements:[];
-  const result={geo,elements};
-  coursePreviewCache.set(key,result);
-  return result;
-}
-function osmQuickCentroid(el){
-  const pts=osmElementPoints(el);if(!pts.length)return null;
-  return [pts.reduce((a,p)=>a+p[0],0)/pts.length,pts.reduce((a,p)=>a+p[1],0)/pts.length];
-}
-function syntheticHoleElement(hole,start,end,source='inferred'){
-  if(!start||!end)return null;
-  return {type:'way',id:`synthetic-hole-${hole}`,tags:{golf:'hole',ref:String(hole),synthetic:source},geometry:[{lon:start[0],lat:start[1]},{lon:end[0],lat:end[1]}]};
-}
-function nearestFeatureToElement(anchor,candidates,maxMeters=140){
-  const ap=osmElementPoints(anchor);if(!ap.length)return null;
-  let best=null,bestD=Infinity;
-  for(const c of candidates){
-    const cp=osmElementPoints(c);if(!cp.length)continue;
-    const d=distanceToHole(cp,ap);
-    if(d<bestD && d<=maxMeters){best=c;bestD=d}
-  }
-  return best;
-}
-function farEndFeature(anchor,candidates,guide=null){
-  const a=osmQuickCentroid(anchor);if(!a)return null;
-  const gp=guide?osmElementPoints(guide):null;
-  const ranked=[];
-  for(const c of candidates){
-    const cp=osmElementPoints(c),cc=osmQuickCentroid(c);if(!cp.length||!cc)continue;
-    const d=pointDistanceMeters(a,cc);
-    if(d<65||d>760)continue;
-    const guideD=gp?.length?distanceToHole(cp,gp):0;
-    if(gp?.length && guideD>145)continue;
-    // Prefer the far end of the same fairway; this avoids pairing a tee with the previous green / next tee nearby.
-    ranked.push({c,score:d-guideD*2});
-  }
-  ranked.sort((x,y)=>y.score-x.score);
-  return ranked[0]?.c||null;
-}
-function bestTeeGreenPair(tees,greens,guide){
-  const gp=osmElementPoints(guide);let best=null,bestScore=-Infinity;
-  for(const t of tees){
-    const tp=osmElementPoints(t),tc=osmQuickCentroid(t);if(!tp.length||!tc)continue;
-    if(distanceToHole(tp,gp)>145)continue;
-    for(const g of greens){
-      const gpts=osmElementPoints(g),gc=osmQuickCentroid(g);if(!gpts.length||!gc)continue;
-      if(distanceToHole(gpts,gp)>145)continue;
-      const d=pointDistanceMeters(tc,gc);if(d<65||d>760)continue;
-      if(d>bestScore){bestScore=d;best={tee:t,green:g}}
-    }
-  }
-  return best;
-}
-function selectedHoleGeometry(courseData,hole){
-  const elements=courseData?.elements||[],target=Number(hole);
-  const kind=e=>String(e?.tags?.golf||'').toLowerCase();
-  const holes=elements.filter(e=>kind(e)==='hole' && osmElementPoints(e).length>=2);
-  const tees=elements.filter(e=>kind(e)==='tee' && osmElementPoints(e).length);
-  const greens=elements.filter(e=>kind(e)==='green' && osmElementPoints(e).length);
-  const fairways=elements.filter(e=>kind(e)==='fairway' && osmElementPoints(e).length>=2);
-
-  let holeEl=holes.find(e=>osmHoleNumber(e)===target);
-
-  // Many community-mapped courses number the tee/green/fairway but omit the golf=hole path.
-  if(!holeEl){
-    let tee=tees.find(e=>osmHoleNumber(e)===target)||null;
-    let green=greens.find(e=>osmHoleNumber(e)===target)||null;
-    let fairway=fairways.find(e=>osmHoleNumber(e)===target)||null;
-
-    if(tee&&!fairway)fairway=nearestFeatureToElement(tee,fairways,125);
-    if(green&&!fairway)fairway=nearestFeatureToElement(green,fairways,125);
-
-    if(tee&&!green)green=farEndFeature(tee,greens,fairway);
-    if(green&&!tee)tee=farEndFeature(green,tees,fairway);
-
-    if((!tee||!green)&&fairway){
-      const pair=bestTeeGreenPair(tees,greens,fairway);
-      tee=tee||pair?.tee||null;
-      green=green||pair?.green||null;
-    }
-
-    if(tee&&green){
-      const t=osmQuickCentroid(tee),g=osmQuickCentroid(green);
-      holeEl=syntheticHoleElement(target,t,g,'tee-green-fallback');
-    }
-  }
-
-  // Keep the old fallback only when OSM actually returned an apparently complete set of hole ways.
-  // Do not guess Hole 12 from the 12th arbitrary OSM element on sparsely mapped courses.
-  if(!holeEl && holes.length>=18){
-    const ordered=holes.slice().sort((a,b)=>(Number(a.id)||0)-(Number(b.id)||0));
-    holeEl=ordered[target-1]||null;
-  }
-  if(!holeEl)return null;
-
-  const holePts=osmElementPoints(holeEl);if(holePts.length<2)return null;
-  const nearby=elements.filter(e=>{
-    const pts=osmElementPoints(e);if(!pts.length)return false;
-    const featureKind=osmFeatureKind(e);
-    const limit=featureKind==='water'?145:115;
-    return distanceToHole(pts,holePts)<=limit;
-  });
-  if(!nearby.includes(holeEl))nearby.push(holeEl);
-  return {holeEl,holePts,elements:nearby,inferred:Boolean(holeEl?.tags?.synthetic)};
-}
-function osmHoleSvg(geom){
-  if(!geom?.holePts?.length)return '';
-  const all=geom.elements.flatMap(osmElementPoints);
+function featureCoords(feature){return flattenCoords(feature?.geometry?.coordinates||[])}
+function holeGeometrySvg(preview){
+  const features=preview?.features?.features||[];
+  const all=features.flatMap(featureCoords);
   if(!all.length)return '';
-  const first=geom.holePts[0],last=geom.holePts[geom.holePts.length-1];
-  const centerLon=all.reduce((a,p)=>a+p[0],0)/all.length;
-  const centerLat=all.reduce((a,p)=>a+p[1],0)/all.length;
-  const cos=Math.cos(centerLat*Math.PI/180);
-  const metric=p=>[(p[0]-centerLon)*111320*cos,(p[1]-centerLat)*110540];
-  const a=metric(first),b=metric(last);
-  const theta=Math.atan2(b[1]-a[1],b[0]-a[0]);
-  const phi=Math.PI/2-theta,cp=Math.cos(phi),sp=Math.sin(phi);
-  const rot=p=>{const [x,y]=metric(p);return [x*cp-y*sp,x*sp+y*cp]};
-  const rotated=all.map(rot);
-  let minX=Math.min(...rotated.map(p=>p[0])),maxX=Math.max(...rotated.map(p=>p[0]));
-  let minY=Math.min(...rotated.map(p=>p[1])),maxY=Math.max(...rotated.map(p=>p[1]));
-  const width=Math.max(60,maxX-minX),height=Math.max(140,maxY-minY);
-  minX-=(width*.12);maxX+=(width*.12);minY-=(height*.08);maxY+=(height*.08);
-  const W=720,H=440;
-  const project=p=>{const [x,y]=rot(p);return [30+(x-minX)/(maxX-minX)*(W-60),H-24-(y-minY)/(maxY-minY)*(H-48)]};
-  const path=pts=>pts.map((p,i)=>{const [x,y]=project(p);return `${i?'L':'M'}${x.toFixed(1)} ${y.toFixed(1)}`}).join(' ');
-  const shapes=[];
-  const order={other:0,water:1,fairway:2,tee:3,bunker:4,green:5};
-  const els=[...geom.elements].filter(e=>e!==geom.holeEl).sort((x,y)=>(order[osmFeatureKind(x)]||0)-(order[osmFeatureKind(y)]||0));
-  for(const el of els){
-    const kind=osmFeatureKind(el);
-    const groups=[];
-    if(Array.isArray(el.geometry)&&el.geometry.length)groups.push(osmElementPoints({geometry:el.geometry}));
-    for(const mem of el.members||[]){
-      const pts=osmElementPoints({geometry:mem.geometry});
-      if(pts.length)groups.push(pts);
-    }
-    for(const pts of groups){
-      if(pts.length<2)continue;
-      const closed=pts.length>2 && pointDistanceMeters(pts[0],pts[pts.length-1])<8;
-      shapes.push(`<path class="osm-${kind}" d="${path(pts)}${closed?' Z':''}"/>`);
-    }
-  }
-  shapes.push(`<path class="osm-hole-line" d="${path(geom.holePts)}"/>`);
-  const [tx,ty]=project(first),[gx,gy]=project(last);
-  shapes.push(`<circle class="osm-tee-dot" cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="5"/>`);
-  shapes.push(`<circle class="osm-pin" cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="5"/>`);
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="OpenStreetMap golf hole geometry">${shapes.join('')}</svg>`;
-}
-
-
-const MAPBOX_TOKEN_KEY='golfreconMapboxPublicTokenV1';
-function mapboxToken(){
-  try{return String(localStorage.getItem(MAPBOX_TOKEN_KEY)||'').trim()}catch{return ''}
-}
-window.configureMapboxToken=()=>{
-  const existing=mapboxToken();
-  const token=window.prompt('Paste your Mapbox PUBLIC access token (starts with pk.). It is stored only in this browser.',existing);
-  if(token===null)return;
-  const clean=String(token||'').trim();
-  try{
-    if(clean)localStorage.setItem(MAPBOX_TOKEN_KEY,clean);
-    else localStorage.removeItem(MAPBOX_TOKEN_KEY);
-  }catch{}
-  render();
-};
-function mercatorWorldPixel(pt,z){
-  const lon=Number(pt?.[0]),lat0=Number(pt?.[1]);
-  if(!Number.isFinite(lon)||!Number.isFinite(lat0))return [0,0];
-  const lat=Math.max(-85.05112878,Math.min(85.05112878,lat0));
-  const size=256*Math.pow(2,z);
-  const sin=Math.sin(lat*Math.PI/180);
-  return [
-    (lon+180)/360*size,
-    (0.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*size
+  let minX=Math.min(...all.map(p=>p[0])),maxX=Math.max(...all.map(p=>p[0]));
+  let minY=Math.min(...all.map(p=>p[1])),maxY=Math.max(...all.map(p=>p[1]));
+  if(maxX-minX<1e-7){minX-=.0001;maxX+=.0001}
+  if(maxY-minY<1e-7){minY-=.0001;maxY+=.0001}
+  const pad=.07,dx=maxX-minX,dy=maxY-minY;
+  minX-=dx*pad;maxX+=dx*pad;minY-=dy*pad;maxY+=dy*pad;
+  const W=700,H=430;
+  const project=([x,y])=>[
+    28+(x-minX)/(maxX-minX)*(W-56),
+    H-28-(y-minY)/(maxY-minY)*(H-56)
   ];
-}
-function satelliteHoleMap(geom){
-  if(!geom?.holePts?.length)return '';
-  const all=geom.elements.flatMap(osmElementPoints);
-  if(!all.length)return '';
-  const W=720,H=440,padX=64,padY=54;
-  let z=18,bounds=null;
-  for(let candidate=20;candidate>=14;candidate--){
-    const px=all.map(p=>mercatorWorldPixel(p,candidate));
-    const minX=Math.min(...px.map(p=>p[0])),maxX=Math.max(...px.map(p=>p[0]));
-    const minY=Math.min(...px.map(p=>p[1])),maxY=Math.max(...px.map(p=>p[1]));
-    if((maxX-minX)<=W-padX*2 && (maxY-minY)<=H-padY*2){z=candidate;bounds={minX,maxX,minY,maxY};break}
-    if(candidate===14){z=candidate;bounds={minX,maxX,minY,maxY}}
-  }
-  if(!bounds)return '';
-  const cx=(bounds.minX+bounds.maxX)/2,cy=(bounds.minY+bounds.maxY)/2;
-  const originX=cx-W/2,originY=cy-H/2;
-  const tileMinX=Math.floor(originX/256),tileMaxX=Math.floor((originX+W)/256);
-  const tileMinY=Math.floor(originY/256),tileMaxY=Math.floor((originY+H)/256);
-  const tileCount=Math.pow(2,z),tiles=[];
-  for(let tx=tileMinX;tx<=tileMaxX;tx++)for(let ty=tileMinY;ty<=tileMaxY;ty++){
-    if(ty<0||ty>=tileCount)continue;
-    const wrapped=((tx%tileCount)+tileCount)%tileCount;
-    const left=Math.round(tx*256-originX),top=Math.round(ty*256-originY);
-    const fallback=`https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${wrapped}`;
-    const token=mapboxToken();
-    const src=token?`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/${z}/${wrapped}/${ty}@2x.webp?access_token=${encodeURIComponent(token)}`:fallback;
-    tiles.push(`<img class="satellite-tile" alt="" draggable="false" src="${src}" data-fallback="${fallback}" onerror="if(this.src!==this.dataset.fallback){this.src=this.dataset.fallback}" style="left:${left}px;top:${top}px" loading="eager">`);
-  }
-  const project=p=>{const q=mercatorWorldPixel(p,z);return [q[0]-originX,q[1]-originY]};
-  const path=pts=>pts.map((p,i)=>{const [x,y]=project(p);return `${i?'L':'M'}${x.toFixed(1)} ${y.toFixed(1)}`}).join(' ');
-  const order={other:0,water:1,fairway:2,tee:3,bunker:4,green:5};
+  const pathForRing=ring=>ring.map((pt,i)=>{const [x,y]=project(pt);return `${i?'L':'M'}${x.toFixed(1)} ${y.toFixed(1)}`}).join(' ')+' Z';
+  const pathForLine=line=>line.map((pt,i)=>{const [x,y]=project(pt);return `${i?'L':'M'}${x.toFixed(1)} ${y.toFixed(1)}`}).join(' ');
   const shapes=[];
-  const els=[...geom.elements].filter(e=>e!==geom.holeEl).sort((a,b)=>(order[osmFeatureKind(a)]||0)-(order[osmFeatureKind(b)]||0));
-  for(const el of els){
-    const kind=osmFeatureKind(el),groups=[];
-    if(Array.isArray(el.geometry)&&el.geometry.length)groups.push(osmElementPoints({geometry:el.geometry}));
-    for(const mem of el.members||[]){const pts=osmElementPoints({geometry:mem.geometry});if(pts.length)groups.push(pts)}
-    for(const pts of groups){
-      if(pts.length<2)continue;
-      const closed=pts.length>2&&pointDistanceMeters(pts[0],pts[pts.length-1])<8;
-      shapes.push(`<path class="sat-${kind}" d="${path(pts)}${closed?' Z':''}"/>`);
+  for(const f of features){
+    const g=f?.geometry;if(!g)continue;
+    const k=geometryKind(f);
+    if(g.type==='Polygon'){
+      shapes.push(`<path class="geometry-${k}" d="${(g.coordinates||[]).map(pathForRing).join(' ')}"/>`);
+    }else if(g.type==='MultiPolygon'){
+      for(const poly of g.coordinates||[])shapes.push(`<path class="geometry-${k}" d="${poly.map(pathForRing).join(' ')}"/>`);
+    }else if(g.type==='LineString'){
+      shapes.push(`<path class="geometry-line" d="${pathForLine(g.coordinates||[])}"/>`);
+    }else if(g.type==='MultiLineString'){
+      for(const line of g.coordinates||[])shapes.push(`<path class="geometry-line" d="${pathForLine(line)}"/>`);
+    }else if(g.type==='Point'){
+      const [x,y]=project(g.coordinates);shapes.push(`<circle class="geometry-point" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5"/>`);
+    }else if(g.type==='MultiPoint'){
+      for(const pt of g.coordinates||[]){const [x,y]=project(pt);shapes.push(`<circle class="geometry-point" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`)}
     }
   }
-  shapes.push(`<path class="sat-hole-line" d="${path(geom.holePts)}"/>`);
-  const first=geom.holePts[0],last=geom.holePts[geom.holePts.length-1];
-  const [tx,ty]=project(first),[gx,gy]=project(last);
-  shapes.push(`<circle class="sat-tee-dot" cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="6"/>`);
-  shapes.push(`<circle class="sat-pin" cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="6"/>`);
-  const teeLabelY=ty<28?ty+23:ty-11,greenLabelY=gy<28?gy+23:gy-11;
-  shapes.push(`<text class="sat-label" x="${(tx+9).toFixed(1)}" y="${teeLabelY.toFixed(1)}">TEE</text>`);
-  shapes.push(`<text class="sat-label" x="${(gx+9).toFixed(1)}" y="${greenLabelY.toFixed(1)}">GREEN</text>`);
-  return `<div class="satellite-stack ${mapboxToken()?'mapbox-live':''}">${tiles.join('')}<svg class="satellite-overlay" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Satellite view with GolfRecon hole overlay">${shapes.join('')}</svg><div class="satellite-north">N ↑</div></div>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Golf hole geometry">${shapes.join('')}</svg>`;
 }
-
-
-let coursePreviewMapInstance=null;
-let coursePreviewMapFocusBounds=null;
-function destroyCoursePreviewMap(){
-  if(coursePreviewMapInstance){try{coursePreviewMapInstance.remove()}catch{}coursePreviewMapInstance=null;}
-  coursePreviewMapFocusBounds=null;
-}
-function ptsCentroid(pts){
-  if(!pts?.length)return null;
-  return [pts.reduce((a,p)=>a+Number(p[0]),0)/pts.length,pts.reduce((a,p)=>a+Number(p[1]),0)/pts.length];
-}
-function elementCentroid(el){return ptsCentroid(osmElementPoints(el))}
-function meterXY(p,origin){
-  const lat=((Number(p[1])+Number(origin[1]))/2)*Math.PI/180;
-  return [(Number(p[0])-Number(origin[0]))*111320*Math.cos(lat),(Number(p[1])-Number(origin[1]))*110540];
-}
-function pointSegmentDistanceMeters(p,a,b){
-  const origin=a,A=[0,0],B=meterXY(b,origin),P=meterXY(p,origin);
-  const vx=B[0],vy=B[1],wx=P[0],wy=P[1],den=vx*vx+vy*vy;
-  const t=den?Math.max(0,Math.min(1,(wx*vx+wy*vy)/den)):0;
-  return Math.hypot(wx-t*vx,wy-t*vy);
-}
-function pointPolylineDistanceMeters(p,line){
-  if(!line?.length)return Infinity;if(line.length===1)return pointDistanceMeters(p,line[0]);
-  let best=Infinity;for(let i=1;i<line.length;i++)best=Math.min(best,pointSegmentDistanceMeters(p,line[i-1],line[i]));return best;
-}
-function nearestKindElement(geom,kind,target,maxDist=140){
-  let best=null,bestD=Infinity;
-  for(const el of geom?.elements||[]){if(osmFeatureKind(el)!==kind)continue;const c=elementCentroid(el);if(!c)continue;const d=pointDistanceMeters(c,target);if(d<bestD){bestD=d;best=el}}
-  return bestD<=maxDist?best:null;
-}
-function pointInRing(point,ring){
-  if(!ring?.length)return false;let inside=false;const x=point[0],y=point[1];
-  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
-    const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
-    const hit=((yi>y)!=(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi);if(hit)inside=!inside;
-  }
-  return inside;
-}
-function orientedHoleContext(geom){
-  let path=[...(geom?.holePts||[])];if(path.length<2)return null;
-  let start=path[0],end=path[path.length-1];
-  const teeAtStart=nearestKindElement(geom,'tee',start),teeAtEnd=nearestKindElement(geom,'tee',end);
-  const ds=teeAtStart?pointDistanceMeters(elementCentroid(teeAtStart),start):Infinity;
-  const de=teeAtEnd?pointDistanceMeters(elementCentroid(teeAtEnd),end):Infinity;
-  if(de+5<ds){path.reverse();start=path[0];end=path[path.length-1];}
-  const teeEl=nearestKindElement(geom,'tee',start,120);
-  const greenEl=nearestKindElement(geom,'green',end,150);
-  const tee=elementCentroid(teeEl)||start,green=elementCentroid(greenEl)||end;
-  return {path,start:tee,end:green,teeEl,greenEl};
-}
-function primaryFairwayElement(geom,ctx){
-  const fairways=(geom?.elements||[]).filter(el=>osmFeatureKind(el)==='fairway'&&osmElementPoints(el).length>=3);
-  if(!fairways.length)return null;
-  const mid=ctx.path[Math.floor(ctx.path.length/2)]||[(ctx.start[0]+ctx.end[0])/2,(ctx.start[1]+ctx.end[1])/2];
-  const containing=fairways.find(el=>pointInRing(mid,osmElementPoints(el)));
-  if(containing)return containing;
-  return fairways.map(el=>({el,d:pointPolylineDistanceMeters(elementCentroid(el),ctx.path)})).sort((a,b)=>a.d-b.d)[0]?.el||null;
-}
-function fairwayCenterLine(fairway,start,end){
-  const ring=osmElementPoints(fairway);if(ring.length<4)return [];
-  const origin=start,B=meterXY(end,origin),len=Math.hypot(B[0],B[1]);if(len<30)return [];
-  const ux=B[0]/len,uy=B[1]/len,vx=-uy,vy=ux;
-  const local=p=>{const q=meterXY(p,origin);return [q[0]*ux+q[1]*uy,q[0]*vx+q[1]*vy]};
-  const toLL=([x,y])=>{const east=x*ux+y*vx,north=x*uy+y*vy,lat=origin[1]+north/110540,lon=origin[0]+east/(111320*Math.cos(((origin[1]+lat)/2)*Math.PI/180));return [lon,lat]};
-  const poly=ring.map(local),out=[start];
-  for(let k=1;k<=9;k++){
-    const x=len*k/10,ys=[];
-    for(let i=0,j=poly.length-1;i<poly.length;j=i++){
-      const a=poly[j],b=poly[i];if((a[0]<=x&&b[0]>=x)||(b[0]<=x&&a[0]>=x)){
-        const dx=b[0]-a[0];if(Math.abs(dx)<1e-6)continue;const t=(x-a[0])/dx;if(t>=0&&t<=1)ys.push(a[1]+t*(b[1]-a[1]));
-      }
-    }
-    if(ys.length>=2){ys.sort((a,b)=>a-b);out.push(toLL([x,(ys[0]+ys[ys.length-1])/2]));}
-  }
-  out.push(end);return out.length>=4?out:[];
-}
-function focusedPreviewElements(geom,ctx,fairway,playLine){
-  const keep=[];if(fairway)keep.push(fairway);if(ctx.teeEl&&!keep.includes(ctx.teeEl))keep.push(ctx.teeEl);if(ctx.greenEl&&!keep.includes(ctx.greenEl))keep.push(ctx.greenEl);
-  for(const el of geom?.elements||[]){
-    const kind=osmFeatureKind(el);if(!['bunker','water'].includes(kind))continue;const c=elementCentroid(el);if(!c)continue;
-    if(pointPolylineDistanceMeters(c,playLine.length?playLine:ctx.path)<=58)keep.push(el);
-  }
-  return keep;
-}
-function elementFeatures(el){
-  const kind=osmFeatureKind(el),features=[];
-  const add=pts=>{if(!pts||pts.length<2)return;let coords=pts.map(p=>[Number(p[0]),Number(p[1])]);const areaKind=['fairway','green','bunker','tee','water'].includes(kind);if(areaKind&&coords.length>=3){const a=coords[0],b=coords[coords.length-1];if(a[0]!==b[0]||a[1]!==b[1])coords=[...coords,a];features.push({type:'Feature',properties:{kind},geometry:{type:'Polygon',coordinates:[coords]}})}else features.push({type:'Feature',properties:{kind},geometry:{type:'LineString',coordinates:coords}})};
-  if(Array.isArray(el?.geometry)&&el.geometry.length)add(el.geometry.map(p=>[p.lon,p.lat]));
-  for(const m of el?.members||[]){if(Array.isArray(m?.geometry)&&m.geometry.length)add(m.geometry.map(p=>[p.lon,p.lat]));}
-  if(!features.length){const pts=osmElementPoints(el);if(pts.length)add(pts)}
-  return features;
-}
-function pointAlongPolyline(points,fraction){
-  if(!Array.isArray(points)||!points.length)return null;
-  if(points.length===1)return points[0];
-  const f=Math.max(0,Math.min(1,Number(fraction)||0));
-  const lengths=[];let total=0;
-  for(let i=1;i<points.length;i++){
-    const d=pointDistanceMeters(points[i-1],points[i]);
-    lengths.push(d);total+=d;
-  }
-  if(total<=0)return points[Math.min(points.length-1,Math.round(f*(points.length-1)))];
-  const target=total*f;let walked=0;
-  for(let i=1;i<points.length;i++){
-    const seg=lengths[i-1];
-    if(walked+seg>=target){
-      const t=seg?((target-walked)/seg):0;
-      return [points[i-1][0]+(points[i][0]-points[i-1][0])*t,points[i-1][1]+(points[i][1]-points[i-1][1])*t];
-    }
-    walked+=seg;
-  }
-  return points[points.length-1];
-}
-function previewHolePar(){
-  const c=course(state.selectedCourseId);if(!c)return null;
-  const holes=(c.holeNumbers||[]).map(Number),idx=holes.indexOf(Number(state.coursePreviewHole));
-  const p=Number(c.pars?.[idx>=0?idx:Number(state.coursePreviewHole)-1]);
-  return Number.isFinite(p)?p:null;
-}
-function segmentedPlayLine(ctx,fairway,center){
-  const par=previewHolePar();
-  if(par===3)return [ctx.start,ctx.end];
-  const guide=(center&&center.length>=2)?center:(fairway?osmElementPoints(fairway):ctx.path);
-  if(par===4){
-    const mid=pointAlongPolyline(guide,.5) || (fairway?elementCentroid(fairway):null) || pointAlongPolyline([ctx.start,ctx.end],.5);
-    return mid?[ctx.start,mid,ctx.end]:[ctx.start,ctx.end];
-  }
-  if(par===5){
-    const p1=pointAlongPolyline(guide,1/3),p2=pointAlongPolyline(guide,2/3);
-    if(p1&&p2)return [ctx.start,p1,p2,ctx.end];
-    const mid=fairway?elementCentroid(fairway):pointAlongPolyline([ctx.start,ctx.end],.5);
-    if(mid){
-      const a=pointAlongPolyline([ctx.start,mid],.67),b=pointAlongPolyline([mid,ctx.end],.33);
-      if(a&&b)return [ctx.start,a,b,ctx.end];
-    }
-    return [ctx.start,ctx.end];
-  }
-  return (center&&center.length)?[ctx.start,...center.slice(1,-1),ctx.end]:[ctx.start,ctx.end];
-}
-
-function buildCoursePreviewGeoJSON(geom){
-  const ctx=orientedHoleContext(geom);if(!ctx)return null;
-  const fairway=primaryFairwayElement(geom,ctx);
-  const center=fairwayCenterLine(fairway,ctx.start,ctx.end);
-  const playLine=segmentedPlayLine(ctx,fairway,center);
-  const focus=focusedPreviewElements(geom,ctx,fairway,playLine);
-  const features=[];focus.forEach(el=>features.push(...elementFeatures(el)));
-  if(playLine.length)features.push({type:'Feature',properties:{kind:'playline'},geometry:{type:'LineString',coordinates:playLine}});
-  features.push({type:'Feature',properties:{kind:'marker',label:'TEE'},geometry:{type:'Point',coordinates:ctx.start}});
-  features.push({type:'Feature',properties:{kind:'marker',label:'GREEN'},geometry:{type:'Point',coordinates:ctx.end}});
-  const focusPoints=[ctx.start,ctx.end,...(fairway?osmElementPoints(fairway):ctx.path)];
-  return {collection:{type:'FeatureCollection',features},focusPoints,ctx,fairway,playLine};
-}
-function previewBounds(points){
-  if(!points?.length)return null;let minLon=Infinity,minLat=Infinity,maxLon=-Infinity,maxLat=-Infinity;
-  points.forEach(p=>{minLon=Math.min(minLon,p[0]);maxLon=Math.max(maxLon,p[0]);minLat=Math.min(minLat,p[1]);maxLat=Math.max(maxLat,p[1])});
-  return [[minLon,minLat],[maxLon,maxLat]];
-}
-function fitCoursePreviewMap(extraZoom=true){
-  if(!coursePreviewMapInstance||!coursePreviewMapFocusBounds)return;
+function coursePreviewKey(courseId,hole){return `${courseId}:${hole}`}
+async function loadCoursePreview(courseId,hole,force=false){
+  const c=course(courseId); if(!c)return;
+  const key=coursePreviewKey(courseId,hole);
+  if(!force && coursePreviewCache.has(key)){state.coursePreviewLoading=false;state.coursePreviewError=null;render();return}
+  state.coursePreviewLoading=true;state.coursePreviewError=null;render();
   try{
-    const camera=coursePreviewMapInstance.cameraForBounds(coursePreviewMapFocusBounds,{padding:{top:54,bottom:54,left:48,right:48}});
-    if(camera){
-      if(extraZoom)camera.zoom=Math.max(14,Math.min(19,(camera.zoom||18)-0.18));
-      coursePreviewMapInstance.jumpTo(camera);
-    }
-  }catch{}
-}
-window.resetCoursePreviewMap=()=>fitCoursePreviewMap(false);
-function initInteractiveCourseMap(){
-  if(!['pregame','coursePreview'].includes(state.view))return;
-  const container=document.getElementById('coursePreviewMap'),token=mapboxToken();if(!container||!token||!window.mapboxgl)return;
-  const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);if(!cached?.geom)return;
-  const built=buildCoursePreviewGeoJSON(cached.geom);if(!built)return;
-  destroyCoursePreviewMap();
-  window.mapboxgl.accessToken=token;
-  const center=ptsCentroid(built.focusPoints)||built.ctx.start;
-  const map=new window.mapboxgl.Map({container,style:'mapbox://styles/mapbox/satellite-v9',center,zoom:18.2,bearing:0,pitch:0,attributionControl:false,dragRotate:false,pitchWithRotate:false,touchPitch:false,maxZoom:20.5});
-  coursePreviewMapInstance=map;coursePreviewMapFocusBounds=previewBounds(built.focusPoints);
-  map.addControl(new window.mapboxgl.NavigationControl({showCompass:true,showZoom:true,visualizePitch:false}),'top-right');
-  map.addControl(new window.mapboxgl.AttributionControl({compact:true}),'bottom-right');
-  map.on('load',()=>{
-    if(coursePreviewMapInstance!==map)return;
-    map.addSource('golfiq-hole',{type:'geojson',data:built.collection});
-    const fill=(id,kind,color,opacity)=>map.addLayer({id,type:'fill',source:'golfiq-hole',filter:['==',['get','kind'],kind],paint:{'fill-color':color,'fill-opacity':opacity,'fill-outline-color':color}});
-    fill('golfiq-fairway','fairway','#b8ea68',0.05);
-    fill('golfiq-water','water','#47aef2',0.12);
-    fill('golfiq-bunker','bunker','#ffe06b',0.14);
-    fill('golfiq-tee','tee','#b8ea68',0.10);
-    fill('golfiq-green','green','#d7ff9f',0.16);
-    map.addLayer({id:'golfiq-playline',type:'line',source:'golfiq-hole',filter:['==',['get','kind'],'playline'],layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':'#d7ff9f','line-width':3.5,'line-opacity':0.95,'line-dasharray':[2,2]}});
-    map.addLayer({id:'golfiq-markers',type:'circle',source:'golfiq-hole',filter:['==',['get','kind'],'marker'],paint:{'circle-radius':6,'circle-color':['case',['==',['get','label'],'TEE'],'#b8ea68','#ffffff'],'circle-stroke-color':'#07100c','circle-stroke-width':2}});
-    map.addLayer({id:'golfiq-labels',type:'symbol',source:'golfiq-hole',filter:['==',['get','kind'],'marker'],layout:{'text-field':['get','label'],'text-size':12,'text-offset':[0.9,0],'text-anchor':'left','text-allow-overlap':true},paint:{'text-color':'#ffffff','text-halo-color':'#07100c','text-halo-width':2}});
-    fitCoursePreviewMap(true);
-  });
-}
-async function ensureCoursePreviewLoaded(courseId,hole){
-  const c=course(courseId); if(!c||!['pregame','coursePreview'].includes(state.view))return;
-  const key=`preview:${courseId}:${hole}`;
-  if(coursePreviewCache.has(key)||state.coursePreviewLoading)return;
-  state.coursePreviewLoading=true;state.coursePreviewError=null;
-  const map=document.getElementById('coursePreviewMapBody');
-  if(map)map.innerHTML=`<div class="preview-map-empty"><div><strong>Loading Hole ${hole}…</strong><span>Finding golf-specific OpenStreetMap geometry.</span></div></div>`;
-  try{
-    const courseData=await loadOsmCourse(c);
-    const geom=selectedHoleGeometry(courseData,hole);
-    coursePreviewCache.set(key,{courseData,geom});
-    if(!geom)state.coursePreviewError='The free course map does not have enough tee/green/hole data to locate this hole yet.';
+    const data=await callImportFunction({
+      action:'course_preview',
+      course_id:c.id,
+      course_name:c.baseName||c.name,
+      hole:Number(hole),
+      force
+    });
+    coursePreviewCache.set(key,data);
   }catch(e){
-    state.coursePreviewError=e.message||String(e);
-    coursePreviewCache.set(key,{courseData:null,geom:null,error:state.coursePreviewError});
+    state.coursePreviewError=e.message;
   }finally{
-    state.coursePreviewLoading=false;
-    if(state.view==='pregame'||state.view==='coursePreview')render();
+    state.coursePreviewLoading=false;render();
   }
 }
 window.openHolePreview=(hole,courseId=state.selectedCourseId)=>{
-  if(!course(courseId))return;
+  const c=course(courseId); if(!c)return;
+  state.coursePreviewReturnView=state.view==='coursePreview'?(state.coursePreviewReturnView||'pregame'):state.view;
   state.selectedCourseId=courseId;
-  state.gameCourseId=courseId;
-  state.roundCourseId=courseId;
-  state.coursePreviewCourseId=courseId;
   state.coursePreviewHole=Number(hole)||1;
-  state.coursePreviewError=null;
-  state.view='pregame';
+  state.view='coursePreview';
   refreshGlobalCourseSelector();
   render();
-  requestAnimationFrame(()=>document.getElementById('pregameHoleInsights')?.scrollIntoView({behavior:'smooth',block:'start'}));
+  loadCoursePreview(courseId,state.coursePreviewHole);
 };
-window.closeCoursePreview=()=>{state.view='pregame';render()};
-window.selectCoursePreviewHole=hole=>{
-  state.coursePreviewCourseId=state.selectedCourseId;
-  state.coursePreviewHole=Number(hole)||1;
-  state.coursePreviewError=null;
+window.closeCoursePreview=()=>{
+  state.view=state.coursePreviewReturnView||'pregame';
   render();
-  requestAnimationFrame(()=>document.getElementById('pregameHoleInsights')?.scrollIntoView({behavior:'smooth',block:'start'}));
+};
+window.selectCoursePreviewHole=(hole)=>{
+  state.coursePreviewHole=Number(hole);
+  render();
+  loadCoursePreview(state.selectedCourseId,state.coursePreviewHole);
 };
 
 function chatText(s){
@@ -2229,7 +1647,7 @@ function pregameChatHtml(c){
     </div>`:'';
   const log=msgs.map(m=>`<div class="chat-msg ${m.role==='user'?'user':'assistant'}">${m.role==='user'?safeText(m.text):chatText(m.text)}</div>`).join('');
   const loading=state.chatBusy?`<div class="chat-msg assistant loading">Thinking…</div>`:'';
-  return `<div class="section-head"><div><div class="eyebrow">AI CADDIE</div><h2>Ask GolfRecon</h2></div></div>
+  return `<div class="section-head"><div><div class="eyebrow">RECON AI</div><h2>Ask Golf Recon</h2></div></div>
     <div class="card chat-card">
       <div class="chat-head"><h3>${c.name}</h3>${msgs.length?'<button class="chat-clear" data-chat-clear="1">Clear</button>':''}</div>
       ${promptButtons}
@@ -2264,135 +1682,50 @@ async function sendPregameChat(question){
     render();
   }
 }
-function pregameHoleInsightsHtml(c,priority=[]){
-  const holes=(c.holeNumbers?.length?c.holeNumbers.slice():c.pars?.map((_,i)=>i+1)||[]);
-  if(!holes.length)holes.push(...Array.from({length:18},(_,i)=>i+1));
-  if(state.coursePreviewCourseId!==c.id){
-    state.coursePreviewCourseId=c.id;
-    state.coursePreviewHole=Number(priority?.[0]?.hole)||Number(holes[0])||1;
-    state.coursePreviewShowAll=false;
-    state.coursePreviewError=null;
-  }
-  let hole=Number(state.coursePreviewHole)||Number(holes[0])||1;
-  if(!holes.map(Number).includes(hole))hole=Number(priority?.[0]?.hole)||Number(holes[0])||1;
-  state.coursePreviewHole=hole;
-  const mem=holeMemory(c.id),h=mem.find(x=>Number(x.hole)===hole);
-  const last=h?holeLastRound(c.id,hole):null;
-  const cached=coursePreviewCache.get(`preview:${c.id}:${hole}`);
-  const avgScore=h?.avgScore;
-  const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
-  const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is loading the golf-course data for this hole.';
-  const mb=mapboxToken();
-  const mapReady=Boolean(mb&&cached?.geom);
-  const waiting=!cached&&!state.coursePreviewError;
-  const mapBody=mapReady
-    ? `<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`
-    : `<div class="preview-map-empty"><div><strong>${state.coursePreviewLoading||waiting?`Loading Hole ${hole}…`:(!mb?'Mapbox token required':'Hole geometry not available yet')}</strong><span>${safeText(!mb?'Set your Mapbox token to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
-  const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
-  const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
-  const holePar=h?.par??c.pars?.[holeIdx]??'—';
-  const holeHcp=c.handicaps?.[holeIdx]??'—';
-  const holeYd=previewHoleYardage(c,hole,titleBuilt);
-  const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
-  const insight=h?usefulHoleInsight(h):'';
-  const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
-  return `
-    <section id="pregameHoleInsights" class="pregame-hole-insights">
-      <div class="section-head">
-        <div><div class="eyebrow">HOLE INSIGHTS</div><h2>Hole ${hole}</h2></div>
-        <button class="button secondary" type="button" onclick="toggleCoursePreviewHoles()">${state.coursePreviewShowAll?'Hide holes':'Show all holes'}</button>
-      </div>
-      ${!mb?`<div class="mapbox-missing">Satellite view needs your Mapbox public token. <button type="button" class="hole-preview-btn" onclick="configureMapboxToken()">Set Mapbox token</button></div>`:''}
-      ${state.coursePreviewShowAll?`<div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>`:''}
-      <div class="preview-hero-grid">
-        <div>
-          <div class="course-preview-map">
-            <div class="preview-map-head">
-              <div class="preview-hole-title"><strong>Hole ${hole}</strong><span>Par ${holePar} · ${yardageText} · HCP ${holeHcp}</span></div>
-              ${h?`<span class="risk-dot preview-risk" title="${riskLabel(h)}">${riskLetter(h)}</span>`:''}
-            </div>
-            <div id="coursePreviewMapBody">${mapBody}</div>
-          </div>
-          <div class="preview-map-tools"><span>Drag to pan · scroll or pinch to zoom</span><button type="button" onclick="resetCoursePreviewMap()">Fit hole</button></div>
-          <div class="preview-attribution">Satellite imagery © Mapbox / providers · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
-        </div>
-        <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
-          ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
-          ${stat('Rounds',h?.played??'—')}
-          ${stat('Avg score',avgScore==null?'—':avgScore.toFixed(1))}
-          ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`)}
-          ${stat('Double+',h?.doubleRate==null?'—':h.doubleRate+'%')}
-          ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'))}
-          ${stat('GIR',h?.gir==null?'—':h.gir+'%')}
-          ${stat('Avg putts',h?.putts==null?'—':h.putts.toFixed(1))}
-          ${stat('Last score',last?.score??'—')}
-          <div class="preview-read-card"><div class="eyebrow">GOLFRECON READ</div><p>${safeText(insight||'More history will sharpen the hole-specific read.')}</p></div>
-        </aside>
-      </div>
-    </section>`;
-}
-window.toggleCoursePreviewHoles=()=>{
-  state.coursePreviewShowAll=!state.coursePreviewShowAll;
-  render();
-  requestAnimationFrame(()=>document.getElementById('pregameHoleInsights')?.scrollIntoView({behavior:'smooth',block:'start'}));
-};
-
 function pregame(){
   const c=course(state.selectedCourseId), rounds=roundsFor(c.id), priority=priorityHoles(c.id);
   const latest=rounds[0], keys=deepPregameInsights(c.id);
   const lastStats=courseRoundStats(c.id,'last'), allStats=courseRoundStats(c.id,'all');
   const pctVal=v=>v==null?'—':`${v}%`, numVal=v=>v==null?'—':v.toFixed(1);
   return `
-    <section class="hero pregame-hero">
-      <div class="hero-copy">
-        <div class="pregame-hero-head">
-          <div class="pregame-hero-title">
-            <div class="eyebrow">TOMORROW'S PREGAME</div>
-            <div class="pregame-title-line">
-              <h2>${c.name}</h2>
-              <span class="muted pregame-course-meta">${c.tees} tees · Par ${c.par??'—'} · ${c.rating??'—'}/${c.slope??'—'} · ${rounds.length} round${rounds.length===1?'':'s'} in memory</span>
-            </div>
-          </div>
-          <label class="pregame-course-picker"><span>COURSE</span><select class="pregame-course-select" aria-label="Pregame course" onchange="setGlobalCourse(this.value)">${courseDropdownOptions(c.id)}</select></label>
+    <section class="hero" style="margin-top:0">
+      <div class="hero-copy"><div class="eyebrow">TOMORROW'S PREGAME</div><h2>${c.name}</h2>
+      <p class="muted">${c.tees} tees · Par ${c.par??'—'} · ${c.rating??'—'}/${c.slope??'—'} · ${rounds.length} round${rounds.length===1?'':'s'} in memory</p>
+      <div class="course-stat-lines">
+        <div class="course-stat-row">
+          <div class="row-label">Last</div>
+          <div class="course-stat"><strong>${lastStats.score??'—'}</strong><span>Score</span></div>
+          <div class="course-stat"><strong>${pctVal(lastStats.fw)}</strong><span>FH</span></div>
+          <div class="course-stat"><strong>${pctVal(lastStats.gir)}</strong><span>GIR</span></div>
+          <div class="course-stat"><strong>${numVal(lastStats.putts)}</strong><span>Putts</span></div>
         </div>
-        <div class="course-stat-lines">
-          <div class="course-stat-row">
-            <div class="row-label">Last</div>
-            <div class="course-stat"><strong>${lastStats.score??'—'}</strong><span>Score</span></div>
-            <div class="course-stat"><strong>${pctVal(lastStats.fw)}</strong><span>FH</span></div>
-            <div class="course-stat"><strong>${pctVal(lastStats.gir)}</strong><span>GIR</span></div>
-            <div class="course-stat"><strong>${numVal(lastStats.putts)}</strong><span>Putts</span></div>
-          </div>
-          <div class="course-stat-row">
-            <div class="row-label">All</div>
-            <div class="course-stat"><strong>${allStats.score==null?'—':allStats.score.toFixed(1)}</strong><span>Avg</span></div>
-            <div class="course-stat"><strong>${pctVal(allStats.fw)}</strong><span>FH</span></div>
-            <div class="course-stat"><strong>${pctVal(allStats.gir)}</strong><span>GIR</span></div>
-            <div class="course-stat"><strong>${numVal(allStats.putts)}</strong><span>Putts</span></div>
-          </div>
+        <div class="course-stat-row">
+          <div class="row-label">All</div>
+          <div class="course-stat"><strong>${allStats.score==null?'—':allStats.score.toFixed(1)}</strong><span>Avg</span></div>
+          <div class="course-stat"><strong>${pctVal(allStats.fw)}</strong><span>FH</span></div>
+          <div class="course-stat"><strong>${pctVal(allStats.gir)}</strong><span>GIR</span></div>
+          <div class="course-stat"><strong>${numVal(allStats.putts)}</strong><span>Putts</span></div>
         </div>
-      </div>
+      </div></div>
     </section>
-
-    <div class="section-head"><div><div class="eyebrow">3 INSIGHTS · LAST ${Math.min(3,rounds.length)||0} HERE</div><h2>What matters tomorrow</h2></div></div>
-    <div class="card key-list">${keys.map((k,i)=>`<div class="key"><div class="key-num">${i+1}</div><div><strong>${holeLinkifyPlain(k.title)}</strong><span class="muted">${holeLinkifyPlain(k.text)}</span></div></div>`).join('')}</div>
 
     ${gameKeysPregameHtml()}
 
     ${pregameTendencies(c)}
 
+    <div class="section-head"><div><div class="eyebrow">3 INSIGHTS · LAST ${Math.min(3,rounds.length)||0} HERE</div><h2>What matters tomorrow</h2></div></div>
+    <div class="card key-list">${keys.map((k,i)=>`<div class="key"><div class="key-num">${i+1}</div><div><strong>${holeLinkifyPlain(k.title)}</strong><span class="muted">${holeLinkifyPlain(k.text)}</span></div></div>`).join('')}</div>
+
     ${pregameChatHtml(c)}
 
-    ${pregameHoleInsightsHtml(c,priority)}
-
-    <div class="section-head"><div><div class="eyebrow">COURSE MEMORY</div><h2>Priority holes</h2></div></div>
+    <div class="section-head"><div><div class="eyebrow">COURSE MEMORY</div><h2>Priority holes</h2></div><button class="button secondary" onclick="openCourseMemory()">See all</button></div>
     <div class="risk-legend"><span class="chip"><span class="risk-dot">L</span> Low risk</span><span class="chip"><span class="risk-dot" style="background:var(--warning);color:#2a2200">M</span> Medium risk</span><span class="chip"><span class="risk-dot" style="background:var(--danger);color:#fff">H</span> High risk</span></div>
     <div class="hole-grid">${priority.map(h=>renderHoleCard(h,true)).join('')}</div>
 
     ${latest?`<div class="section-head"><div><div class="eyebrow">LAST TIME HERE</div><h2>${fmtDate(latest.date)} · ${latest.gross}</h2></div></div>
     <div class="card">
       <div class="score-strip">${latest.scores.map((s,i)=>`<button type="button" class="score-box ${scoreClass(s,c.pars[i])}" data-hole-preview="${c.holeNumbers?.[i]??i+1}" title="View Hole ${c.holeNumbers?.[i]??i+1} · Par ${c.pars[i]}">${s}</button>`).join('')}</div>
-      
+      <div class="muted" style="font-size:11px;margin-top:8px">Scorecard symbols: circle birdie · square bogey · double outline double bogey · no outline par</div>
     </div>`:''}
   `;
 }
@@ -2442,102 +1775,71 @@ function courseMemorySection(courseId){
   <div class="hole-grid">${mem.length?mem.map(renderHoleCard).join(''):'<div class="card muted">No hole-by-hole memory yet for this course.</div>'}</div>`;
 }
 
-function previewPolylineYards(points){
-  if(!Array.isArray(points)||points.length<2)return null;
-  let meters=0;
-  for(let i=1;i<points.length;i++)meters+=pointDistanceMeters(points[i-1],points[i]);
-  return meters>0?Math.round(meters/0.9144):null;
-}
-function previewHoleYardage(c,hole,built){
-  const nums=(c?.holeNumbers||[]).map(Number),idx=Math.max(0,nums.indexOf(Number(hole)));
-  const arrays=[c?.yardages,c?.holeYardages,c?.hole_yardages];
-  for(const arr of arrays){
-    const v=Number(arr?.[idx]);
-    if(Number.isFinite(v)&&v>0)return {value:Math.round(v),approx:false};
-  }
-  const hv=c?.holes?.find?.(x=>Number(x?.hole??x?.number??x?.hole_number)===Number(hole));
-  const direct=Number(hv?.yardage??hv?.yards??hv?.distance);
-  if(Number.isFinite(direct)&&direct>0)return {value:Math.round(direct),approx:false};
-  const pts=built?.playLine?.length?built.playLine:built?.ctx?.path;
-  const approx=previewPolylineYards(pts);
-  return approx?{value:approx,approx:true}:null;
-}
-
 function coursePreviewView(){
   const c=course(state.selectedCourseId);
   if(!c)return `<div class="card">Course not found.</div>`;
-  const holes=(c.holeNumbers?.length?c.holeNumbers:c.pars?.map((_,i)=>i+1)||[]);
-  if(!holes.length)holes.push(...Array.from({length:18},(_,i)=>i+1));
-  let hole=Number(state.coursePreviewHole)||Number(holes[0])||1;
-  if(!holes.map(Number).includes(hole))hole=Number(holes[0])||1;
-  state.coursePreviewHole=hole;
-  const mem=holeMemory(c.id),h=mem.find(x=>Number(x.hole)===hole);
+  const hole=Number(state.coursePreviewHole)||Number(c.holeNumbers?.[0])||1;
+  const mem=holeMemory(c.id);
+  const h=mem.find(x=>Number(x.hole)===hole);
+  const key=coursePreviewKey(c.id,hole);
+  const preview=coursePreviewCache.get(key);
   const last=h?holeLastRound(c.id,hole):null;
-  const cached=coursePreviewCache.get(`preview:${c.id}:${hole}`);
+  const holes=(c.holeNumbers?.length?c.holeNumbers:c.pars.map((_,i)=>i+1));
+  const mapSvg=holeGeometrySvg(preview);
+  const status=preview?.status;
+  const providerName=preview?.providerCourseName||preview?.providerCourseId||'';
+  const mapBody=state.coursePreviewLoading
+    ? `<div class="preview-map-empty"><div><strong>Loading Hole ${hole}…</strong><span>Pulling golf-specific course geometry.</span></div></div>`
+    : mapSvg
+      ? mapSvg
+      : `<div class="preview-map-empty"><div><strong>${state.coursePreviewError?'Could not load hole view':'Hole geometry not available yet'}</strong><span>${safeText(state.coursePreviewError||'Golf Recon still shows your hole history below. OpenGolfAPI may not have mapped geometry for this hole yet.')}</span></div></div>`;
   const avgScore=h?.avgScore;
   const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
-  const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is checking the golf-course data for this hole.';
-  const mb=mapboxToken();
-  const mapReady=Boolean(mb&&cached?.geom);
-  const mapBody=mapReady?`<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`:`<div class="preview-map-empty"><div><strong>${state.coursePreviewLoading?`Loading Hole ${hole}…`:(!mb?'Mapbox token required':'Hole geometry not available yet')}</strong><span>${safeText(!mb?'Set your Mapbox token above to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
-  const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
-  const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
-  const holePar=h?.par??c.pars?.[holeIdx]??'—';
-  const holeHcp=c.handicaps?.[holeIdx]??'—';
-  const holeYd=previewHoleYardage(c,hole,titleBuilt);
-  const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
-  const insight=h?usefulHoleInsight(h):'';
-  const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
   return `
     <div class="preview-page-head">
       <button class="preview-back" type="button" onclick="closeCoursePreview()">← Back</button>
       <div class="muted">${safeText(c.name)} · ${safeText(c.tees||'')} tees</div>
     </div>
     <div class="section-head"><div><div class="eyebrow">COURSE PREVIEW</div><h2>${safeText(c.name)}</h2></div></div>
-    <div class="mapbox-row"><span><span class="mapbox-dot ${mb?'ready':''}"></span>${mb?'Mapbox Satellite ready':'Mapbox Satellite not configured'}</span><button type="button" onclick="configureMapboxToken()">${mb?'Change token':'Set Mapbox token'}</button></div>
-    ${mb?'':`<div class="mapbox-missing">For the upgraded satellite imagery, tap <strong>Set Mapbox token</strong> and paste a free public Mapbox token. Until then GolfRecon falls back to the previous imagery source.</div>`}
     <div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>
 
-    <div class="preview-hero-grid">
-      <div>
-        <div class="course-preview-map">
-          <div class="preview-map-head">
-            <div class="preview-hole-title"><strong>Hole ${hole}</strong><span>Par ${holePar} · ${yardageText} · HCP ${holeHcp}</span></div>
-            ${h?`<span class="risk-dot preview-risk" title="${riskLabel(h)}">${riskLetter(h)}</span>`:''}
-          </div>
-          <div id="coursePreviewMapBody">${mapBody}</div>
-        </div>
-        <div class="preview-map-tools"><span>Drag to pan · scroll or pinch to zoom · use + / − for step zoom</span><button type="button" onclick="resetCoursePreviewMap()">Fit hole</button></div>
-        <div class="preview-attribution">Satellite imagery © Mapbox / providers · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
+    <div class="course-preview-map">
+      <div class="preview-map-head">
+        <div class="preview-hole-title"><strong>Hole ${hole}</strong><span>Par ${h?.par??c.pars?.[holes.indexOf(hole)]??'—'}${providerName?` · ${safeText(providerName)}`:''}</span></div>
+        ${h?`<span class="risk-dot preview-risk" title="${riskLabel(h)}">${riskLetter(h)}</span>`:''}
       </div>
-
-      <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
-        ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
-        ${stat('Rounds',h?.played??'—')}
-        ${stat('Avg score',avgScore==null?'—':avgScore.toFixed(1))}
-        ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`)}
-        ${stat('Double+',h?.doubleRate==null?'—':h.doubleRate+'%')}
-        ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'))}
-        ${stat('GIR',h?.gir==null?'—':h.gir+'%')}
-        ${stat('Avg putts',h?.putts==null?'—':h.putts.toFixed(1))}
-        ${stat('Last score',last?.score??'—')}
-        <div class="preview-read-card"><div class="eyebrow">GOLFRECON READ</div><p>${safeText(insight||'More history will sharpen the hole-specific read.')}</p></div>
-      </aside>
+      ${mapBody}
     </div>
+    <div class="preview-attribution">${safeText(preview?.attribution||'© OpenStreetMap contributors (ODbL 1.0) via OpenGolfAPI')}</div>
+
+    <div class="section-head"><div><div class="eyebrow">YOUR MEMORY</div><h2>Hole ${hole} stats</h2></div></div>
+    ${h?`
+      <div class="preview-stat-grid">
+        <div class="card preview-stat"><strong>${h.played}</strong><span>Rounds</span></div>
+        <div class="card preview-stat"><strong>${avgScore==null?'—':avgScore.toFixed(1)}</strong><span>Avg score</span></div>
+        <div class="card preview-stat"><strong>${over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`}</strong><span>Vs par</span></div>
+        <div class="card preview-stat"><strong>${h.doubleRate??'—'}${h.doubleRate!=null?'%':''}</strong><span>Double+</span></div>
+        <div class="card preview-stat"><strong>${h.par===3?'—':(h.fw==null?'—':h.fw+'%')}</strong><span>Fairways</span></div>
+        <div class="card preview-stat"><strong>${h.gir==null?'—':h.gir+'%'}</strong><span>GIR</span></div>
+        <div class="card preview-stat"><strong>${h.putts==null?'—':h.putts.toFixed(1)}</strong><span>Avg putts</span></div>
+        <div class="card preview-stat"><strong>${last?.score??'—'}</strong><span>Last score</span></div>
+      </div>
+      ${usefulHoleInsight(h)?`<div class="card" style="margin-top:8px"><div class="eyebrow">RECON READ</div><div style="margin-top:6px">${safeText(usefulHoleInsight(h))}</div></div>`:''}
+    `:`<div class="card muted">No personal history on this hole yet.</div>`}
 
     <div class="section-head"><div><div class="eyebrow">COURSE MEMORY</div><h2>Hole-by-hole</h2></div></div>
-    <div class="risk-legend"><span class="chip"><span class="risk-dot">L</span> Low risk</span><span class="chip"><span class="risk-dot" style="background:var(--warning);color:#2a2200">M</span> Medium risk</span><span class="chip"><span class="risk-dot" style="background:var(--danger);color:#fff">H</span> High risk</span></div>
-    <div class="hole-grid">${mem.map(x=>`<div class="${Number(x.hole)===hole?'preview-current-card':''}">${renderHoleCard(x)}</div>`).join('')}</div>`;
+    <div class="hole-grid">${mem.map(x=>`<div class="${Number(x.hole)===hole?'preview-current-card':''}">${renderHoleCard(x)}</div>`).join('')}</div>
+  `;
 }
 
 function groupsView(){
-  return `<div class="section-head"><div><div class="eyebrow">SOCIAL GOLF</div><h2>Platoons & Leagues</h2></div></div>
+  return `<div class="section-head"><div><div class="eyebrow">PLATOONS</div><h2>Platoons</h2></div></div>
   <div class="card groups-hero">
     <span class="coming-badge">BUILDING NEXT</span>
     <h2 style="margin:10px 0 6px">Golf is better with your crew.</h2>
-    <div class="muted">This will become the home for platoons, leagues, events, standings, previews and recaps.</div>
+    <div class="muted">This will become the home for recurring groups, league seasons, events, standings, previews, recaps and shareable trash talk.</div>
     <div class="groups-grid">
-      <div class="card group-feature"><span>👥</span><h3>Platoons</h3><div class="muted">Create a crew, invite golfers and keep shared history.</div></div>
+      <div class="card group-feature"><span>👥</span><h3>Platoons</h3><div class="muted">Create a platoon, invite golfers and keep shared history.</div></div>
       <div class="card group-feature"><span>🏆</span><h3>Leagues</h3><div class="muted">Schedules, handicaps, standings and season-long competitions.</div></div>
       <div class="card group-feature"><span>🗓️</span><h3>Events</h3><div class="muted">Pregame previews, formats, teams, postgame recaps and cards.</div></div>
     </div>
@@ -2562,8 +1864,8 @@ const roundStatDefs={
  score:{label:'Score',short:'Score',domain:[70,100],value:r=>r.holes===18?r.gross:null,better:'low',fmt:v=>Math.round(v)},
  scoreToPar:{label:'Score vs par',short:'Vs Par',domain:[0,25],value:r=>r.scoreToPar,better:'low',fmt:v=>(v>=0?'+':'')+Math.round(v)},
  differential:{label:'Score differential',short:'Score Differential',domain:[0,25],value:r=>scoreDifferential(r),better:'low',fmt:v=>v.toFixed(1)},
- gir:{label:'Greens in regulation',short:'GIR',domain:[0,100],value:r=>{const a=(r.gir||[]).map(binaryStatValue).filter(v=>v!=null);return a.length?100*sum(a)/a.length:null},better:'high',fmt:v=>Math.round(v)+'%'},
- fairways:{label:'Fairways hit',short:'Fairways',domain:[0,100],value:r=>{const a=(r.fairways||[]).map(binaryStatValue).filter(v=>v!=null);return a.length?100*sum(a)/a.length:null},better:'high',fmt:v=>Math.round(v)+'%'},
+ gir:{label:'Greens in regulation',short:'GIR',domain:[0,100],value:r=>100*sum(r.gir)/(r.gir?.length||1),better:'high',fmt:v=>Math.round(v)+'%'},
+ fairways:{label:'Fairways hit',short:'Fairways',domain:[0,100],value:r=>{const a=(r.fairways||[]).filter(x=>x!=null);return a.length?100*sum(a)/a.length:null},better:'high',fmt:v=>Math.round(v)+'%'},
  putts:{label:'Putts',short:'Putting',domain:[20,45],value:r=>r.holes===18?sum(r.putts):null,better:'low',fmt:v=>Math.round(v)},
  chips:{label:'Chip shots',short:'Chipping',domain:[0,20],value:r=>r.holes===18?sum(r.chips):null,better:'low',fmt:v=>Math.round(v)},
  penalties:{label:'Penalty strokes',short:'Penalties',domain:[0,6],value:r=>r.holes===18?sum(r.penalties):null,better:'low',fmt:v=>Math.round(v)},
@@ -2599,7 +1901,7 @@ function roundsView(){
  <div class="stat-tabs">${Object.entries(roundStatDefs).map(([k,x])=>`<button class="stat-tab ${k===key?'active':''}" data-round-stat="${k}">${x.short}</button>`).join('')}</div>
  <div class="filter-tabs"><button class="filter-tab ${state.roundFilter==='18'?'active':''}" data-round-filter="18">18 holes</button><button class="filter-tab ${state.roundFilter==='all'?'active':''}" data-round-filter="all">All</button><button class="filter-tab ${state.roundFilter==='9'?'active':''}" data-round-filter="9">9 holes</button></div>
  ${roundsChart(sorted,key)}
- <div class="section-head"><div><div class="eyebrow">ROUND LIST</div><h2>${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'Score by round'}</h2></div></div><div class="card">${sorted.map(r=>{const c=course(r.courseId),diff=scoreDifferential(r),sel=String(state.selectedRoundId)===String(r.id),g=missingRoundStats(r),basicMissing=g.fw+g.gir+g.putts,status=basicMissing?`<span class="round-status missing">Missing stats</span>`:g.firstPutts?`<span class="round-status warn">Putt detail missing</span>`:`<span class="round-status complete">Complete ✓</span>`;return `<div class="round-row round-summary has-edit ${sel?'selected':''}" data-round-row="${r.id}"><div><strong>${c.name}</strong><div class="muted">${fmtDate(r.date)} · ${c.tees} tees · Par ${c.par??'—'} · ${r.holes} holes</div><div class="round-status-row">${status}</div></div><div class="score-big">${r.gross}${sel&&Number.isFinite(c.par)?`<span class="score-over">${r.gross-c.par>=0?'+':''}${r.gross-c.par}</span>`:''}</div><div><span class="badge">Diff ${diff==null?'—':diff.toFixed(1)}</span></div><button class="edit-round-btn" data-round-action="${r.id}" type="button">Edit</button></div>`}).join('')}</div>
+ <div class="section-head"><div><div class="eyebrow">ROUND LIST</div><h2>${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'Score by round'}</h2></div></div><div class="card">${sorted.map(r=>{const c=course(r.courseId),diff=scoreDifferential(r),sel=String(state.selectedRoundId)===String(r.id);return `<div class="round-row round-summary has-edit ${sel?'selected':''}" data-round-row="${r.id}"><div><strong>${c.name}</strong><div class="muted">${fmtDate(r.date)} · ${c.tees} tees · Par ${c.par??'—'} · ${r.holes} holes</div></div><div class="score-big">${r.gross}${sel&&Number.isFinite(c.par)?`<span class="score-over">${r.gross-c.par>=0?'+':''}${r.gross-c.par}</span>`:''}</div><div><span class="badge">Diff ${diff==null?'—':diff.toFixed(1)}</span></div><button class="edit-round-btn" data-round-action="${r.id}" type="button">${r.supabaseImportId?'Edit':'Add Stats'}</button></div>`}).join('')}</div>
  ${selectedCourse?courseMemorySection(selectedCourse.id):''}`;
 }
 
@@ -2670,7 +1972,7 @@ function puttingOutcomeGrid(p){
       {cls:'four',v:100*z.four/z.n,label:'4+'}
     ];
     const segs=vals.filter(x=>x.v>0).map(x=>`<div class="putt-seg ${x.cls}" style="height:${x.v}%">${x.v>=12?Math.round(x.v)+'%':''}</div>`).join('');
-    return `<div class="putt-stack-col"><div class="putt-stack-bar">${segs}</div><div class="putt-stack-label ${puttingRowTone(z)}">${z.label}</div><div class="putt-stack-count">${z.n}</div></div>`;
+    return `<div class="putt-stack-col"><div class="putt-stack-bar">${segs}</div><div class="putt-stack-label ${puttingRowTone(z)}">${z.label}</div><div class="putt-stack-count">${z.n} greens</div></div>`;
   }).join('');
   return `<div class="putt-stack-wrap"><div class="putt-stack-chart">${cols}</div></div>
   <div class="putt-stack-legend"><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#4f9df7"></span>1 putt</span><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#55c878"></span>2 putts</span><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#ef6461"></span>3+ putts</span></div>`;
@@ -2692,8 +1994,8 @@ function heatMap(){
  const practice=ranked.filter(z=>z.priority>0).slice(0,3);
  const practiceHtml=practice.length?practice.map((z,i)=>`<div class="practice-item"><div class="practice-rank">${i+1}</div><div><strong>${z.label}</strong><div class="why">${z.why}</div></div><div class="practice-score">${z.priority>20?'High':z.priority>9?'Med':'Low'} focus</div></div>`).join(''):`<div class="muted">No clear putting weakness in the available sample.</div>`;
  return `<div class="putting-summary"><div class="card"><div class="metric-label">Greens tracked</div><div class="metric">${total}</div></div><div class="card"><div class="metric-label">1-putts</div><div class="metric">${ones}</div><div class="muted">${total?Math.round(100*ones/total):0}%</div></div><div class="card"><div class="metric-label">3+ putts</div><div class="metric">${threes}</div></div><div class="card"><div class="metric-label">Best zone</div><div class="metric" style="font-size:20px">${best?.label||'—'}</div><div class="muted">${best?(best.sg>=0?'+':'')+best.sg.toFixed(2)+' SG':'—'}</div></div></div>
- <div class="card"><div class="eyebrow">PUTTING BY DISTANCE</div><h3 style="margin-top:4px">Results</h3>${puttingOutcomeGrid(p)}</div>
- <div class="card" style="margin-top:12px"><div class="eyebrow">PRACTICE PLAN</div><h3 style="margin-top:4px">Focus</h3><div class="practice-focus">${practiceHtml}</div></div>`;
+ <div class="card"><div class="eyebrow">PUTTING BY DISTANCE</div><h3 style="margin-top:4px">Outcome mix</h3>${puttingOutcomeGrid(p)}</div>
+ <div class="card" style="margin-top:12px"><div class="eyebrow">PRACTICE PLAN</div><h3 style="margin-top:4px">Where to spend your putting time</h3><div class="practice-focus">${practiceHtml}</div></div>`;
 }
 
 
@@ -2706,13 +2008,8 @@ function gameKeysPregameHtml(){
   const defs=[['driver','Driver'],['irons','Irons'],['chipping','Chipping'],['putting','Putting']];
   const active=defs.filter(([k])=>swingLines(k).length);
   if(!active.length)return '';
-  const group=([k,label])=>`<div class="game-key-group"><strong>${label}</strong><div class="game-key-list">${swingLines(k).map(x=>`<span class="game-key-pill">${safeText(x)}</span>`).join('')}</div></div>`;
-  const left=defs.slice(0,2).filter(([k])=>swingLines(k).length).map(group).join('');
-  const right=defs.slice(2,4).filter(([k])=>swingLines(k).length).map(group).join('');
-  return `<div class="card game-keys-card">
-    <div class="game-keys-title"><div><div class="eyebrow">YOUR GAME KEYS</div><h2>Keep these in your head</h2></div></div>
-    <div class="game-keys-grid"><div class="game-key-column">${left}</div><div class="game-key-column">${right}</div></div>
-  </div>`;
+  return `<div class="section-head"><div><div class="eyebrow">YOUR GAME KEYS</div><h2>Keep these in your head</h2></div></div>
+    <div class="card game-keys-card">${active.map(([k,label])=>`<div class="game-key-group"><strong>${label}</strong><div class="game-key-list">${swingLines(k).map(x=>`<span class="game-key-pill">${safeText(x)}</span>`).join('')}</div></div>`).join('')}</div>`;
 }
 function myGame(){
  const rs=gameFilteredRounds(),ps=playerSummary(rs);
@@ -2721,6 +2018,12 @@ function myGame(){
  const scopeLabel=selectedCourse?`${selectedCourse.name}${selectedCourse.tees?` · ${selectedCourse.tees}`:''}`:'All data';
  const roundLabel=state.gameRoundLimit==='all'?'All rounds':`Last ${state.gameRoundLimit} rounds`;
  return `<div class="section-head"><div><div class="eyebrow">PLAYER MODEL</div><h2>My Game</h2></div></div>
+
+ <div class="section-head"><div><div class="eyebrow">SWING THOUGHTS</div><h2>My Game Keys</h2></div></div>
+ <div class="swing-grid">
+   ${[['driver','Driver','Your top driver thoughts'],['irons','Irons','Your top iron thoughts'],['chipping','Chipping','Your short-game cues'],['putting','Putting','Your putting cues']].map(([k,label,hint])=>`<div class="card swing-card"><h3>${label}</h3><p>${hint} · one per line · top 3</p><textarea data-swing-input="${k}" placeholder="Add up to 3 thoughts...">${swingTextareaValue(k)}</textarea></div>`).join('')}
+ </div>
+ <div class="swing-save-row"><span id="swingSaveStatus" class="swing-save-status">These will appear in Pregame.</span><button id="saveSwingThoughts" class="button primary" type="button">Save Game Keys</button></div>
 
  <div class="game-filter-block">
    <div class="game-filter-label">Data</div>
@@ -2742,13 +2045,6 @@ function myGame(){
    <div class="card"><div class="metric-label">Putts / round</div><div class="metric">${ps.putts==null?'—':ps.putts.toFixed(1)}</div></div>
  </div>
 
- <div class="section-head"><div><div class="eyebrow">SWING THOUGHTS</div><h2>My Game Keys</h2></div></div>
- <div class="swing-grid">
-   ${[['driver','Driver','Your top driver thoughts'],['irons','Irons','Your top iron thoughts'],['chipping','Chipping','Your short-game cues'],['putting','Putting','Your putting cues']].map(([k,label,hint])=>`<div class="card swing-card"><h3>${label}</h3><p>${hint} · one per line · top 3</p><textarea data-swing-input="${k}" placeholder="Add up to 3 thoughts...">${swingTextareaValue(k)}</textarea></div>`).join('')}
- </div>
- <div class="swing-save-row"><span id="swingSaveStatus" class="swing-save-status">These will appear in Pregame.</span><button id="saveSwingThoughts" class="button primary" type="button">Save Game Keys</button></div>
-
-
  <div class="mygame-accuracy">
    <div class="section-head"><div><div class="eyebrow">SHOT PATTERNS</div><h2>Fairways & GIR</h2></div></div>
    <div class="direction-grid">${directionGraphic('Fairways',fw,false)}${directionGraphic('Greens in regulation',gir,true)}</div>
@@ -2768,10 +2064,7 @@ function selectRoundFromBar(id){
  if(row)row.scrollIntoView({behavior:'smooth',block:'center'});
 }
 function render(){
- destroyCoursePreviewMap();
- const globalCourseBar=document.querySelector('.global-course-bar');
- if(globalCourseBar)globalCourseBar.style.display=state.view==='pregame'?'none':'grid';
- app.innerHTML=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():myGame();
+ app.innerHTML=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():state.view==='coursePreview'?coursePreviewView():myGame();
  document.querySelectorAll('[data-hole-preview]').forEach(b=>b.addEventListener('click',e=>{
    e.preventDefault();e.stopPropagation();openHolePreview(Number(b.dataset.holePreview),state.selectedCourseId);
  }));
@@ -2819,12 +2112,7 @@ function render(){
 
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===state.view));
  if(state.view==='rounds')requestAnimationFrame(()=>document.querySelectorAll('.round-chart-wrap').forEach(w=>w.scrollLeft=w.scrollWidth));
- if(state.view==='pregame')requestAnimationFrame(()=>{
-   const l=document.getElementById('pregameChatLog');if(l)l.scrollTop=l.scrollHeight;
-   ensureCoursePreviewLoaded(state.selectedCourseId,state.coursePreviewHole);
-   requestAnimationFrame(initInteractiveCourseMap);
- });
-
+ if(state.view==='pregame')requestAnimationFrame(()=>{const l=document.getElementById('pregameChatLog');if(l)l.scrollTop=l.scrollHeight});
 }
 window.setView = v => {state.view=v; render();};
 
@@ -2852,27 +2140,17 @@ const backfillUploadStep=document.getElementById('backfillUploadStep');
 const backfillReviewStep=document.getElementById('backfillReviewStep');
 const backfillReview=document.getElementById('backfillReview');
 
-function binaryStatValue(v){
-  if(v===true||v===1||v==='1')return 1;
-  if(v===false||v===0||v==='0')return 0;
-  const x=String(v??'').trim().toLowerCase();
-  if(x==='true'||x==='hit')return 1;
-  if(x==='false'||x==='miss')return 0;
-  return null;
-}
-function validBinaryStat(v){return binaryStatValue(v)!=null}
-function validCountStat(v){return String(v??'').trim()!=='' && Number.isFinite(Number(v))}
 function missingRoundStats(r){
   const c=course(r.courseId);
   const n=r.holes||c?.holeNumbers?.length||0;
   const pars=c?.pars||[];
   let fw=0,gir=0,putts=0;
   for(let i=0;i<n;i++){
-    if(pars[i]!==3 && !validBinaryStat(r.fairways?.[i]))fw++;
-    if(!validBinaryStat(r.gir?.[i]))gir++;
-    if(!validCountStat(r.putts?.[i]))putts++;
+    if(pars[i]!==3 && (r.fairways?.[i]===null || r.fairways?.[i]===undefined))fw++;
+    if(r.gir?.[i]===null || r.gir?.[i]===undefined)gir++;
+    if(r.putts?.[i]===null || r.putts?.[i]===undefined)putts++;
   }
-  const puttingKnown=new Set(db.puttingDetails.filter(p=>p.date===r.date && normalizeCourseName(p.course)===normalizeCourseName(c?.name) && Number.isFinite(Number(p.distance))).map(p=>Number(p.hole)));
+  const puttingKnown=new Set(db.puttingDetails.filter(p=>p.date===r.date && normalizeCourseName(p.course)===normalizeCourseName(c?.name)).map(p=>Number(p.hole)));
   const firstPutts=Math.max(0,n-puttingKnown.size);
   return {fw,gir,putts,firstPutts};
 }
@@ -3033,7 +2311,7 @@ document.getElementById('backfillFromEdit').onclick=()=>{
 document.getElementById('deleteEditRound').onclick=async()=>{
   const id=document.getElementById('editImportId').value;
   if(!id)return;
-  if(!confirm('Delete this round from GolfRecon? This cannot be undone.'))return;
+  if(!confirm('Delete this round from Golf Recon? This cannot be undone.'))return;
   const btn=document.getElementById('deleteEditRound');
   try{
     btn.disabled=true;btn.textContent='Deleting…';
@@ -3117,15 +2395,6 @@ async function compressImage(file,maxDim=1600,quality=.78){
 }
 function val(v){return v===null||v===undefined||v===''?'—':v}
 function boolMark(v){return v===true||v===1?'✓':v===false||v===0?'✕':'—'}
-function directionalReviewHtml(r){
-  const pct=v=>v===null||v===undefined||v===''?'—':`${Number(v).toFixed(Number(v)%1?1:0)}%`;
-  const fd=r?.fairway_distribution, gd=r?.gir_distribution;
-  if(!fd && !gd)return '';
-  const row=(label,v)=>`<div class="import-kpi"><div class="k">${label}</div><div class="v">${pct(v)}</div></div>`;
-  return `<div class="section-head" style="margin-top:16px"><div><div class="eyebrow">DIRECTIONAL DATA</div><h3>Miss patterns found</h3></div></div>
-    ${fd?`<div class="backfill-note" style="margin-bottom:8px"><strong>Fairways</strong></div><div class="import-summary">${row('Hit',fd.hit_pct)}${row('Left',fd.left_pct)}${row('Right',fd.right_pct)}${row('Short',fd.short_pct)}${row('Long',fd.long_pct)}</div>`:''}
-    ${gd?`<div class="backfill-note" style="margin:12px 0 8px"><strong>GIR</strong></div><div class="import-summary">${row('Hit',gd.hit_pct)}${row('Short',gd.short_pct)}${row('Left',gd.left_pct)}${row('Right',gd.right_pct)}${row('Long',gd.long_pct)}${row('Other',gd.other_pct)}</div>`:''}`;
-}
 function reviewHtml(x){
   const r=x.round||x;
   const holes=r.holes_detail||r.hole_details||[];
@@ -3141,7 +2410,6 @@ function reviewHtml(x){
       <div class="import-kpi"><div class="k">Fairways</div><div class="v">${val(r.fairways_hit)}</div></div>
       <div class="import-kpi"><div class="k">GIR</div><div class="v">${val(r.gir)}</div></div>
     </div>
-    ${directionalReviewHtml(r)}
     ${holes.length?`<div style="overflow-x:auto"><table class="import-hole-table"><thead><tr><th>Hole</th><th>Score</th><th>FH</th><th>GIR</th><th>Putts</th><th>1st putt</th></tr></thead><tbody>${holes.map(h=>`<tr><td>${val(h.hole)}</td><td>${val(h.score)}</td><td>${boolMark(h.fairway_hit)}</td><td>${boolMark(h.gir)}</td><td>${val(h.putts)}</td><td>${h.first_putt_distance_ft!=null?val(h.first_putt_distance_ft)+'′':'—'}</td></tr>`).join('')}</tbody></table></div>`:''}
     <div class="import-confidence">Extraction confidence: ${Math.round(100*(x.confidence??r.confidence??0))}%</div>`;
 }
@@ -3194,7 +2462,7 @@ async function callImportFunction(payload,retry=true){
   if(res.status===401 && retry && authSession?.refresh_token){
     try{await refreshAuthSession();return callImportFunction(payload,false)}catch{}
   }
-  if(!res.ok) throw new Error(body.error||body.message||`GolfRecon request failed (${res.status})`);
+  if(!res.ok) throw new Error(body.error||body.message||`Golf Recon request failed (${res.status})`);
   return body;
 }
 function showAuth(mode='signin',message='',kind=''){
@@ -3203,7 +2471,7 @@ function showAuth(mode='signin',message='',kind=''){
   document.getElementById('appShell').style.display='none';
   const signup=mode==='signup';
   document.getElementById('usernameWrap').style.display=signup?'grid':'none';
-  document.getElementById('authTitle').textContent=signup?'Create your GolfRecon account':'Sign in';
+  document.getElementById('authTitle').textContent=signup?'Create your Golf Recon account':'Sign in';
   document.getElementById('authSubtitle').textContent=signup?'Pick a username for groups, leagues and leaderboards.':'Your golf memory, game plan and round history.';
   document.getElementById('authSubmit').textContent=signup?'Create account':'Sign in';
   document.getElementById('authModeToggle').textContent=signup?'Already have an account? Sign in':'New to Golf Recon? Create account';
@@ -3225,7 +2493,7 @@ async function initializeAuth(){
 
 async function bootstrapGolfRecon(){
   const pill=document.getElementById('syncPill'),txt=document.getElementById('syncText');
-  app.innerHTML=`<div class="card bootstrap-card"><div class="bootstrap-spinner"></div><strong>Loading GolfRecon</strong><div class="muted">Syncing your golf database…</div></div>`;
+  app.innerHTML=`<div class="card bootstrap-card"><div class="bootstrap-spinner"></div><strong>Loading Golf Recon</strong><div class="muted">Syncing your golf database…</div></div>`;
   try{
     if(txt)txt.textContent='Syncing';
     if(pill)pill.classList.remove('ok','err');
@@ -3236,12 +2504,11 @@ async function bootstrapGolfRecon(){
     db.rounds=data.rounds||[];
     db.puttingDetails=data.puttingDetails||[];
     db.clubStats=data.clubStats||[];
-    try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){console.warn('Directional import hydration failed',e)}
     const userChip=document.getElementById('userChip');
     if(userChip)userChip.textContent='@'+(db.player.username||db.player.name||'golfer');
 
     let savedCourse=null;
-    try{savedCourse=localStorage.getItem('golfreconSelectedCourseId')}catch{}
+    try{savedCourse=localStorage.getItem('golfiqSelectedCourseId')}catch{}
     if(savedCourse && db.courses.some(c=>c.id===savedCourse)){
       state.selectedCourseId=savedCourse;
     }else if(!db.courses.some(c=>c.id===state.selectedCourseId)){
@@ -3259,7 +2526,7 @@ async function bootstrapGolfRecon(){
   }catch(e){
     if(pill)pill.classList.add('err');
     if(txt)txt.textContent='Database error';
-    app.innerHTML=`<div class="card bootstrap-card"><strong>Could not load GolfRecon</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:10px">Check the Supabase migration and Edge Function deployment.</div></div>`;
+    app.innerHTML=`<div class="card bootstrap-card"><strong>Could not load Golf Recon</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:10px">Check the Supabase migration and Edge Function deployment.</div></div>`;
     console.error(e);
     return null;
   }
@@ -3477,7 +2744,7 @@ async function syncSupabaseRounds(){
     if(unmapped){
       if(pill)pill.classList.add('err');
       if(txt)txt.textContent=`${unmapped} needs course`;
-      console.warn('GolfRecon imports needing course mapping:',unmappedNames);
+      console.warn('Golf Recon imports needing course mapping:',unmappedNames);
     }else{
       if(pill)pill.classList.add('ok');
       if(txt)txt.textContent=`Synced${added?` +${added}`:''}`;
@@ -3527,7 +2794,7 @@ document.getElementById('saveImport').onclick=async()=>{
   const sig=importSignature(r);
   const embedded=embeddedRoundSignatures();
   if(embedded.has(sig)){
-    const ok=confirm('This round appears to already exist in GolfRecon. Save it to Supabase anyway?');
+    const ok=confirm('This round appears to already exist in Golf Recon. Save it to Supabase anyway?');
     if(!ok)return;
   }
   const btn=document.getElementById('saveImport');
@@ -3535,7 +2802,7 @@ document.getElementById('saveImport').onclick=async()=>{
     btn.disabled=true;btn.textContent='Saving…';
     const result=await callImportFunction({action:'save',parsed:pendingImport});
     if(result.duplicate){
-      alert('Duplicate detected. This round is already saved in GolfRecon.');
+      alert('Duplicate detected. This round is already saved in Golf Recon.');
       btn.disabled=false;btn.textContent='Save Round';
       return;
     }
