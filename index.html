@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Golf Recon v14.2 Beta</title>
+  <title>Golf Recon v14.3 Beta</title>
   <style>
 :root{
   --bg:#0d1412;
@@ -875,6 +875,69 @@ main#app{display:block}
 .chat-log{background:rgba(7,14,11,.52);border:1px solid rgba(196,255,99,.08);border-radius:16px;padding:14px}
 @media (max-width: 900px){.hero-copy{grid-template-columns:1fr}.course-stat-lines{grid-template-columns:1fr}.brand-title{font-size:24px;letter-spacing:.22em}.global-course-label strong{font-size:18px}.hero-copy>h2{font-size:30px}}
 
+
+
+/* v14.3 Pregame command center + mobile sticky fix */
+.pregame-command{
+  position:sticky!important;
+  top:6px!important;
+  z-index:60!important;
+  margin-bottom:14px!important;
+  padding:14px 16px 12px!important;
+  background:
+    linear-gradient(180deg,rgba(10,23,18,.985),rgba(7,16,13,.985))!important;
+  border:1px solid rgba(196,255,99,.28)!important;
+  box-shadow:0 16px 36px rgba(0,0,0,.48),0 0 0 1px rgba(196,255,99,.05),0 0 30px rgba(196,255,99,.08)!important;
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));
+}
+.pregame-command::before{
+  content:'';position:absolute;left:0;top:0;width:120px;height:3px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2),transparent);
+  box-shadow:0 0 16px rgba(196,255,99,.35);
+}
+.pregame-command::after{
+  content:'';position:absolute;right:14px;top:12px;width:9px;height:9px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 14px rgba(196,255,99,.8);
+}
+.pregame-command-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(210px,320px);gap:14px;align-items:end}
+.pregame-command-title{min-width:0}.pregame-command-title .eyebrow{font-size:9px;margin-bottom:3px}
+.pregame-title-line{display:flex;align-items:center;gap:10px;min-width:0}
+.pregame-command h2{font-size:25px!important;line-height:1!important;margin:0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pregame-command p{font-size:10px!important;line-height:1.2!important;margin:5px 0 0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pregame-live-pill{font-size:8px;letter-spacing:.15em;font-weight:950;color:var(--accent);border:1px solid rgba(196,255,99,.25);background:rgba(196,255,99,.06);padding:4px 7px;border-radius:999px;white-space:nowrap}
+.pregame-course-picker{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center}
+.pregame-course-picker>span{font-size:8px;letter-spacing:.16em;color:#89a89a;font-weight:900;white-space:nowrap}
+.pregame-course-select{height:34px!important;padding:5px 30px 5px 10px!important;border-radius:10px!important;font-size:11px!important;font-weight:850!important;background:#102019!important;border-color:rgba(196,255,99,.30)!important;min-width:0;width:100%}
+.pregame-stat-deck{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:8px!important;background:transparent!important;border:0!important;padding:0!important}
+.pregame-stat-deck .course-stat-row{display:grid!important;grid-template-columns:38px repeat(4,minmax(0,1fr))!important;gap:2px!important;align-items:center!important;padding:6px 8px!important;border:1px solid rgba(196,255,99,.11)!important;background:rgba(11,24,18,.72)!important;border-radius:11px!important;min-width:0}
+.pregame-stat-deck .row-label{font-size:8px!important;min-width:0!important;letter-spacing:.12em!important}
+.pregame-stat-deck .course-stat strong{font-size:13px!important;line-height:1!important}
+.pregame-stat-deck .course-stat span{font-size:7px!important;line-height:1.1!important;margin-top:2px!important;letter-spacing:.08em!important}
+@media(max-width:700px){
+  .app-shell{padding-top:8px!important}
+  .topbar{margin-bottom:8px!important;padding:10px 12px!important;min-height:0!important}
+  .topbar .brand-title{font-size:17px!important;letter-spacing:.16em!important}
+  .topbar .giq-logo{display:none!important}
+  .topbar-right{position:absolute;right:10px;top:9px}
+  .topbar-right .user-tools{display:none!important}
+  .topbar-right .button{font-size:9px!important;padding:7px 9px!important}
+  .pregame-command{top:4px!important;padding:10px 10px 9px!important;border-radius:15px!important;max-height:none!important}
+  .pregame-command-head{grid-template-columns:1fr!important;gap:5px!important}
+  .pregame-title-line{gap:6px!important}
+  .pregame-command h2{font-size:19px!important}
+  .pregame-live-pill{font-size:6px!important;padding:3px 5px!important}
+  .pregame-command p{font-size:8px!important;margin-top:3px!important}
+  .pregame-course-picker{grid-template-columns:44px minmax(0,1fr)!important;gap:5px!important}
+  .pregame-course-picker>span{font-size:6px!important;line-height:1.05!important;white-space:normal!important}
+  .pregame-course-select{height:29px!important;font-size:9px!important;padding:3px 26px 3px 8px!important}
+  .pregame-stat-deck{grid-template-columns:1fr 1fr!important;gap:5px!important;margin-top:5px!important}
+  .pregame-stat-deck .course-stat-row{grid-template-columns:27px repeat(4,minmax(0,1fr))!important;padding:4px 4px!important;border-radius:8px!important}
+  .pregame-stat-deck .row-label{font-size:6px!important;letter-spacing:.05em!important}
+  .pregame-stat-deck .course-stat strong{font-size:10px!important}
+  .pregame-stat-deck .course-stat span{font-size:5.5px!important;letter-spacing:.02em!important}
+}
+
 </style>
 </head>
 <body>
@@ -909,7 +972,7 @@ main#app{display:block}
     <header class="topbar">
       <div class="topbar-left">
         <div class="brand-title">Golf Recon</div>
-        <div class="brand-meta"><span>v14.2 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-meta"><span>v14.3 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
       <div class="giq-logo" aria-label="Golf Recon">
@@ -1688,10 +1751,19 @@ function pregame(){
   const lastStats=courseRoundStats(c.id,'last'), allStats=courseRoundStats(c.id,'all');
   const pctVal=v=>v==null?'—':`${v}%`, numVal=v=>v==null?'—':v.toFixed(1);
   return `
-    <section class="hero" style="margin-top:0">
-      <div class="hero-copy"><div class="eyebrow">TOMORROW'S PREGAME</div><h2>${c.name}</h2>
-      <p class="muted">${c.tees} tees · Par ${c.par??'—'} · ${c.rating??'—'}/${c.slope??'—'} · ${rounds.length} round${rounds.length===1?'':'s'} in memory</p>
-      <div class="course-stat-lines">
+    <section class="hero pregame-command" style="margin-top:0">
+      <div class="pregame-command-head">
+        <div class="pregame-command-title">
+          <div class="eyebrow">PRE-GAME INTEL</div>
+          <div class="pregame-title-line"><h2>${c.name}</h2><span class="pregame-live-pill">COURSE LOCK</span></div>
+          <p class="muted">${c.tees} tees · Par ${c.par??'—'} · ${c.rating??'—'}/${c.slope??'—'} · ${rounds.length} round${rounds.length===1?'':'s'} in memory</p>
+        </div>
+        <div class="pregame-course-picker">
+          <span>SELECT COURSE</span>
+          <select id="pregameCourseSelect" class="pregame-course-select">${courseDropdownOptions(c.id)}</select>
+        </div>
+      </div>
+      <div class="course-stat-lines pregame-stat-deck">
         <div class="course-stat-row">
           <div class="row-label">Last</div>
           <div class="course-stat"><strong>${lastStats.score??'—'}</strong><span>Score</span></div>
@@ -1706,7 +1778,7 @@ function pregame(){
           <div class="course-stat"><strong>${pctVal(allStats.gir)}</strong><span>GIR</span></div>
           <div class="course-stat"><strong>${numVal(allStats.putts)}</strong><span>Putts</span></div>
         </div>
-      </div></div>
+      </div>
     </section>
 
     ${gameKeysPregameHtml()}
@@ -2065,6 +2137,10 @@ function selectRoundFromBar(id){
 }
 function render(){
  app.innerHTML=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():state.view==='coursePreview'?coursePreviewView():myGame();
+ const globalCourseBar=document.querySelector('.global-course-bar');
+ if(globalCourseBar)globalCourseBar.style.display=state.view==='pregame'?'none':'';
+ const pregameCourseSelect=document.getElementById('pregameCourseSelect');
+ if(pregameCourseSelect)pregameCourseSelect.addEventListener('change',()=>setGlobalCourse(pregameCourseSelect.value));
  document.querySelectorAll('[data-hole-preview]').forEach(b=>b.addEventListener('click',e=>{
    e.preventDefault();e.stopPropagation();openHolePreview(Number(b.dataset.holePreview),state.selectedCourseId);
  }));
