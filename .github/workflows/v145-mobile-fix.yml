@@ -1,0 +1,33 @@
+name: Golf Recon v14.5 Mobile Fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/patch_v145_mobile.py
+      - .github/workflows/v145-mobile-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply v14.5 mobile fixes
+        run: python scripts/patch_v145_mobile.py
+      - name: Commit v14.5
+        run: |
+          git config user.name "github-actions-bot"
+          git config user.email "actions@github.com"
+          git add index.html
+          git commit -m "Golf Recon v14.5 — mobile import scroll and sticky Pregame" || exit 0
+          git push origin HEAD:main
