@@ -1,0 +1,92 @@
+name: Repair Golf Recon v14.9 regression
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/repair-v149.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore v14.8 function set and keep Platoons v14.9
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          p=Path('index.html')
+          current=p.read_text()
+          assert '<title>Golf Recon v14.9 Beta</title>' in current
+
+          # Keep the new Platoons UI function from v14.9.
+          gs=current.index('function groupsView(){')
+          gm=current.index('function myGame(){', gs)
+          new_groups=current[gs:gm].strip()
+          assert 'PLATOON HQ' in new_groups and 'CLUB EAGLE' in new_groups
+
+          # Keep the v14.9 Platoons CSS block.
+          css_start=current.index('/* v14.9 Platoons foundation */')
+          css_end=current.index('</style>', css_start)
+          platoon_css=current[css_start:css_end].rstrip()
+
+          # Rebuild from the last known-good v14.8 index so no helper functions are lost.
+          base=subprocess.check_output(['git','show','4af7c6c463a5130cab4ae6842f5bcac4c7f5e830:index.html'], text=True)
+          assert '<title>Golf Recon v14.8 Beta</title>' in base
+          assert 'function gameKeysPregameHtml(){' in base
+          assert 'function scoreDifferential(r){' in base
+          assert 'function swingLines(key){' in base
+
+          base=base.replace('<title>Golf Recon v14.8 Beta</title>','<title>Golf Recon v14.9 Beta</title>',1)
+          base=base.replace('<span>v14.8 Beta</span>','<span>v14.9 Beta</span>',1)
+
+          # Add Platoons styling once.
+          assert '/* v14.9 Platoons foundation */' not in base
+          base=base.replace('</style>',platoon_css+'\n</style>',1)
+
+          # Replace ONLY the old placeholder groupsView; preserve every helper after it.
+          old_start=base.index('function groupsView(){')
+          after_groups=base.index('function scoreDifferential(r){',old_start)
+          base=base[:old_start]+new_groups+'\n\n'+base[after_groups:]
+
+          # Regression guards for functions accidentally removed by the first v14.9 patch.
+          required=[
+            'function gameKeysPregameHtml(){',
+            'function swingLines(key){',
+            'function scoreDifferential(r){',
+            'function handicapIndexFromDifferentials(',
+            'function roundsChart(',
+            'function myGame(){',
+            'PLATOON HQ',
+            'MISSION CALENDAR',
+            'CLUB EAGLE'
+          ]
+          for token in required:
+            assert token in base, token
+
+          p.write_text(base)
+          PY
+      - name: Syntax and regression check
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text()
+          scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S)
+          inline='\n'.join(x for x in scripts if x.strip())
+          Path('/tmp/golfrecon-inline.js').write_text(inline)
+          PY
+          node --check /tmp/golfrecon-inline.js
+          grep -q 'function gameKeysPregameHtml(){' index.html
+          grep -q 'function scoreDifferential(r){' index.html
+          grep -q 'PLATOON HQ' index.html
+      - name: Commit repaired index
+        run: |
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add index.html
+          git commit -m 'Repair v14.9 regression and restore Golf Recon helpers'
+          git push
