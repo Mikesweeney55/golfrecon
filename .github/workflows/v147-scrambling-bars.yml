@@ -1,0 +1,33 @@
+name: Golf Recon v14.7 Scrambling Bars
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/patch_v147_scrambling_bars.py
+      - .github/workflows/v147-scrambling-bars.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Patch scrambling nested bars
+        run: python scripts/patch_v147_scrambling_bars.py
+      - name: Commit v14.7
+        run: |
+          git config user.name "github-actions-bot"
+          git config user.email "actions@github.com"
+          git add index.html
+          git commit -m "Golf Recon v14.7 — nested scrambling bars" || exit 0
+          git push origin HEAD:main
