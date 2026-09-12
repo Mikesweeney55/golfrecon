@@ -1,0 +1,75 @@
+name: Platoons v15.5 summary layout
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v155-trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Platoons summary and standings
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          js_path=Path('platoons-v15-real.js')
+          css_path=Path('platoons-v15-real.css')
+          index_path=Path('index.html')
+          js=js_path.read_text()
+          css=css_path.read_text()
+          idx=index_path.read_text()
+
+          helpers=r'''function resultRows(m){return Array.isArray(m.results)?m.results:[]}
+function netStandings(m){return resultRows(m).filter(r=>Number.isFinite(Number(r.net))).map(r=>({...r,net:Number(r.net)})).sort((a,b)=>a.net-b.net||Number(a.finish_position??999)-Number(b.finish_position??999))}
+function platoonStandings(p){const members=membersOf(p),score=new Map(members.map(m=>[String(m.name||'').trim().toLowerCase(),{name:m.name,points:0}]));for(const m of (p.missions||[])){if(m.type==='war'||m.status!=='completed')continue;for(const r of resultRows(m)){const k=String(r.player_name||'').trim().toLowerCase();if(score.has(k))score.get(k).points+=Number(r.raw_points||0)}}return [...score.values()].sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name))}
+function missionHighlights(m){const rows=resultRows(m),net=netStandings(m),gross=rows.filter(r=>Number.isFinite(Number(r.gross))).map(r=>({...r,gross:Number(r.gross)})).sort((a,b)=>a.gross-b.gross),pts=rows.filter(r=>Number.isFinite(Number(r.raw_points))).map(r=>({...r,raw_points:Number(r.raw_points)})).sort((a,b)=>b.raw_points-a.raw_points),eagles=rows.filter(r=>Number(r.eagle_count)>0).sort((a,b)=>Number(b.eagle_count)-Number(a.eagle_count));return {lowNet:net[0]||null,lowGross:gross[0]||null,points:pts[0]||null,eagles:eagles[0]||null}}
+function summaryText(m){const net=netStandings(m),h=missionHighlights(m);if(!net.length){const rows=resultRows(m);if(!rows.length)return 'Mission complete.';const ranked=[...rows].sort((a,b)=>(a.finish_position??999)-(b.finish_position??999));const w=ranked[0];return w?`${w.player_name} led the field${w.gross!=null?` with ${w.gross} gross`:''}.`:'Mission complete.'}const w=net[0],runner=net[1];let s=`${w.player_name} took low net at ${w.net}`;if(runner){const margin=runner.net-w.net;s+=margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${runner.player_name}`:` in a tie with ${runner.player_name}`}if(h.lowGross&&h.lowGross.player_name!==w.player_name)s+=`. ${h.lowGross.player_name} posted the low gross at ${h.lowGross.gross}`;if(h.points&&Number(h.points.raw_points)>0)s+=`. ${h.points.player_name} earned ${h.points.raw_points} point${Number(h.points.raw_points)===1?'':'s'}`;return s+'.'}
+function missionSummaryMarkup(m){const net=netStandings(m).slice(0,6),h=missionHighlights(m);const netRows=net.length?net.map((r,i)=>`<div class="gr-net-row"><span><b>${i+1}</b> ${E(r.player_name||'Player')}</span><strong>${r.net}</strong></div>`).join(''):'<div class="gr-after-empty">No net scores</div>';const highlights=[h.lowGross?`<div><span>Low Gross</span><strong>${E(h.lowGross.player_name)} · ${h.lowGross.gross}</strong></div>`:'',h.points&&Number(h.points.raw_points)>0?`<div><span>Points</span><strong>${E(h.points.player_name)} · ${h.points.raw_points}</strong></div>`:'',h.eagles?`<div><span>Eagles</span><strong>${E(h.eagles.player_name)} · ${h.eagles.eagle_count}</strong></div>`:''].filter(Boolean).join('')||'<div class="gr-after-empty">No extra highlights</div>';return `<div class="gr-after-grid"><section class="gr-after-panel"><h4>Net Standings</h4>${netRows}</section><section class="gr-after-panel gr-highlights"><h4>Highlights</h4>${highlights}</section></div><div class="gr-after-narrative">${E(summaryText(m))}</div>`}
+function platoonStandingsMarkup(p){const rows=platoonStandings(p);return `<div class="gr-platoon-standings"><div class="gr-standings-title">Platoon Standings</div>${rows.map((r,i)=>`<div class="gr-platoon-standing-row"><span><b>${i+1}</b> ${E(r.name)}</span><strong>${Number(r.points||0)}</strong></div>`).join('')}</div>`}
+'''
+          js,n=re.subn(r'function summaryText\(m\).*?(?=function missionCard)',helpers,js,flags=re.S)
+          if n!=1: raise SystemExit(f'summary helper patch matches={n}')
+
+          mission=r'''function missionCard(p,m,featured=false){const people=peopleOf(p,m),pre=previewFor(p,m),warId=warIdOf(m);return `<div class="gr-mission ${featured?'featured':''}"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(m.locationName||'Course TBD')}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}</div></div><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' · GUEST':''}</span>`).join('')}</div>${m.status==='ready'?`<div class="gr-preview"><h4>🛰️ Pre-Mission Intel</h4><p>${E(pre.battlefield)}</p><p>${E(pre.watch)}</p></div>`:''}${m.status==='completed'?`<div class="gr-summary gr-summary-compact">${missionSummaryMarkup(m)}</div>`:''}<div class="gr-mini-actions">${m.status==='planned'?`<button class="button primary" onclick="grLockMission('${E(m.id)}')">Lock & Preview</button>`:`<button class="button secondary" onclick="grViewMission('${E(m.id)}')">${m.status==='completed'?'Post-Game':'Preview'}</button>`}<button class="button secondary" onclick="grOpenMissionEditor('${E(m.id)}','${E(warId)}')">Edit</button>${m.status!=='completed'?`<button class="button secondary" onclick="grUploadScores('${E(m.id)}')">📸 Scores</button>`:''}</div></div>`}
+'''
+          js,n=re.subn(r'function missionCard\(p,m,featured=false\).*?(?=function leaderboard)',mission,js,flags=re.S)
+          if n!=1: raise SystemExit(f'missionCard patch matches={n}')
+
+          groups=r'''function groupsV15(){const p=loadPlatoonLocal(),missions=(p.missions||[]).filter(m=>m.type!=='war'),wars=(p.missions||[]).filter(m=>m.type==='war'),standalone=missions.filter(m=>!warIdOf(m)),upcoming=standalone.filter(m=>m.status!=='completed'&&String(m.date||'9999')>=today()).sort((a,b)=>String(a.date).localeCompare(String(b.date))),complete=standalone.filter(m=>m.status==='completed').sort((a,b)=>String(b.date).localeCompare(String(a.date))),latest=complete[0],older=complete.slice(1);return `<section class="card gr-platoon-hq"><div><div class="eyebrow">PLATOON HQ</div><div class="gr-platoon-name">${E(p.name||'My Time')}</div><div class="gr-platoon-motto">${E(p.motto||'')}</div>${platoonStandingsMarkup(p)}<div class="chips"><span class="chip">${E(p.season||new Date().getFullYear())}</span><span class="chip">${membersOf(p).length} cadets</span><span class="chip">${E(p.visibility||'Private')}</span></div><div class="gr-hq-actions"><button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button><button class="button primary" onclick="grOpenOperation()">+ Operation</button></div></div><div>${p.logoData?`<img class="gr-platoon-logo" src="${E(p.logoData)}" alt="Platoon logo">`:'<div class="gr-logo-placeholder">PLATOON<br>LOGO</div>'}</div></section>${wars.map(w=>warCard(p,w)).join('')}${upcoming.length?`<section class="gr-section"><div class="gr-section-head"><h2>Upcoming Missions</h2></div><div class="gr-stack">${upcoming.map((m,i)=>missionCard(p,m,i===0)).join('')}</div></section>`:''}${latest?`<section class="gr-section"><div class="gr-section-head"><h2>Latest Mission</h2></div>${missionCard(p,latest,true)}</section>`:''}${older.length?`<section class="gr-section"><details class="card"><summary style="font-weight:850;cursor:pointer">Mission History · ${older.length}</summary><div style="margin-top:8px">${older.map(m=>`<div class="gr-archive-row">${dateTile(m.date)}<div><div style="font-weight:850">${E(m.title||m.locationName)}</div><div class="muted" style="font-size:9px">${E(m.locationName||'')} · ${E(fmtTime(m.teeTime))}</div></div><div class="gr-archive-actions"><button class="button secondary" onclick="grViewMission('${E(m.id)}')">Preview / Post-Game</button></div></div>`).join('')}</div></details></section>`:''}${!wars.length&&!upcoming.length&&!latest?'<div class="card empty" style="margin-top:14px">No Missions yet. Create one with + Operation.</div>':''}`}
+'''
+          js,n=re.subn(r'function groupsV15\(\).*?(?=function modal)',groups,js,flags=re.S)
+          if n!=1: raise SystemExit(f'groups patch matches={n}')
+
+          view=r'''window.grViewMission=id=>{const p=loadPlatoonLocal(),m=(p.missions||[]).find(x=>x.id===id);if(!m)return;const pre=previewFor(p,m);modal(`<div class="dialog-head"><div><div class="eyebrow">${m.status==='completed'?'AFTER ACTION':'PRE-MISSION INTEL'}</div><h2>${E(m.title||'Mission')}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-event-banner"><div class="gr-event-course">${E(m.locationName||'Course TBD')}</div><div class="gr-event-facts"><span class="gr-event-fact">📅 ${E(fmtDate(m.date))}</span><span class="gr-event-fact">⏱ ${E(fmtTime(m.teeTime))}</span><span class="gr-event-fact">${E(m.format||'')}</span></div></div>${m.status!=='completed'?`<div class="gr-preview"><h4>Battlefield</h4><p>${E(pre.battlefield)}</p><h4>Field</h4><p>${E(pre.watch)}</p></div>`:`<div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>`}<div class="dialog-actions"><button class="button secondary" onclick="grCloseModal()">Close</button></div>`) };
+'''
+          js,n=re.subn(r'window\.grViewMission=id=>.*?(?=window\.grUploadScores)',view,js,flags=re.S)
+          if n!=1: raise SystemExit(f'view patch matches={n}')
+
+          css += r'''
+.gr-platoon-standings{margin-top:12px;border:1px solid rgba(255,255,255,.07);background:#0d1713;border-radius:12px;padding:9px 10px;max-width:360px}.gr-standings-title{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:900;margin-bottom:4px}.gr-platoon-standing-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:3px 0;font-size:10px}.gr-platoon-standing-row b{color:var(--accent);display:inline-block;width:15px}.gr-platoon-standing-row strong{font-size:11px}.gr-after-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px}.gr-after-panel{border:1px solid rgba(255,255,255,.07);background:#0b1511;border-radius:10px;padding:8px;min-width:0}.gr-after-panel h4{font-size:10px;margin:0 0 5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.gr-net-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:9px}.gr-net-row:last-child{border-bottom:0}.gr-net-row b{color:var(--accent);display:inline-block;width:13px}.gr-net-row strong{font-size:10px}.gr-highlights>div{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)}.gr-highlights>div:last-child{border-bottom:0}.gr-highlights span{display:block;color:var(--muted);font-size:7px;text-transform:uppercase;letter-spacing:.06em}.gr-highlights strong{display:block;font-size:9px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gr-after-empty{font-size:9px;color:var(--muted);padding:4px 0}.gr-after-narrative{margin-top:7px;font-size:10px;line-height:1.35;color:#dce6e1;border-top:1px solid rgba(255,255,255,.06);padding-top:7px}.gr-summary-compact{padding:8px}.gr-after-action{padding:10px}.gr-after-action .gr-after-grid{gap:9px}.gr-after-action .gr-after-narrative{font-size:11px}@media(max-width:700px){.gr-platoon-standings{max-width:none;margin-right:-74px}.gr-after-grid{grid-template-columns:1fr 1fr}.gr-after-panel{padding:7px}.gr-after-action{max-height:52vh;overflow:auto}}
+'''
+
+          idx=idx.replace('Golf Recon v15.4 Beta','Golf Recon v15.5 Beta')
+          idx=idx.replace('platoons-v15-real.css?v=154','platoons-v15-real.css?v=155')
+          idx=idx.replace('platoons-v15-real.js?v=154','platoons-v15-real.js?v=155')
+
+          js_path.write_text(js)
+          css_path.write_text(css)
+          index_path.write_text(idx)
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add platoons-v15-real.js platoons-v15-real.css index.html
+          git commit -m "Add compact Mission summaries and Platoon standings" || exit 0
+          git push
