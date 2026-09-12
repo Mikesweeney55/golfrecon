@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 p = Path('index.html')
 s = p.read_text()
@@ -78,8 +77,7 @@ new_func = r'''function groupsView(){
   </div>`;
 }'''
 
-pattern = r'function groupsView\(\)\{.*?\n\}\n\nfunction myGame'
-m = re.search(pattern, s, re.S)
-assert m, 'groupsView block not found'
-s = s[:m.start()] + new_func + '\n\nfunction myGame' + s[m.end():]
+start = s.index('function groupsView(){')
+end = s.index('function myGame(){', start)
+s = s[:start] + new_func + '\n\n' + s[end:]
 p.write_text(s)
