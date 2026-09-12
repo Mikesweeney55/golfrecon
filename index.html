@@ -1062,7 +1062,6 @@ main#app{overflow:visible!important;contain:none!important}
 .scramble-swatch.attempts{background:rgba(67,180,255,.16);border-color:rgba(67,180,255,.55)}
 .scramble-swatch.saves{background:var(--accent);border-color:rgba(199,255,102,.55)}
 
-
 /* v14.9 Platoons foundation */
 .platoon-shell{display:grid;gap:14px}
 .platoon-command{padding:20px;background:radial-gradient(circle at 88% 0,rgba(56,201,255,.08),transparent 36%),linear-gradient(145deg,rgba(13,31,22,.98),rgba(7,19,14,.98));overflow:hidden;position:relative}
@@ -1084,7 +1083,6 @@ main#app{overflow:visible!important;contain:none!important}
 .eagle-lockup{display:flex;gap:12px;align-items:center}.eagle-mark{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(184,234,104,.28);background:rgba(184,234,104,.06);font-size:22px}.eagle-lockup h3{margin:0 0 3px}.eagle-lockup .muted{font-size:10px}
 .privacy-card{border-left:3px solid rgba(56,201,255,.45)}.privacy-stats{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.privacy-stats .badge{min-width:auto}
 @media(max-width:700px){.platoon-grid{grid-template-columns:1fr}.platoon-kpis{grid-template-columns:repeat(2,1fr)}.platoon-command{padding:16px}.platoon-title{font-size:24px}.calendar-day{min-height:36px;padding:4px}.platoon-command-head{display:block}}
-
 </style>
 </head>
 <body>
@@ -2701,6 +2699,248 @@ function groupsView(){
   </div>`;
 }
 
+function scoreDifferential(r){
+ const c=course(r.courseId);
+ if(r.holes!==18 || !c)return null;
+ let rating=c.rating,slope=c.slope;
+ if((!Number.isFinite(rating)||!Number.isFinite(slope)) && isCalusaName(c.name||c.baseName)){
+   const tee=romanTee(c.tees);
+   const rs=tee?CALUSA_BLUE_TEE_RATINGS[tee]:null;
+   if(rs){rating=rs.rating;slope=rs.slope}
+ }
+ if(!Number.isFinite(rating) || !Number.isFinite(slope) || !slope)return null;
+ // WHS Score Differential estimate: 113 / Slope × (recorded gross - Course Rating - PCC[0]).
+ return Math.round((((r.gross-rating)*113/slope)+Number.EPSILON)*10)/10;
+}
+function handicapIndexFromDifferentials(differentials){
+  const recent=(differentials||[]).filter(Number.isFinite).slice(-20);
+  const n=recent.length;
+  if(n<3)return null;
+  let use=1,adjust=0;
+  if(n===3){use=1;adjust=-2.0}
+  else if(n===4){use=1;adjust=-1.0}
+  else if(n===5){use=1}
+  else if(n===6){use=2;adjust=-1.0}
+  else if(n<=8){use=2}
+  else if(n<=11){use=3}
+  else if(n<=14){use=4}
+  else if(n<=16){use=5}
+  else if(n<=18){use=6}
+  else if(n===19){use=7}
+  else {use=8}
+  const selected=recent.slice().sort((a,b)=>a-b).slice(0,use);
+  const raw=avg(selected)+adjust;
+  return Math.min(54,Math.round((raw+Number.EPSILON)*10)/10);
+}
+function handicapIndexAtRound(target){
+  const eligible=db.rounds
+    .filter(r=>r.holes===18 && Number.isFinite(scoreDifferential(r)))
+    .slice()
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date)) || (Number(a.id)||0)-(Number(b.id)||0));
+  const idx=eligible.findIndex(r=>String(r.id)===String(target?.id));
+  if(idx<0)return null;
+  return handicapIndexFromDifferentials(eligible.slice(0,idx+1).map(scoreDifferential));
+}
+function currentHandicapIndex(){
+  const diffs=db.rounds
+    .filter(r=>r.holes===18 && Number.isFinite(scoreDifferential(r)))
+    .slice()
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date)) || (Number(a.id)||0)-(Number(b.id)||0))
+    .map(scoreDifferential);
+  return handicapIndexFromDifferentials(diffs);
+}
+
+const roundStatDefs={
+ score:{label:'Score',short:'Score',domain:[70,100],value:r=>r.holes===18?r.gross:null,better:'low',fmt:v=>Math.round(v)},
+ scoreToPar:{label:'Score vs par',short:'Vs Par',domain:[0,25],value:r=>r.scoreToPar,better:'low',fmt:v=>(v>=0?'+':'')+Math.round(v)},
+ differential:{label:'Score differential',short:'Score Differential',domain:[0,25],value:r=>scoreDifferential(r),better:'low',fmt:v=>v.toFixed(1)},
+ handicap:{label:'Handicap Index',short:'Handicap',domain:[0,30],value:r=>handicapIndexAtRound(r),better:'low',fmt:v=>v.toFixed(1)},
+ gir:{label:'Greens in regulation',short:'GIR',domain:[0,100],value:r=>{const a=(r.gir||[]).map(binaryStatValue).filter(v=>v!=null);return a.length?100*sum(a)/a.length:null},better:'high',fmt:v=>Math.round(v)+'%'},
+ fairways:{label:'Fairways hit',short:'Fairways',domain:[0,100],value:r=>{const a=(r.fairways||[]).map(binaryStatValue).filter(v=>v!=null);return a.length?100*sum(a)/a.length:null},better:'high',fmt:v=>Math.round(v)+'%'},
+ putts:{label:'Putts',short:'Putting',domain:[20,45],value:r=>r.holes===18?sum(r.putts):null,better:'low',fmt:v=>Math.round(v)},
+ chips:{label:'Chip shots',short:'Chipping',domain:[0,20],value:r=>r.holes===18?sum(r.chips):null,better:'low',fmt:v=>Math.round(v)},
+ penalties:{label:'Penalty strokes',short:'Penalties',domain:[0,6],value:r=>r.holes===18?sum(r.penalties):null,better:'low',fmt:v=>Math.round(v)},
+ scrambling:{label:'Scrambling',short:'Scrambling',domain:[0,100],value:r=>scramblingPct(r),better:'high',fmt:v=>Math.round(v)}
+};
+function statValue(r,key){const d=roundStatDefs[key]||roundStatDefs.score,v=d.value(r);return Number.isFinite(v)?v:null}
+function filteredRounds(){
+ let rs=db.rounds.slice();
+ if(state.roundCourseId!=='all')rs=rs.filter(r=>r.courseId===state.roundCourseId);
+ if(state.roundFilter==='18')rs=rs.filter(r=>r.holes===18);
+ if(state.roundFilter==='9')rs=rs.filter(r=>r.holes===9);
+ return rs.sort((a,b)=>b.date.localeCompare(a.date));
+}
+function roundsChart(rounds,key){
+ const d=roundStatDefs[key],chrono=rounds.slice().sort((a,b)=>a.date.localeCompare(b.date));
+
+ if(key==='scrambling'){
+   const counts=chrono.map(r=>({r,c:scramblingCounts(r)}));
+   const eligible=counts.filter(x=>x.c.opportunities>0);
+   if(!eligible.length)return `<div class="card empty">No scrambling opportunities in the selected rounds.</div>`;
+
+   const maxRoundHoles=Math.max(...counts.map(x=>Number(x.r.holes)||0),1);
+   const maxAttempts=Math.max(...eligible.map(x=>x.c.opportunities),1);
+   let max=Math.max(maxRoundHoles,maxAttempts);
+   if(max<=9)max=9; else if(max<=12)max=12; else max=18;
+   const ticks=[max,Math.round(max*.75),Math.round(max*.5),Math.round(max*.25),0];
+   const bars=counts.map(({r,c})=>{
+     const outerH=c.opportunities?Math.max(1,100*c.opportunities/max):0;
+     const fillH=c.opportunities?Math.max(0,Math.min(100,100*c.made/c.opportunities)):0;
+     const sel=String(state.selectedRoundId)===String(r.id);
+     const shown=`${c.made}/${c.opportunities}`;
+     return `<div class="bar-col ${sel?'selected':''}" data-round-bar="${r.id}" role="button" tabindex="0" aria-label="${fmtDate(r.date)}, ${c.made} scrambling saves in ${c.opportunities} opportunities"><div class="bar-track"><div class="bar-value" style="bottom:calc(${outerH}% + 6px)">${shown}</div>${c.opportunities?`<div class="bar scramble-bar" style="height:${outerH}%"><div class="scramble-fill" style="height:${fillH}%"></div></div>`:''}</div><div class="bar-label"><strong>${shortDate(r.date)}${r.holes===9?'<span class="nine-marker"></span>':''}</strong></div></div>`;
+   }).join('');
+   const total=eligible.reduce((a,x)=>({made:a.made+x.c.made,opportunities:a.opportunities+x.c.opportunities}),{made:0,opportunities:0});
+   const bestRound=eligible.slice().sort((a,b)=>(b.c.made/b.c.opportunities)-(a.c.made/a.c.opportunities)||b.c.opportunities-a.c.opportunities)[0];
+   const latestRound=eligible.at(-1);
+   const summary=`<span class="badge">Total ${total.made}/${total.opportunities}</span><span class="badge">Best ${bestRound?scramblingDisplay(bestRound.r):'—'}</span><span class="badge">Latest ${latestRound?scramblingDisplay(latestRound.r):'—'}</span>`;
+   const note=`<div class="scramble-legend"><span><i class="scramble-swatch attempts"></i>Full bar = opportunities</span><span><i class="scramble-swatch saves"></i>Filled portion = saves</span></div><div class="target-note">Both use the same count scale. Example: 5/18 reaches 18 attempts, with the fill rising to 5.</div>`;
+   return `<div class="card chart-card"><div class="chart-head"><div><div class="eyebrow">ROUND-BY-ROUND TREND</div><strong>${d.label}</strong></div></div><div class="chart-scale"><div class="y-axis">${ticks.map(v=>`<span>${v}</span>`).join('')}</div><div class="round-chart-wrap"><div class="round-chart true-scale" style="--bars:${chrono.length}">${bars}</div></div></div><div class="chart-summary">${summary}</div>${note}</div>`;
+ }
+
+ const vals=chrono.map(r=>statValue(r,key)).filter(v=>v!=null);
+ if(!vals.length)return `<div class="card empty">No comparable data for this metric in the selected rounds.</div>`;
+ let [min,max]=d.domain;if(Math.min(...vals)<min)min=Math.floor(Math.min(...vals)/5)*5;if(Math.max(...vals)>max)max=Math.ceil(Math.max(...vals)/5)*5;
+ const range=Math.max(max-min,1),av=avg(vals),best=d.better==='high'?Math.max(...vals):Math.min(...vals),ticks=[max,min+range*.75,min+range*.5,min+range*.25,min];
+ const bars=chrono.map(r=>{const v=statValue(r,key),h=v==null?0:Math.max(1,Math.min(100,100*(v-min)/range)),sel=String(state.selectedRoundId)===String(r.id),shown=v==null?'—':d.fmt(v);return `<div class="bar-col ${sel?'selected':''}" data-round-bar="${r.id}" role="button" tabindex="0" aria-label="${fmtDate(r.date)}, ${v==null?'no value':shown}"><div class="bar-track"><div class="bar-value" style="bottom:calc(${h}% + 6px)">${shown}</div><div class="bar" style="height:${h}%"></div></div><div class="bar-label"><strong>${shortDate(r.date)}${r.holes===9?'<span class="nine-marker"></span>':''}</strong></div></div>`}).join('');
+ const latest=chrono.at(-1),lv=latest?statValue(latest,key):null;
+ let summary=`<span class="badge">Average ${d.fmt(av)}</span><span class="badge">Best ${d.fmt(best)}</span><span class="badge">Latest ${lv==null?'—':d.fmt(lv)}</span>`;
+ let note='';
+ if(key==='handicap'){
+   const current=currentHandicapIndex();
+   summary=`<span class="badge">Current ${current==null?'—':current.toFixed(1)}</span><span class="badge">Low shown ${Math.min(...vals).toFixed(1)}</span><span class="badge">Rounds ${vals.length}</span>`;
+   note='<div class="target-note">Golf Recon handicap estimate uses the USGA/WHS lowest differentials table: lowest 8 of the most recent 20 once 20 are available. Stored gross score is used with PCC assumed 0; official GHIN can differ when adjusted-gross, PCC, cap, exceptional-score or committee adjustments apply.</div>';
+ }
+ return `<div class="card chart-card"><div class="chart-head"><div><div class="eyebrow">ROUND-BY-ROUND TREND</div><strong>${d.label}</strong></div></div><div class="chart-scale"><div class="y-axis">${ticks.map(v=>`<span>${d.fmt(v)}</span>`).join('')}</div><div class="round-chart-wrap"><div class="round-chart true-scale" style="--bars:${chrono.length}">${bars}</div></div></div><div class="chart-summary">${summary}</div>${note}</div>`;
+}
+function roundsView(){
+ const sorted=filteredRounds(),key=state.roundStat||'score',d=roundStatDefs[key];
+ const courseChoices=db.courses.slice().sort((a,b)=>(a.baseName||a.name).localeCompare(b.baseName||b.name)||String(a.tees||'').localeCompare(String(b.tees||'')));
+ const selectedCourse=state.roundCourseId==='all'?null:course(state.roundCourseId);
+ return `<div class="section-head"><div><div class="eyebrow">ROUND DATABASE</div><h2>${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'All courses'} · ${sorted.length} round${sorted.length===1?'':'s'}</h2></div></div>
+ <div class="game-filter-label">Course scope</div>
+ <div class="scope-toggle">
+   <button class="filter-tab ${state.roundCourseId==='all'?'':'active'}" data-round-scope="selected">Selected course</button>
+   <button class="filter-tab ${state.roundCourseId==='all'?'active':''}" data-round-scope="all">All courses</button>
+ </div>
+ <div class="stat-tabs">${Object.entries(roundStatDefs).map(([k,x])=>`<button class="stat-tab ${k===key?'active':''}" data-round-stat="${k}">${x.short}</button>`).join('')}</div>
+ <div class="filter-tabs"><button class="filter-tab ${state.roundFilter==='18'?'active':''}" data-round-filter="18">18 holes</button><button class="filter-tab ${state.roundFilter==='all'?'active':''}" data-round-filter="all">All</button><button class="filter-tab ${state.roundFilter==='9'?'active':''}" data-round-filter="9">9 holes</button></div>
+ ${roundsChart(sorted,key)}
+ <div class="section-head"><div><div class="eyebrow">ROUND LIST</div><h2>${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'Score by round'}</h2></div></div><div class="card">${sorted.map(r=>{const c=course(r.courseId),diff=scoreDifferential(r),sel=String(state.selectedRoundId)===String(r.id),g=missingRoundStats(r),basicMissing=g.fw+g.gir+g.putts,status=basicMissing?`<span class="round-status missing">Missing stats</span>`:g.firstPutts?`<span class="round-status warn">Putt detail missing</span>`:`<span class="round-status complete">Complete ✓</span>`;return `<div class="round-row round-summary has-edit ${sel?'selected':''}" data-round-row="${r.id}"><div><strong>${c.name}</strong><div class="muted">${fmtDate(r.date)} · ${c.tees} tees · Par ${c.par??'—'} · ${r.holes} holes</div><div class="round-status-row">${status}</div></div><div class="score-big">${r.gross}${sel&&Number.isFinite(c.par)?`<span class="score-over">${r.gross-c.par>=0?'+':''}${r.gross-c.par}</span>`:''}</div><div><span class="badge">Diff ${diff==null?'—':diff.toFixed(1)}</span></div><button class="edit-round-btn" data-round-action="${r.id}" type="button">Edit</button></div>`}).join('')}</div>
+ ${selectedCourse?courseMemorySection(selectedCourse.id):''}`;
+}
+
+function gameCourseOptions(){
+  const ids=[...new Set(db.rounds.map(r=>r.courseId))];
+  return ids.map(id=>course(id)).filter(Boolean).sort((a,b)=>(a.baseName||a.name).localeCompare(b.baseName||b.name)||String(a.tees||'').localeCompare(String(b.tees||'')));
+}
+function gameFilteredRounds(){
+  let rs=db.rounds.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  if(state.gameCourseId!=='all')rs=rs.filter(r=>r.courseId===state.gameCourseId);
+  if(state.gameRoundLimit!=='all')rs=rs.slice(0,Number(state.gameRoundLimit));
+  return rs;
+}
+function gameSelectedPutting(){
+  const rs=gameFilteredRounds();
+  const allowed=new Set();
+  rs.forEach(r=>{
+    const c=course(r.courseId);
+    if(!c)return;
+    const pn=puttingCourseNameForCourse(c);
+    if(pn)allowed.add(`${r.date}|${pn}`);
+  });
+  return db.puttingDetails.filter(p=>allowed.has(`${p.date}|${p.course}`));
+}
+function weightedDistributionFromRounds(rs,key){
+  const use=rs.filter(r=>r[key]);
+  if(!use.length)return null;
+  const keys=key==='fairwayDistribution'
+    ?['hitPct','missLeftPct','missRightPct','missShortPct','missLongPct','missFairwaysHitPct']
+    :['hitPct','missShortPct','missLeftPct','missRightPct','missLongPct','missGirPct','noChancePct'];
+  const totals=Object.fromEntries(keys.map(k=>[k,0]));
+  let totalW=0;
+  use.forEach(r=>{
+    const w=key==='fairwayDistribution'?(r.fairways||[]).filter(v=>v!=null).length:(r.gir||[]).filter(v=>v!=null).length;
+    if(!w)return;
+    totalW+=w;
+    keys.forEach(k=>totals[k]+=(r[key][k]||0)*w);
+  });
+  if(!totalW)return null;
+  keys.forEach(k=>totals[k]/=totalW);
+  totals.rounds=use.length;
+  return totals;
+}
+function detailedPuttingRounds(){return [...new Set(db.puttingDetails.map(p=>p.date+'|'+p.course))].sort().reverse()}
+function selectedPutting(){return gameSelectedPutting()}
+function heatTone(sg,n){if(!n)return 'no-data';if(sg>=.30)return 'heat-excellent';if(sg>=.10)return 'heat-good';if(sg>=-.09)return 'heat-average';return 'heat-poor'}
+
+function cellTone(label,outcome){
+  // Color means "how good is this result from this distance?"
+  // It does NOT judge a complementary percentage in isolation.
+  // Example: from 0–3 ft, a 2-putt is a bad outcome even when it happened 0% of the time.
+  if(outcome==='3+') return 'bad';
+  if(outcome==='1') return 'good';
+  if(label==='0–3 ft') return 'bad';
+  if(label==='4–6 ft') return 'ok';
+  if(label==='7–10 ft') return 'ok';
+  return 'good';
+}
+function puttingRowTone(z){return z.n?'':'empty'}
+function puttingOutcomeGrid(p){
+  const stats=puttingBandStats(p);
+  const cols=stats.map(z=>{
+    if(!z.n)return `<div class="putt-stack-col"><div class="putt-stack-bar"></div><div class="putt-stack-label">${z.label}</div><div class="putt-stack-count">0</div></div>`;
+    const vals=[
+      {cls:'one',v:100*z.one/z.n,label:'1'},
+      {cls:'two',v:100*z.two/z.n,label:'2'},
+      {cls:'three',v:100*z.three/z.n,label:'3'},
+      {cls:'four',v:100*z.four/z.n,label:'4+'}
+    ];
+    const segs=vals.filter(x=>x.v>0).map(x=>`<div class="putt-seg ${x.cls}" style="height:${x.v}%">${x.v>=12?Math.round(x.v)+'%':''}</div>`).join('');
+    return `<div class="putt-stack-col"><div class="putt-stack-bar">${segs}</div><div class="putt-stack-label ${puttingRowTone(z)}">${z.label}</div><div class="putt-stack-count">${z.n}</div></div>`;
+  }).join('');
+  return `<div class="putt-stack-wrap"><div class="putt-stack-chart">${cols}</div></div>
+  <div class="putt-stack-legend"><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#4f9df7"></span>1 putt</span><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#55c878"></span>2 putts</span><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#ef6461"></span>3+ putts</span></div>`;
+}
+function heatMap(){
+ const p=selectedPutting(),stats=puttingBandStats(p);
+ const total=p.length,ones=p.filter(x=>x.putts===1).length,threes=p.filter(x=>x.putts>=3).length,best=stats.filter(x=>x.sg!=null).sort((a,b)=>b.sg-a.sg)[0];
+ const ranked=stats.filter(z=>z.n>=3).map(z=>{
+   const onePct=100*z.one/z.n,badPct=100*(z.three+z.four)/z.n;
+   const shortPenalty=z.hi<=10?Math.max(0,55-onePct):Math.max(0,25-onePct)*.25;
+   const threePenalty=badPct*(z.hi<=20?.7:1.15);
+   const priority=shortPenalty+threePenalty;
+   let why='';
+   if(z.hi<=10 && onePct<55) why=`1-putt rate ${Math.round(onePct)}%`;
+   else if(badPct>0) why=`3+ putts ${Math.round(badPct)}%`;
+   else why=`${Math.round(onePct)}% 1-putt`;
+   return {...z,priority,why};
+ }).sort((a,b)=>b.priority-a.priority);
+ const practice=ranked.filter(z=>z.priority>0).slice(0,3);
+ const practiceHtml=practice.length?practice.map((z,i)=>`<div class="practice-item"><div class="practice-rank">${i+1}</div><div><strong>${z.label}</strong><div class="why">${z.why}</div></div><div class="practice-score">${z.priority>20?'High':z.priority>9?'Med':'Low'} focus</div></div>`).join(''):`<div class="muted">No clear putting weakness in the available sample.</div>`;
+ return `<div class="putting-summary"><div class="card"><div class="metric-label">Greens tracked</div><div class="metric">${total}</div></div><div class="card"><div class="metric-label">1-putts</div><div class="metric">${ones}</div><div class="muted">${total?Math.round(100*ones/total):0}%</div></div><div class="card"><div class="metric-label">3+ putts</div><div class="metric">${threes}</div></div><div class="card"><div class="metric-label">Best zone</div><div class="metric" style="font-size:20px">${best?.label||'—'}</div><div class="muted">${best?(best.sg>=0?'+':'')+best.sg.toFixed(2)+' SG':'—'}</div></div></div>
+ <div class="card"><div class="eyebrow">PUTTING BY DISTANCE</div><h3 style="margin-top:4px">Results</h3>${puttingOutcomeGrid(p)}</div>
+ <div class="card" style="margin-top:12px"><div class="eyebrow">PRACTICE PLAN</div><h3 style="margin-top:4px">Focus</h3><div class="practice-focus">${practiceHtml}</div></div>`;
+}
+
+
+function swingLines(key){
+  const v=db.swingThoughts?.[key];
+  return Array.isArray(v)?v:[];
+}
+function swingTextareaValue(key){return safeText(swingLines(key).join('\n'))}
+function gameKeysPregameHtml(){
+  const defs=[['driver','Driver'],['irons','Irons'],['chipping','Chipping'],['putting','Putting']];
+  const active=defs.filter(([k])=>swingLines(k).length);
+  if(!active.length)return '';
+  const group=([k,label])=>`<div class="game-key-group"><strong>${label}</strong><div class="game-key-list">${swingLines(k).map(x=>`<span class="game-key-pill">${safeText(x)}</span>`).join('')}</div></div>`;
+  const left=defs.slice(0,2).filter(([k])=>swingLines(k).length).map(group).join('');
+  const right=defs.slice(2,4).filter(([k])=>swingLines(k).length).map(group).join('');
+  return `<div class="card game-keys-card">
+    <div class="game-keys-title"><div><div class="eyebrow">YOUR GAME KEYS</div><h2>Keep these in your head</h2></div></div>
+    <div class="game-keys-grid"><div class="game-key-column">${left}</div><div class="game-key-column">${right}</div></div>
+  </div>`;
+}
 function myGame(){
  const rs=gameFilteredRounds(),ps=playerSummary(rs);
  const fw=weightedDistributionFromRounds(rs,'fairwayDistribution'),gir=weightedDistributionFromRounds(rs,'girDistribution');
