@@ -2702,7 +2702,9 @@ function platoonDefault(){
 function loadPlatoonLocal(){
   const d=platoonDefault();
   try{
-    const x=JSON.parse(localStorage.getItem(PLATOON_LOCAL_KEY)||'null');
+    const raw=localStorage.getItem(PLATOON_LOCAL_KEY)||localStorage.getItem('golfreconPlatoonV1410');
+    const x=JSON.parse(raw||'null');
+    if(x&&!localStorage.getItem(PLATOON_LOCAL_KEY))try{localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(x))}catch{}
     if(!x)return d;
     const p={...d,...x};
     p.members=Array.isArray(x.members)&&x.members.length?x.members:d.members;
