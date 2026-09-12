@@ -3177,7 +3177,7 @@ document.getElementById('authForm').addEventListener('submit',async e=>{
     btn.textContent=authMode==='recovery'?'Updating…':authMode==='signup'?'Creating…':'Signing in…';
     msg.className='auth-message';msg.textContent='';
     if((authMode==='signup'||authMode==='recovery')&&password!==confirmPassword)throw new Error('Passwords do not match.');
-    if(password.length<8)throw new Error('Password must be at least 8 characters.');
+    if((authMode==='signup'||authMode==='recovery')&&password.length<8)throw new Error('Password must be at least 8 characters.');
     if(authMode==='recovery'){
       const session=await ensureAuthSession();
       if(!session?.access_token)throw new Error('This password reset link has expired. Request a new one.');
