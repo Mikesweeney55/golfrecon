@@ -1,0 +1,40 @@
+name: Preserve v14.10 Platoon Local Data
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/v1411-migrate-local.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add local storage migration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old="const x=JSON.parse(localStorage.getItem(PLATOON_LOCAL_KEY)||'null');"
+          new="const raw=localStorage.getItem(PLATOON_LOCAL_KEY)||localStorage.getItem('golfreconPlatoonV1410');\n    const x=JSON.parse(raw||'null');\n    if(x&&!localStorage.getItem(PLATOON_LOCAL_KEY))try{localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(x))}catch{}"
+          assert old in s
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text()
+          assert "golfreconPlatoonV1410" in s
+          scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S)
+          Path('/tmp/gr.js').write_text('\n'.join(x for x in scripts if x.strip()))
+          PY
+          node --check /tmp/gr.js
+      - name: Commit
+        run: |
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add index.html
+          git commit -m 'Preserve v14.10 Platoon missions during v14.11 upgrade'
+          git push
