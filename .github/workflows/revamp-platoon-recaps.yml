@@ -12,20 +12,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply direct recap patch
+      - name: Apply recap polish
         run: python scripts/patch-recaps-v2.py
       - name: Verify
         run: |
           node --check dev-v15.5-results.js
-          node --check dev-mobile-pregame-fix.js
-          grep -q 'AFTER ACTION REPORT' dev-v15.5-results.js
-          grep -q 'PLATOON INTEL' dev-v15.5-results.js
-          grep -q 'dev-v15.5-results.js?v=156' index.html
-          grep -q 'dev-mobile-pregame-fix.js?v=156' index.html
+          grep -q 'CLUB EAGLE' dev-v15.5-results.js
+          grep -q 'Kevin Cunningham' dev-v15.5-results.js
+          grep -q 'Josh Mankey' dev-v15.5-results.js
+          grep -q 'gr155RecapNote' dev-v15.5-results.js
+          grep -q 'dev-v15.5-results.js?v=157' index.html
       - name: Commit and push
         run: |
           git config user.name github-actions-bot
           git config user.email actions@github.com
-          git add dev-v15.5-results.js dev-mobile-pregame-fix.js index.html
-          git commit -m 'Integrate three-block Platoon recaps and bust cache'
+          git add dev-v15.5-results.js index.html
+          git commit -m 'Polish Platoon recap voice, Club Eagle, and field notes'
           git push
