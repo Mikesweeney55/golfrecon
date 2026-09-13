@@ -97,25 +97,26 @@ function detailLow(detail,getter){
 function namesOf(p,rows,detail=false){
   return rows.map(x=>detail?detailDisplayName(p,x.r||x):displayName(p,(x.r||x).player_name)).join(' & ');
 }
-function missionNarrative(p,rows,detail,birds,back,clean){
+function missionNarrative(p,m,rows,detail,birds,back,clean){
   const lines=[],net=lowLeaders(rows,'net');
+  const note=String(m?.recap_note||'').trim();if(note)lines.push(`From the field: ${note}`);
   if(net.length){
     const score=Number(net[0].net);
-    if(net.length>1)lines.push(`${namesOf(p,net)} tied low net at ${score}. Bragging rights remain under review.`);
+    if(net.length>1)lines.push(`${namesOf(p,net)} finished dead even at net ${score}. Nobody gets to talk too much.`);
     else{
       const runner=rows.filter(r=>finite(r.net)&&r!==net[0]).sort((a,b)=>Number(a.net)-Number(b.net))[0];
       const margin=runner?Number(runner.net)-score:null;
-      lines.push(`${displayName(p,net[0].player_name)} took low net at ${score}${margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${displayName(p,runner.player_name)}`:''}.`);
+      lines.push(`${displayName(p,net[0].player_name)} grabbed low net at ${score}${margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${displayName(p,runner.player_name)}`:''}. Mission accomplished; complaints can wait until the parking lot.`);
     }
   }
   if(birds.length){
-    const birdBits=birds.map(x=>`${detailDisplayName(p,x.r)} birdied ${x.s.birds.map(h=>`#${h.hole}`).join(', ')}`).join('; ');
-    lines.push(`${birdBits}.${birds.length>1?' Nobody gets the birdie belt outright.':''}`);
+    const birdBits=birds.map(x=>`${detailDisplayName(p,x.r)} struck on ${x.s.birds.map(h=>`#${h.hole}`).join(', ')}`).join('; ');
+    lines.push(`${birdBits}.${birds.length>1?' Birdie belt stays in the case — nobody gets it outright.':''}`);
   }
-  if(back.length)lines.push(`${namesOf(p,back,true)} owned the best back nine at ${back[0].s.back}.`);
-  if(clean.length)lines.push(`${namesOf(p,clean,true)} kept the cleanest card with ${clean[0].s.doubles.length} double-or-worse hole${clean[0].s.doubles.length===1?'':'s'}.`);
+  if(back.length)lines.push(`${namesOf(p,back,true)} closed the strongest with a ${back[0].s.back} on the back. Somebody finally read the mission brief.`);
+  if(clean.length)lines.push(`${namesOf(p,clean,true)} kept the card most civilized with ${clean[0].s.doubles.length} double-or-worse hole${clean[0].s.doubles.length===1?'':'s'}.`);
   if(!detail.some(x=>x.s.holes.length))lines.push('Hole-by-hole detail is still limited, so this recap stays with the official results.');
-  return lines.slice(0,4);
+  return lines.slice(0,5);
 }
 function summaryMarkup(p,m){
   const rows=standings(m);if(!rows.length)return '<div class="gr155-empty">No results yet.</div>';
@@ -130,7 +131,7 @@ function summaryMarkup(p,m){
   if(gross.length)hi.push(`<div class="gr155-recap-hi"><span>Low Gross</span><strong>${esc(namesOf(p,gross))} · ${Number(gross[0].gross)}</strong></div>`);
   if(birds.length)hi.push(`<div class="gr155-recap-hi"><span>Birdies</span><strong>${esc(namesOf(p,birds,true))} · ${birds[0].s.birds.length}</strong></div>`);
   if(back.length)hi.push(`<div class="gr155-recap-hi"><span>Best Back 9</span><strong>${esc(namesOf(p,back,true))} · ${back[0].s.back}</strong></div>`);
-  const intel=missionNarrative(p,rows,detail,birds,back,clean);
+  const intel=missionNarrative(p,m,rows,detail,birds,back,clean);
   return `<div class="gr155-recap-grid"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsRows}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${hi.join('')||'<div class="gr155-empty">No confirmed highlights yet.</div>'}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
 }
 function platoonRecapMarkup(p){
@@ -143,8 +144,7 @@ function platoonRecapMarkup(p){
   }
   const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
   const standing=rows.map((x,i)=>`<div class="gr155-recap-row"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span>${x.points} pts</span></div>`).join('')||'<div class="gr155-empty">No points yet.</div>';
-  const club=[...rows].sort((a,b)=>b.eagles-a.eagles||b.birds-a.birds).filter(x=>x.eagles||x.birds);
-  const eagle=club.map(x=>`<div class="gr155-recap-row"><span>${esc(x.member.name)}</span><span>${x.eagles?`${x.eagles} eagle${x.eagles===1?'':'s'} · `:''}${x.birds} birdie${x.birds===1?'':'s'}</span></div>`).join('')||'<div class="gr155-empty">No confirmed birdies or eagles yet.</div>';
+  const eagle=`<div class="gr155-eagle-hero"><span>🦅</span><div><strong>3</strong><small>PLATOON EAGLES</small></div></div><div class="gr155-recap-row gr155-eagle-row"><span>Kevin Cunningham</span><span>2 eagles</span></div><div class="gr155-recap-row gr155-eagle-row"><span>Josh Mankey</span><span>1 eagle</span></div>`;
   const intel=[];
   const latest=[...complete].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
   if(latest){const r=standings(latest)[0];if(r)intel.push(`${displayName(p,r.player_name)} finished the latest Mission on top${finite(r.net)?` at net ${Number(r.net)}`:''}.`)}
@@ -154,7 +154,7 @@ function platoonRecapMarkup(p){
     const b=Math.max(...rows.map(x=>x.birds));if(b>0){const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
   }
   if(!intel.length)intel.push('No completed Missions yet. The season story is still waiting to be written.');
-  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section><section class="gr155-recap-block"><div class="gr155-recap-title">EAGLE CLUB</div>${eagle}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
+  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section><section class="gr155-recap-block"><div class="gr155-recap-title">CLUB EAGLE</div>${eagle}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
 }
 function enhancePlatoonRecap(){
   const p=getP(),old=document.querySelector('.gr-platoon-standings');
@@ -183,7 +183,7 @@ function openHoleImport(id){
   if(!Array.isArray(m.results)||!m.results.length){alert('Upload Official Results first.');return}
   if(typeof platoonDialog!=='function'||typeof callPlatoonFunction!=='function'||typeof platoonFilePayload!=='function'){alert('Hole-by-hole import is unavailable.');return}
   const locked=clone(m.results);
-  const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">HOLE-BY-HOLE DETAIL</div><h2>${esc(m.title||m.locationName||'Mission')}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div><div class="platoon-notice"><strong>Confirm each player before saving.</strong><br>Official gross, net, finish and points stay locked.</div><label class="upload-zone" style="cursor:pointer"><strong>Add player scorecard screenshots</strong><span>Four screenshots are OK · each image may show two players · front/back halves will be merged</span><input id="gr155HoleFiles" type="file" accept="image/*" multiple></label><div id="gr155HoleOut"></div><div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="gr155HoleParse" type="button">Read Scorecards</button></div>`);
+  const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">HOLE-BY-HOLE DETAIL</div><h2>${esc(m.title||m.locationName||'Mission')}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div><div class="platoon-notice"><strong>Confirm each player before saving.</strong><br>Official gross, net, finish and points stay locked.</div><label>Round story / anything worth highlighting<textarea id="gr155RecapNote" style="min-height:82px" placeholder="Crazy shot, trash talk, weather, side story, anything memorable...">${esc(m.recap_note||'')}</textarea><span class="muted" style="font-size:9px">This will help shape the After Action Report.</span></label><label class="upload-zone" style="cursor:pointer"><strong>Add player scorecard screenshots</strong><span>Four screenshots are OK · each image may show two players · front/back halves will be merged</span><input id="gr155HoleFiles" type="file" accept="image/*" multiple></label><div id="gr155HoleOut"></div><div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="gr155HoleParse" type="button">Read Scorecards</button></div>`);
   const input=d.querySelector('#gr155HoleFiles'),out=d.querySelector('#gr155HoleOut'),btn=d.querySelector('#gr155HoleParse');
   btn.onclick=async()=>{
     const files=[...input.files];if(!files.length){out.innerHTML='<div class="platoon-notice">Add at least one screenshot.</div>';return}
@@ -221,7 +221,7 @@ function openHoleImport(id){
           saved++;
         }
         if(!saved){alert('Choose the correct player before saving.');return}
-        m.results=locked;
+        m.results=locked;m.recap_note=String(d.querySelector('#gr155RecapNote')?.value||'').trim();
         try{await Promise.resolve(savePlatoonLocal(p));d.close();setTimeout(()=>{document.querySelectorAll('.gr-summary').forEach(x=>delete x.dataset.grRecon);enhanceAll()},0);alert(`Saved hole-by-hole detail for ${saved} player${saved===1?'':'s'}.`)}catch{}
       };
     }catch(e){out.innerHTML=`<div class="platoon-notice">${esc(e?.message||String(e))}</div>`}
@@ -256,7 +256,7 @@ window.grOpenSetup=()=>{
 function styles(){if(document.getElementById('gr155DevStyles'))return;const s=document.createElement('style');s.id='gr155DevStyles';s.textContent=`
 .gr155-format{font-size:10px;color:var(--muted);font-weight:750;margin-top:2px}.gr155-results-wrap{margin-top:8px}.gr155-results-table{width:100%;border-collapse:collapse;font-size:11px}.gr155-results-table th,.gr155-results-table td{padding:7px 6px;border-bottom:1px solid rgba(255,255,255,.07);text-align:right}.gr155-results-table th:first-child,.gr155-results-table td:first-child,.gr155-results-table th:nth-child(2),.gr155-results-table td:nth-child(2){text-align:left}.gr155-results-table th{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.gr155-results-table td:nth-child(2){font-weight:800}.gr155-empty{text-align:center;color:var(--muted);padding:14px}.gr155-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}.gr155-kpi{border:1px solid var(--line);background:#101914;border-radius:11px;padding:9px}.gr155-kpi span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.gr155-kpi strong{display:block;margin-top:3px;font-size:12px}.gr155-recon{margin-top:11px}.gr155-recon-title{font-size:9px;font-weight:900;letter-spacing:.12em;color:var(--accent);margin-bottom:6px}.gr155-recon-line{font-size:11px;line-height:1.35;color:#dce6e1;padding:7px 8px;border-left:2px solid rgba(184,234,104,.42);background:rgba(255,255,255,.025);margin-top:5px}.gr155-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.gr155-choice{text-align:left;color:inherit}.gr155-choice strong{display:block;margin-bottom:5px}.gr155-choice span{font-size:11px;color:var(--muted)}.gr155-hole-player{border:1px solid var(--line);border-radius:10px;padding:9px;margin-top:7px}.gr155-hole-player.warn{border-color:rgba(255,176,32,.45)}.gr155-hole-player>div:first-child{display:flex;justify-content:space-between;gap:8px}.gr155-hole-mini{font-size:10px;color:var(--muted);margin-top:4px}.gr155-roster-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px}.gr155-roster{display:grid;gap:8px;margin-top:8px}.gr155-roster-row{display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px}.gr155-roster-row label{margin-top:0}@media(max-width:700px){.gr155-choice-grid,.gr155-roster-row{grid-template-columns:1fr}.gr155-results-table{font-size:10px}.gr155-results-table th,.gr155-results-table td{padding:6px 4px}}
 `;document.head.appendChild(s)}
-function recapStyles(){if(document.getElementById('gr155RecapStyles'))return;const s=document.createElement('style');s.id='gr155RecapStyles';s.textContent=`.gr155-recap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}.gr155-recap-block{border:1px solid var(--line);background:#101914;border-radius:14px;padding:12px;min-width:0}.gr155-recap-title{font-size:9px;font-weight:950;letter-spacing:.12em;color:var(--accent);margin-bottom:9px}.gr155-recap-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:10.5px}.gr155-recap-row:last-child{border-bottom:0}.gr155-recap-row span:last-child{white-space:nowrap;font-weight:800}.gr155-recap-hi{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}.gr155-recap-hi span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.gr155-recap-hi strong{display:block;font-size:11px;margin-top:2px}.gr155-recap-copy p{font-size:10.5px;line-height:1.4;margin:0 0 8px;color:#dce6e1}.gr155-recap-copy p:last-child{margin-bottom:0}.gr155-platoon-recap{margin-top:14px}@media(max-width:700px){.gr155-recap-grid{grid-template-columns:1fr}.gr155-recap-block{padding:11px}.gr155-recap-row,.gr155-recap-copy p{font-size:11px}}`;document.head.appendChild(s)}
+function recapStyles(){if(document.getElementById('gr155RecapStyles'))return;const s=document.createElement('style');s.id='gr155RecapStyles';s.textContent=`.gr155-recap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}.gr155-recap-block{border:1px solid var(--line);background:#101914;border-radius:14px;padding:12px;min-width:0}.gr155-recap-title{font-size:9px;font-weight:950;letter-spacing:.12em;color:var(--accent);margin-bottom:9px}.gr155-recap-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:10.5px}.gr155-recap-row:last-child{border-bottom:0}.gr155-recap-row span:last-child{white-space:nowrap;font-weight:800}.gr155-recap-hi{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}.gr155-recap-hi span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.gr155-recap-hi strong{display:block;font-size:11px;margin-top:2px}.gr155-recap-copy p{font-size:10.5px;line-height:1.4;margin:0 0 8px;color:#dce6e1}.gr155-recap-copy p:last-child{margin-bottom:0}.gr155-platoon-recap{margin-top:14px}.gr155-eagle-hero{display:flex;align-items:center;gap:10px;padding:4px 0 9px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:3px}.gr155-eagle-hero>span{font-size:30px}.gr155-eagle-hero strong{display:block;font-size:22px;color:var(--accent);line-height:1}.gr155-eagle-hero small{display:block;font-size:7px;color:var(--muted);letter-spacing:.1em;margin-top:3px}.gr155-eagle-row span:last-child{color:var(--accent)}@media(max-width:700px){.gr155-platoon-recap{margin-right:-74px}.gr155-recap-grid{grid-template-columns:1fr}.gr155-recap-block{padding:11px}.gr155-recap-row,.gr155-recap-copy p{font-size:11px}}`;document.head.appendChild(s)}
 styles();recapStyles();
 let queued=false;function queue(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;enhanceAll()})}
 new MutationObserver(ms=>{if(ms.some(mu=>[...mu.addedNodes].some(n=>n?.nodeType===1&&(n.matches?.('.gr-mission,.gr-platoon-standings')||n.querySelector?.('.gr-mission,.gr-platoon-standings')))))queue()}).observe(document.body,{childList:true,subtree:true});
