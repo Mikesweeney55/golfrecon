@@ -25,3 +25,4 @@ jobs:
           git add index.html
           git diff --cached --quiet || git commit -m 'Bump historical importer to v2'
           git diff --cached --quiet || git push
+# trigger v2
