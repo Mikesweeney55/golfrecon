@@ -1,0 +1,1 @@
+(()=>{'use strict';console.log('Golf Recon recap layout loaded');})();
