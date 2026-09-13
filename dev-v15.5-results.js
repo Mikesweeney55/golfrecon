@@ -1,7 +1,7 @@
 (()=>{
 'use strict';
 
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
 const clone=v=>{try{return JSON.parse(JSON.stringify(v))}catch{return null}};
@@ -38,6 +38,8 @@ function canonicalMember(p,raw){
   return firstMatches.length===1?firstMatches[0]:null;
 }
 function displayName(p,raw){return canonicalMember(p,raw)?.name||raw||'Player'}
+function memberById(p,id){return (p?.members||[]).find(m=>m.id===id)||null}
+function detailDisplayName(p,r){return memberById(p,r?.hole_detail_canonical_id)?.name||displayName(p,r?.player_name)}
 function rosterForMission(p,m){
   const ids=new Set(Array.isArray(m?.participants)?m.participants:[]);
   return (p?.members||[]).filter(x=>!ids.size||ids.has(x.id)).map(x=>({id:x.id,name:x.name,aliases:aliasesOf(x)}));
@@ -88,14 +90,14 @@ function summaryMarkup(p,m){
   if(net[0])cards.push(`<div class="gr155-kpi"><span>Low Net</span><strong>${esc(displayName(p,net[0].player_name))} · ${Number(net[0].net)}</strong></div>`);
   if(gross[0])cards.push(`<div class="gr155-kpi"><span>Low Gross</span><strong>${esc(displayName(p,gross[0].player_name))} · ${Number(gross[0].gross)}</strong></div>`);
   if(pts[0]&&Number(pts[0].raw_points)>0)cards.push(`<div class="gr155-kpi"><span>Points</span><strong>${esc(displayName(p,pts[0].player_name))} · ${Number(pts[0].raw_points)}</strong></div>`);
-  if(birdLead)cards.push(`<div class="gr155-kpi"><span>Birdies</span><strong>${esc(displayName(p,birdLead.r.player_name))} · ${birdLead.s.birds.length}</strong></div>`);
+  if(birdLead)cards.push(`<div class="gr155-kpi"><span>Birdies</span><strong>${esc(detailDisplayName(p,birdLead.r))} · ${birdLead.s.birds.length}</strong></div>`);
   const recon=[];
   if(net[0]){const margin=net[1]?Number(net[1].net)-Number(net[0].net):null;recon.push(`${displayName(p,net[0].player_name)} won low net at ${Number(net[0].net)}${margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${displayName(p,net[1].player_name)}`:''}.`)}
   if(gross[0])recon.push(`${displayName(p,gross[0].player_name)} posted low gross at ${Number(gross[0].gross)}.`);
-  if(birdLead){const hs=birdLead.s.birds.map(h=>h.hole).join(', ');recon.push(`${displayName(p,birdLead.r.player_name)} led the birdies with ${birdLead.s.birds.length}${hs?` on hole${birdLead.s.birds.length===1?'':'s'} ${hs}`:''}.`)}
-  if(clean)recon.push(`${displayName(p,clean.r.player_name)} kept the cleanest card with ${clean.s.doubles.length} double-or-worse hole${clean.s.doubles.length===1?'':'s'}.`);
-  if(back)recon.push(`${displayName(p,back.r.player_name)} had the best back nine at ${back.s.back}.`);
-  if(blow&&blow.s.doubles.length>=2)recon.push(`${displayName(p,blow.r.player_name)} took the most damage: ${blow.s.doubles.length} double-or-worse holes.`);
+  if(birdLead){const hs=birdLead.s.birds.map(h=>h.hole).join(', ');recon.push(`${detailDisplayName(p,birdLead.r)} led the birdies with ${birdLead.s.birds.length}${hs?` on hole${birdLead.s.birds.length===1?'':'s'} ${hs}`:''}.`)}
+  if(clean)recon.push(`${detailDisplayName(p,clean.r)} kept the cleanest card with ${clean.s.doubles.length} double-or-worse hole${clean.s.doubles.length===1?'':'s'}.`);
+  if(back)recon.push(`${detailDisplayName(p,back.r)} had the best back nine at ${back.s.back}.`);
+  if(blow&&blow.s.doubles.length>=2)recon.push(`${detailDisplayName(p,blow.r)} took the most damage: ${blow.s.doubles.length} double-or-worse holes.`);
   const body=rows.map((r,i)=>`<tr><td>${finite(r.finish_position)?Number(r.finish_position):i+1}</td><td>${esc(displayName(p,r.player_name))}</td><td>${finite(r.net)?Number(r.net):'—'}</td><td>${finite(r.gross)?Number(r.gross):'—'}</td><td>${finite(r.raw_points)?Number(r.raw_points):'—'}</td></tr>`).join('');
   return `<div class="gr155-results-wrap"><table class="gr155-results-table"><thead><tr><th>Pos</th><th>Player</th><th>Net</th><th>Gross</th><th>Pts</th></tr></thead><tbody>${body}</tbody></table>${cards.length?`<div class="gr155-kpis">${cards.join('')}</div>`:''}<div class="gr155-recon"><div class="gr155-recon-title">ROUND RECON</div>${recon.map(x=>`<div class="gr155-recon-line">${esc(x)}</div>`).join('')}</div></div>`;
 }
@@ -122,7 +124,7 @@ function openHoleImport(id){
   if(!Array.isArray(m.results)||!m.results.length){alert('Upload Official Results first.');return}
   if(typeof platoonDialog!=='function'||typeof callPlatoonFunction!=='function'||typeof platoonFilePayload!=='function'){alert('Hole-by-hole import is unavailable.');return}
   const locked=clone(m.results);
-  const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">HOLE-BY-HOLE DETAIL</div><h2>${esc(m.title||m.locationName||'Mission')}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div><div class="platoon-notice"><strong>Matched through the Platoon master roster.</strong><br>Official gross, net, finish and points stay locked.</div><label class="upload-zone" style="cursor:pointer"><strong>Add player scorecard screenshots</strong><span>Front 9, back 9, or full 18 · multiple images allowed</span><input id="gr155HoleFiles" type="file" accept="image/*" multiple></label><div id="gr155HoleOut"></div><div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="gr155HoleParse" type="button">Read Scorecards</button></div>`);
+  const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">HOLE-BY-HOLE DETAIL</div><h2>${esc(m.title||m.locationName||'Mission')}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div><div class="platoon-notice"><strong>Confirm each player before saving.</strong><br>Official gross, net, finish and points stay locked.</div><label class="upload-zone" style="cursor:pointer"><strong>Add player scorecard screenshots</strong><span>Front 9, back 9, or full 18 · multiple images allowed</span><input id="gr155HoleFiles" type="file" accept="image/*" multiple></label><div id="gr155HoleOut"></div><div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="gr155HoleParse" type="button">Read Scorecards</button></div>`);
   const input=d.querySelector('#gr155HoleFiles'),out=d.querySelector('#gr155HoleOut'),btn=d.querySelector('#gr155HoleParse');
   btn.onclick=async()=>{
     const files=[...input.files];if(!files.length){out.innerHTML='<div class="platoon-notice">Add at least one screenshot.</div>';return}
@@ -131,17 +133,25 @@ function openHoleImport(id){
       const images=[];for(const f of files)images.push(await platoonFilePayload(f));
       const parsed=await callPlatoonFunction({action:'parse_hole_details',mission:{date:m.date,locationName:m.locationName,title:m.title,roster:rosterForMission(p,m)},images});
       const details=(parsed?.players||[]).map(x=>({raw:x.player_name,member:canonicalMember(p,x.player_name),holes:cleanHoles(x.holes)}));
-      const good=details.filter(x=>x.member&&x.holes.length);
-      out.innerHTML=details.map(x=>`<div class="gr155-hole-player ${x.member?'':'warn'}"><div><strong>${esc(x.raw||'Unknown')}</strong><span>${x.member?`→ ${esc(x.member.name)}`:'NO ROSTER MATCH'}</span></div><div class="gr155-hole-mini">${x.holes.length} holes</div></div>`).join('')+`<div class="dialog-actions"><button class="button primary" id="gr155HoleSave" type="button" ${good.length?'':'disabled'}>Save Hole-by-Hole</button></div>`;
+      const roster=rosterForMission(p,m);
+      out.innerHTML=details.map((x,i)=>`<div class="gr155-hole-player ${x.member?'':'warn'}"><div><strong>${esc(x.raw||'Unknown')}</strong><span>${x.holes.length} holes</span></div><label style="margin-top:7px">Confirm player<select data-gr155-match="${i}"><option value="">Choose player…</option>${roster.map(r=>`<option value="${esc(r.id)}" ${x.member?.id===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label></div>`).join('')+`<div class="dialog-actions"><button class="button primary" id="gr155HoleSave" type="button">Save Hole-by-Hole</button></div>`;
       const save=out.querySelector('#gr155HoleSave');
-      if(save&&!save.disabled)save.onclick=async()=>{
+      if(save)save.onclick=async()=>{
         let saved=0;
-        for(const d0 of good){
-          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===d0.member.id);if(!target)continue;
+        for(let i=0;i<details.length;i++){
+          const d0=details[i];if(!d0.holes.length)continue;
+          const memberId=out.querySelector(`[data-gr155-match="${i}"]`)?.value;
+          const member=memberById(p,memberId);if(!member)continue;
+          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===member.id);if(!target)continue;
           const sig=holeSig(d0.holes);
-          for(const other of locked){if(other!==target&&sig&&holeSig(other.holes)===sig){delete other.holes;delete other.hole_detail_saved_at;delete other.hole_detail_source_name;delete other.hole_detail_canonical_id}}
-          target.holes=d0.holes;target.hole_detail_saved_at=new Date().toISOString();target.hole_detail_source_name=d0.raw;target.hole_detail_canonical_id=d0.member.id;saved++;
+          for(const other of locked){
+            if(other!==target&&((sig&&holeSig(other.holes)===sig)||other.hole_detail_canonical_id===member.id)){
+              delete other.holes;delete other.hole_detail_saved_at;delete other.hole_detail_source_name;delete other.hole_detail_canonical_id;
+            }
+          }
+          target.holes=d0.holes;target.hole_detail_saved_at=new Date().toISOString();target.hole_detail_source_name=d0.raw;target.hole_detail_canonical_id=member.id;saved++;
         }
+        if(!saved){alert('Choose the correct player before saving.');return}
         m.results=locked;
         try{await Promise.resolve(savePlatoonLocal(p));d.close();setTimeout(()=>{document.querySelectorAll('.gr-summary').forEach(x=>delete x.dataset.grRecon);enhanceAll()},0);alert(`Saved hole-by-hole detail for ${saved} player${saved===1?'':'s'}.`)}catch{}
       };
