@@ -12,17 +12,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply historical import mobile fix
+      - name: Apply historical import fixes
         run: python scripts/patch-past-mission-mobile.py
       - name: Verify
         run: |
           node --check past-mission-import.js
-          grep -q 'grPastMissionMobileFix' past-mission-import.js
-          grep -q 'past-mission-import.js?v=3' index.html
+          node --check dev-v15.5-results.js
+          grep -q 'Match every player before creating the Mission' past-mission-import.js
+          grep -q 'cleanCourseName' past-mission-import.js
+          grep -q "m?.recap_note||m?.notes" dev-v15.5-results.js
+          grep -q 'past-mission-import.js?v=4' index.html
+          grep -q 'dev-v15.5-results.js?v=158' index.html
       - name: Commit and push
         run: |
           git config user.name github-actions-bot
           git config user.email actions@github.com
-          git add past-mission-import.js index.html
-          git commit -m 'Fix historical import scrolling on mobile'
+          git add past-mission-import.js dev-v15.5-results.js index.html
+          git commit -m 'Fix historical import player matching and recap data'
           git push
