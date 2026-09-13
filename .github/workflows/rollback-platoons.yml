@@ -1,0 +1,20 @@
+name: Rollback Platoons Consolidation
+on:
+  push:
+    paths:
+      - 'rollback-platoons-trigger.txt'
+permissions:
+  contents: write
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore last working Platoons state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git revert --no-edit 07c9792d1bb51584ecbcfcb6a188da60e9c0717a
+          git push
