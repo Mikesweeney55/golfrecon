@@ -34,7 +34,6 @@ const resultSchema={
   required:["confidence","warnings","event","results"]
 };
 
-
 const holeDetailSchema={
   type:"object",
   additionalProperties:false,
@@ -75,6 +74,16 @@ function response(data:any,status=200){
 function text(v:any){return String(v??"").trim()}
 function safeYear(v:any){const n=Number(v);return Number.isInteger(n)&&n>=2020&&n<=2100?n:new Date().getFullYear()}
 function keyFor(v:any,fallback:string){const s=text(v);return s||fallback}
+function aliasesFor(v:any){
+  const raw=Array.isArray(v)?v:(typeof v==="string"?v.split(/[,|]/):[]);
+  return [...new Set(raw.map((x:any)=>text(x)).filter(Boolean))];
+}
+function memberAliasInput(m:any){
+  if(Array.isArray(m?.aliases))return {present:true,aliases:aliasesFor(m.aliases)};
+  if(typeof m?.nickname==="string")return {present:true,aliases:aliasesFor(m.nickname)};
+  return {present:false,aliases:[]};
+}
+function nicknameFor(aliases:any){const a=aliasesFor(aliases);return a.length?a.join(", "):null}
 function schemaError(error:any){
   const m=String(error?.message||"");
   return error?.code==="42P01" || /does not exist/i.test(m) || /column .* does not exist/i.test(m);
@@ -135,12 +144,12 @@ ${JSON.stringify({date:mission.date||null,course:mission.locationName||null,titl
   return JSON.parse(outputText);
 }
 
-
 async function parseHoleDetails(body:any){
   const key=Deno.env.get("OPENAI_API_KEY");
   if(!key)throw new Error("OPENAI_API_KEY secret is not configured.");
   if(!Array.isArray(body.images)||!body.images.length)throw new Error("Add at least one scorecard screenshot.");
   const mission=body.mission||{};
+  const roster=Array.isArray(mission.roster)?mission.roster:[];
   const content:any[]=[{
     type:"input_text",
     text:`You are the Golf Recon Platoon hole-by-hole scorecard parser.
@@ -157,6 +166,10 @@ Never guess a score, par, player identity, or missing hole.
 Do NOT infer or overwrite gross, net, handicap, finish position, Mission points, or the official Mission leaderboard.
 A displayed gross total may be used only as a consistency check; do not return it as official scoring.
 If a screenshot is ambiguous, leave the uncertain value null and add a warning.
+
+Known Platoon master roster for identity matching only:
+${JSON.stringify(roster)}
+Use roster names and aliases only to help resolve a visible abbreviation or nickname. Do not attach a scorecard to a roster member unless the screenshot itself supports that identity.
 
 Selected Mission context is for matching only and must not be used to invent scores:
 ${JSON.stringify({date:mission.date||null,course:mission.locationName||null,title:mission.title||null})}`
@@ -194,7 +207,8 @@ async function ensurePlatoon(supabase:any,user:any,snapshot:any){
   let membership=await activeMembership(supabase,user.id);
   if(membership)return {membership,created:false};
 
-  const chiefName=text(snapshot?.chief)||text(snapshot?.members?.find((m:any)=>m?.role==="chief")?.name)||text(user.user_metadata?.username)||text(user.email?.split("@")[0])||"Golfer";
+  const chiefSnapshot=snapshot?.members?.find((m:any)=>m?.role==="chief")||snapshot?.members?.find((m:any)=>m?.linked);
+  const chiefName=text(snapshot?.chief)||text(chiefSnapshot?.name)||text(user.user_metadata?.username)||text(user.email?.split("@")[0])||"Golfer";
   const slug=`platoon-${user.id.slice(0,8)}-${Date.now().toString(36)}`;
   const {data:platoon,error:pErr}=await supabase.from("golfrecon_platoons").insert({
     name:text(snapshot?.name)||"My Time",slug,motto:text(snapshot?.motto)||null,
@@ -202,9 +216,11 @@ async function ensurePlatoon(supabase:any,user:any,snapshot:any){
     logo_data_url:text(snapshot?.logoData)||null
   }).select("id").single();
   if(pErr){if(schemaError(pErr))throw new Error("PLATOON_SCHEMA_NOT_READY");throw pErr}
-  const chiefKey=keyFor(snapshot?.members?.find((m:any)=>m?.role==="chief")?.id,"chief");
+  const chiefKey=keyFor(chiefSnapshot?.id,"chief");
+  const chiefAliases=memberAliasInput(chiefSnapshot);
   const {data:member,error:mErr}=await supabase.from("golfrecon_platoon_members").insert({
-    platoon_id:platoon.id,user_id:user.id,display_name:chiefName,role:"chief",status:"active",client_key:chiefKey
+    platoon_id:platoon.id,user_id:user.id,display_name:chiefName,role:"chief",status:"active",client_key:chiefKey,
+    nickname:chiefAliases.present?nicknameFor(chiefAliases.aliases):null
   }).select("id,platoon_id,role,status,client_key").single();
   if(mErr)throw mErr;
   membership=member;
@@ -237,7 +253,7 @@ async function readPlatoonState(supabase:any,platoonId:string){
     visibility:p.visibility==="invite_only"?"Invite only":"Private",logoData:p.logo_data_url||"",
     chief:chief?.display_name||"",coChief:co?.client_key||co?.id||"",
     members:(members||[]).map((m:any)=>({
-      id:m.client_key||m.id,serverId:m.id,name:m.display_name,linked:!!m.user_id,role:m.role
+      id:m.client_key||m.id,serverId:m.id,name:m.display_name,nickname:m.nickname||"",aliases:aliasesFor(m.nickname),linked:!!m.user_id,role:m.role
     })),
     missions:(missions||[]).map((m:any)=>({
       id:m.client_key||m.id,serverId:m.id,date:m.played_on,teeTime:m.tee_time?String(m.tee_time).slice(0,5):"",
@@ -252,22 +268,27 @@ async function readPlatoonState(supabase:any,platoonId:string){
 async function upsertMembers(supabase:any,user:any,platoonId:string,snapshot:any,allowRoleChanges:boolean){
   const incoming=Array.isArray(snapshot?.members)?snapshot.members:[];
   const {data:existing,error}=await supabase.from("golfrecon_platoon_members")
-    .select("id,user_id,display_name,role,status,client_key").eq("platoon_id",platoonId);
+    .select("id,user_id,display_name,nickname,role,status,client_key").eq("platoon_id",platoonId);
   if(error)throw error;
   const byKey=new Map((existing||[]).filter((m:any)=>m.client_key).map((m:any)=>[m.client_key,m]));
   const chiefRow=(existing||[]).find((m:any)=>m.role==="chief");
   const chiefIncoming=incoming.find((m:any)=>m.role==="chief")||incoming.find((m:any)=>m.linked);
   if(chiefRow&&chiefIncoming){
-    await supabase.from("golfrecon_platoon_members").update({display_name:text(chiefIncoming.name)||chiefRow.display_name,client_key:keyFor(chiefIncoming.id,chiefRow.client_key||"chief")}).eq("id",chiefRow.id);
+    const patch:any={display_name:text(chiefIncoming.name)||chiefRow.display_name,client_key:keyFor(chiefIncoming.id,chiefRow.client_key||"chief")};
+    const aliasInput=memberAliasInput(chiefIncoming);
+    if(aliasInput.present)patch.nickname=nicknameFor(aliasInput.aliases);
+    await supabase.from("golfrecon_platoon_members").update(patch).eq("id",chiefRow.id);
   }
   for(const m of incoming){
     const clientKey=keyFor(m?.id,`member-${crypto.randomUUID()}`);
     if(m?.role==="chief")continue;
     const found=byKey.get(clientKey);
     const role=allowRoleChanges?(m?.role==="co_chief"?"co_chief":(m?.linked?"member":"cadet")):(found?.role||"cadet");
-    const row={display_name:text(m?.name)||"Cadet",client_key:clientKey,status:"active",role};
+    const row:any={display_name:text(m?.name)||"Cadet",client_key:clientKey,status:"active",role};
+    const aliasInput=memberAliasInput(m);
+    if(aliasInput.present)row.nickname=nicknameFor(aliasInput.aliases);
     if(found)await supabase.from("golfrecon_platoon_members").update(row).eq("id",found.id);
-    else await supabase.from("golfrecon_platoon_members").insert({platoon_id:platoonId,user_id:null,...row});
+    else await supabase.from("golfrecon_platoon_members").insert({platoon_id:platoonId,user_id:null,nickname:aliasInput.present?nicknameFor(aliasInput.aliases):null,...row});
   }
   if(allowRoleChanges){
     const wanted=text(snapshot?.coChief);
