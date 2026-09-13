@@ -1,0 +1,27 @@
+name: Bump Past Mission Import v2
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/bump-past-mission-v2.py'
+      - '.github/workflows/bump-past-mission-v2.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump importer cache version
+        run: python scripts/bump-past-mission-v2.py
+      - name: Verify
+        run: |
+          grep -q 'past-mission-import.js?v=2' index.html
+          node --check past-mission-import.js
+      - name: Commit and push
+        run: |
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add index.html
+          git diff --cached --quiet || git commit -m 'Bump historical importer to v2'
+          git diff --cached --quiet || git push
