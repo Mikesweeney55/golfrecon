@@ -10,18 +10,26 @@
   </style>
 </head>
 <body>
-  <iframe id="previewApp" title="Golf Recon v15.5 Preview" src="index.html?preview=155"></iframe>
+  <iframe id="previewApp" title="Golf Recon v15.5 Preview" src="index.html?preview=155c"></iframe>
   <script>
     const frame=document.getElementById('previewApp');
     frame.addEventListener('load',()=>{
       try{
         const doc=frame.contentDocument;
-        if(!doc||doc.getElementById('grPreviewSandboxLoader'))return;
-        const s=doc.createElement('script');
-        s.id='grPreviewSandboxLoader';
-        s.src='dev-preview-sandbox.js?v=155';
-        doc.body.appendChild(s);
-      }catch(err){console.error('Preview sandbox failed to load',err)}
+        if(!doc||!doc.body)return;
+        if(!doc.getElementById('grPreviewSandboxLoader')){
+          const s=doc.createElement('script');
+          s.id='grPreviewSandboxLoader';
+          s.src='dev-preview-sandbox.js?v=155c';
+          doc.body.appendChild(s);
+        }
+        if(!doc.getElementById('grMobilePregameFixLoader')){
+          const s2=doc.createElement('script');
+          s2.id='grMobilePregameFixLoader';
+          s2.src='dev-mobile-pregame-fix.js?v=155c';
+          doc.body.appendChild(s2);
+        }
+      }catch(err){console.error('Preview support failed to load',err)}
     });
   </script>
 </body>
