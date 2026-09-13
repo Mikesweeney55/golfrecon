@@ -1,9 +1,9 @@
 (()=>{
 'use strict';
-if(document.getElementById('gr155MobilePregameFix'))return;
-const style=document.createElement('style');
-style.id='gr155MobilePregameFix';
-style.textContent=`
+if(!document.getElementById('gr155MobilePregameFix')){
+  const style=document.createElement('style');
+  style.id='gr155MobilePregameFix';
+  style.textContent=`
 @media (max-width:760px){
   .pregame-hero{height:auto!important;max-height:none!important;overflow:visible!important;padding-bottom:12px!important}
   .pregame-hero .hero-copy{overflow:visible!important}
@@ -14,5 +14,38 @@ style.textContent=`
   .pregame-course-select{display:block!important;visibility:visible!important;opacity:1!important;flex:1 1 auto!important;width:auto!important;min-width:0!important;max-width:none!important;height:36px!important;position:relative!important;z-index:51!important;color:#f5f7f6!important;background:#0e1714!important;border:1px solid rgba(184,234,104,.6)!important;-webkit-appearance:menulist!important;appearance:auto!important}
 }
 `;
-document.head.appendChild(style);
+  document.head.appendChild(style);
+}
+
+// Platoons: Supabase is authoritative. Local storage is only an immediate UI cache.
+if(!window.__grSupabaseFirstSaveInstalled){
+  window.__grSupabaseFirstSaveInstalled=true;
+  window.savePlatoonLocal=function(p,push=true){
+    try{if(typeof writePlatoonLocal==='function')writePlatoonLocal(p)}catch{}
+    try{if(typeof render==='function')render()}catch{}
+    if(push===false)return Promise.resolve(null);
+    if(typeof callPlatoonFunction!=='function'){
+      alert('Platoon save failed: Supabase connection is unavailable.');
+      return Promise.reject(new Error('Supabase connection unavailable'));
+    }
+    return callPlatoonFunction({action:'save_state',snapshot:p}).then(out=>{
+      if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
+      try{if(typeof platoonSyncError!=='undefined')platoonSyncError=''}catch{}
+      try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
+      return out?.platoon||null;
+    }).catch(e=>{
+      try{if(typeof platoonSyncError!=='undefined')platoonSyncError=String(e?.message||e||'Supabase save failed')}catch{}
+      alert('Supabase save failed. This change has not been confirmed on the server. Please retry.');
+      throw e;
+    });
+  };
+}
+
+function refreshPlatoonFromSupabase(){
+  try{if(typeof syncPlatoonFromServer==='function')return syncPlatoonFromServer()}catch{}
+}
+setTimeout(refreshPlatoonFromSupabase,700);
+setTimeout(refreshPlatoonFromSupabase,2200);
+window.addEventListener('focus',refreshPlatoonFromSupabase);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshPlatoonFromSupabase()});
 })();
