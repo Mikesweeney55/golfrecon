@@ -1,0 +1,28 @@
+name: Fix Past Mission Mobile
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/patch-past-mission-mobile.py'
+      - '.github/workflows/fix-past-mission-mobile.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply historical import mobile fix
+        run: python scripts/patch-past-mission-mobile.py
+      - name: Verify
+        run: |
+          node --check past-mission-import.js
+          grep -q 'grPastMissionMobileFix' past-mission-import.js
+          grep -q 'past-mission-import.js?v=3' index.html
+      - name: Commit and push
+        run: |
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add past-mission-import.js index.html
+          git commit -m 'Fix historical import scrolling on mobile'
+          git push
