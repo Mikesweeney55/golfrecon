@@ -19,6 +19,35 @@ function calendarView(){const p=pData(),cur=monthStart(),y=cur.getFullYear(),m=c
 function blogView(){const p=pData();return `${subHead('Blog',(p.name||'My Time')+' Clubhouse')}<div class="card"><div class="empty" style="padding:34px 12px">No posts yet.</div></div>`}
 function installStyles(){if(document.getElementById('grV5Fix'))return;const s=document.createElement('style');s.id='grV5Fix';s.textContent=`#grPlatoonDialog[open]{position:fixed!important;inset:8px!important;width:auto!important;max-width:none!important;max-height:none!important;height:auto!important;overflow:hidden!important;margin:auto!important}#grPlatoonDialog[open] .dialog-card{box-sizing:border-box!important;max-height:calc(100dvh - 16px)!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;padding-bottom:calc(32px + env(safe-area-inset-bottom))!important}@media(max-width:700px){#grPlatoonDialog[open]{inset:10px!important}#grPlatoonDialog[open] .dialog-card{max-height:calc(100dvh - 20px)!important}}`;document.head.appendChild(s)}
 function missionIdFromEdit(btn){const s=btn.getAttribute('onclick')||'';const m=s.match(/grOpenMissionEditor\(['\"]([^'\"]+)/);return m?m[1]:''}
+function missionCourseNames(){
+  const names=[];
+  try{if(typeof db!=='undefined'&&Array.isArray(db.courses))db.courses.forEach(c=>{const n=String(c?.name||'').trim();if(n)names.push(n)})}catch{}
+  try{(pData().missions||[]).forEach(m=>{const n=String(m?.locationName||'').trim();if(n&&n!=='Course TBD'&&n!=='Multi-course')names.push(n)})}catch{}
+  return [...new Set(names)].sort((a,b)=>a.localeCompare(b));
+}
+function enhanceCoursePicker(dlg){
+  if(!dlg||!dlg.open)return;
+  const input=dlg.querySelector('input#grMCourse');if(!input||input.dataset.grCoursePickerDone)return;
+  const current=String(input.value||'').trim(),select=document.createElement('select');
+  select.id='grMCourse';select.dataset.grCoursePickerDone='1';select.style.width='100%';
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Select course…';select.appendChild(placeholder);
+  const names=missionCourseNames();if(current&&!names.includes(current))names.unshift(current);
+  names.forEach(name=>{const o=document.createElement('option');o.value=name;o.textContent=name;if(name===current)o.selected=true;select.appendChild(o)});
+  const add=document.createElement('option');add.value='__gr_add_course__';add.textContent='＋ Add new course…';select.appendChild(add);
+  input.replaceWith(select);
+  const sync=()=>{const b=dlg.querySelector('#grBannerCourse');if(b)b.textContent=select.value||'Course TBD'};
+  select.addEventListener('change',()=>{
+    if(select.value==='__gr_add_course__'){
+      const name=String(prompt('New course name')||'').trim();
+      if(!name){select.value=current||'';sync();return}
+      let o=[...select.options].find(x=>x.value===name);
+      if(!o){o=document.createElement('option');o.value=name;o.textContent=name;select.insertBefore(o,add)}
+      select.value=name;
+    }
+    sync();
+  });
+  sync();
+}
 function safeSupplementalImport(id){
   const p=loadPlatoonLocal(),m=(p.missions||[]).find(x=>x.id===id);if(!m)return;
   const locked=JSON.parse(JSON.stringify(Array.isArray(m.results)?m.results:[]));
@@ -36,7 +65,7 @@ function enhanceDom(){
     const edit=[...actions.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Edit');const id=edit?missionIdFromEdit(edit):'';if(!id)return;
     const b=document.createElement('button');b.type='button';b.className='button secondary';b.dataset.grAddResults=id;b.textContent='📸 Add Results';b.onclick=()=>safeSupplementalImport(id);actions.appendChild(b);
   });
-  const dlg=document.getElementById('grPlatoonDialog');if(dlg&&dlg.open){dlg.style.overflow='hidden';const card=dlg.querySelector('.dialog-card');if(card){card.style.maxHeight='calc(100dvh - 20px)';card.style.overflowY='auto';card.style.webkitOverflowScrolling='touch';}}
+  const dlg=document.getElementById('grPlatoonDialog');if(dlg&&dlg.open){dlg.style.overflow='hidden';const card=dlg.querySelector('.dialog-card');if(card){card.style.maxHeight='calc(100dvh - 20px)';card.style.overflowY='auto';card.style.webkitOverflowScrolling='touch';}enhanceCoursePicker(dlg)}
 }
 function applyPatch(){
   installStyles();window.grUploadScores=safeSupplementalImport;const base=window.grGroupsView;if(typeof base==='function'){
