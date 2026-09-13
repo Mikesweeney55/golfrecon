@@ -18,12 +18,14 @@ backend.write_text(text)
 
 idx = Path('index.html')
 html = idx.read_text()
-if 'mission-delete.js?v=2' not in html:
-    if 'mission-delete.js?v=1' in html:
-        html = html.replace('mission-delete.js?v=1','mission-delete.js?v=2')
+if 'mission-delete.js?v=3' not in html:
+    if 'mission-delete.js?v=2' in html:
+        html = html.replace('mission-delete.js?v=2','mission-delete.js?v=3')
+    elif 'mission-delete.js?v=1' in html:
+        html = html.replace('mission-delete.js?v=1','mission-delete.js?v=3')
     else:
-        html = html.replace('<script src="past-mission-import.js?v=4"></script>', '<script src="past-mission-import.js?v=4"></script>\n<script src="mission-delete.js?v=2"></script>')
+        html = html.replace('<script src="past-mission-import.js?v=4"></script>', '<script src="past-mission-import.js?v=4"></script>\n<script src="mission-delete.js?v=3"></script>')
 idx.write_text(html)
 
 trigger = Path('deploy-platoon-import-trigger.txt')
-trigger.write_text('mission-delete-v2\n')
+trigger.write_text('mission-ui-fixes-v3\n')
