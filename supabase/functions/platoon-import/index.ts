@@ -431,6 +431,21 @@ async function upsertMissions(supabase:any,user:any,platoonId:string,snapshot:an
   }
 }
 
+async function deleteMission(supabase:any,user:any,clientKey:any){
+  const membership=await activeMembership(supabase,user.id);
+  if(!membership)throw new Error("PLATOON_ADMIN_REQUIRED");
+  if(!["chief","co_chief"].includes(membership.role))throw new Error("PLATOON_ADMIN_REQUIRED");
+  const key=text(clientKey);if(!key)throw new Error("MISSION_ID_REQUIRED");
+  const {data:mission,error:mErr}=await supabase.from("golfrecon_missions")
+    .select("id").eq("platoon_id",membership.platoon_id).eq("client_key",key).maybeSingle();
+  if(mErr)throw mErr;
+  if(mission?.id){
+    const {error:dErr}=await supabase.from("golfrecon_missions").delete().eq("id",mission.id).eq("platoon_id",membership.platoon_id);
+    if(dErr)throw dErr;
+  }
+  return readPlatoonState(supabase,membership.platoon_id);
+}
+
 async function bootstrapState(supabase:any,user:any,snapshot:any){
   const {membership,created}=await ensurePlatoon(supabase,user,snapshot||{});
   if(created){
@@ -465,6 +480,7 @@ Deno.serve(async(req)=>{
     if(body.action==="parse_completed_mission")return response(await parseCompletedMission(body));
     if(body.action==="parse_hole_details")return response(await parseHoleDetails(body));
     if(body.action==="bootstrap")return response({platoon:await bootstrapState(supabase,user,body.snapshot||{})});
+    if(body.action==="delete_mission")return response({platoon:await deleteMission(supabase,user,body.mission_id)});
     if(body.action==="save_state")return response({platoon:await saveState(supabase,user,body.snapshot||{})});
     throw new Error("Unsupported Platoon action.");
   }catch(e:any){
