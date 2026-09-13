@@ -124,7 +124,7 @@ function openHoleImport(id){
   if(!Array.isArray(m.results)||!m.results.length){alert('Upload Official Results first.');return}
   if(typeof platoonDialog!=='function'||typeof callPlatoonFunction!=='function'||typeof platoonFilePayload!=='function'){alert('Hole-by-hole import is unavailable.');return}
   const locked=clone(m.results);
-  const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">HOLE-BY-HOLE DETAIL</div><h2>${esc(m.title||m.locationName||'Mission')}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div><div class="platoon-notice"><strong>Confirm each player before saving.</strong><br>Official gross, net, finish and points stay locked.</div><label class="upload-zone" style="cursor:pointer"><strong>Add player scorecard screenshots</strong><span>Front 9, back 9, or full 18 · multiple images allowed</span><input id="gr155HoleFiles" type="file" accept="image/*" multiple></label><div id="gr155HoleOut"></div><div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="gr155HoleParse" type="button">Read Scorecards</button></div>`);
+  const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">HOLE-BY-HOLE DETAIL</div><h2>${esc(m.title||m.locationName||'Mission')}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div><div class="platoon-notice"><strong>Confirm each player before saving.</strong><br>Official gross, net, finish and points stay locked.</div><label class="upload-zone" style="cursor:pointer"><strong>Add player scorecard screenshots</strong><span>Four screenshots are OK · each image may show two players · front/back halves will be merged</span><input id="gr155HoleFiles" type="file" accept="image/*" multiple></label><div id="gr155HoleOut"></div><div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="gr155HoleParse" type="button">Read Scorecards</button></div>`);
   const input=d.querySelector('#gr155HoleFiles'),out=d.querySelector('#gr155HoleOut'),btn=d.querySelector('#gr155HoleParse');
   btn.onclick=async()=>{
     const files=[...input.files];if(!files.length){out.innerHTML='<div class="platoon-notice">Add at least one screenshot.</div>';return}
@@ -137,19 +137,29 @@ function openHoleImport(id){
       out.innerHTML=details.map((x,i)=>`<div class="gr155-hole-player ${x.member?'':'warn'}"><div><strong>${esc(x.raw||'Unknown')}</strong><span>${x.holes.length} holes</span></div><label style="margin-top:7px">Confirm player<select data-gr155-match="${i}"><option value="">Choose player…</option>${roster.map(r=>`<option value="${esc(r.id)}" ${x.member?.id===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label></div>`).join('')+`<div class="dialog-actions"><button class="button primary" id="gr155HoleSave" type="button">Save Hole-by-Hole</button></div>`;
       const save=out.querySelector('#gr155HoleSave');
       if(save)save.onclick=async()=>{
-        let saved=0;
+        const grouped=new Map();
         for(let i=0;i<details.length;i++){
           const d0=details[i];if(!d0.holes.length)continue;
           const memberId=out.querySelector(`[data-gr155-match="${i}"]`)?.value;
           const member=memberById(p,memberId);if(!member)continue;
-          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===member.id);if(!target)continue;
-          const sig=holeSig(d0.holes);
+          const g=grouped.get(member.id)||{member,raw:[],holes:[]};
+          g.raw.push(d0.raw);
+          g.holes=cleanHoles([...(g.holes||[]),...d0.holes]);
+          grouped.set(member.id,g);
+        }
+        let saved=0;
+        for(const g of grouped.values()){
+          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===g.member.id);if(!target)continue;
           for(const other of locked){
-            if(other!==target&&((sig&&holeSig(other.holes)===sig)||other.hole_detail_canonical_id===member.id)){
+            if(other!==target&&other.hole_detail_canonical_id===g.member.id){
               delete other.holes;delete other.hole_detail_saved_at;delete other.hole_detail_source_name;delete other.hole_detail_canonical_id;
             }
           }
-          target.holes=d0.holes;target.hole_detail_saved_at=new Date().toISOString();target.hole_detail_source_name=d0.raw;target.hole_detail_canonical_id=member.id;saved++;
+          target.holes=g.holes;
+          target.hole_detail_saved_at=new Date().toISOString();
+          target.hole_detail_source_name=[...new Set(g.raw.filter(Boolean))].join(' + ');
+          target.hole_detail_canonical_id=g.member.id;
+          saved++;
         }
         if(!saved){alert('Choose the correct player before saving.');return}
         m.results=locked;
