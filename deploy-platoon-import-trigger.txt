@@ -1,5 +1,1 @@
-Trigger Platoon backend deployment from main.
-Alias persistence update 2026-09-13.
-Read-only bootstrap fix 2026-09-13.
-Two-player scorecard parser update 2026-09-13.
-Per-image hole parser update 2026-09-13.
+past-mission-import-v1
