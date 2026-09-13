@@ -18,35 +18,30 @@ if(!document.getElementById('gr155MobilePregameFix')){
 }
 
 const PENDING_KEY='golfreconPlatoonPendingServerSaveV1';
-const clone=v=>{try{return JSON.parse(JSON.stringify(v))}catch{return null}};
-const getPending=()=>{try{return JSON.parse(localStorage.getItem(PENDING_KEY)||'null')}catch{return null}};
-const setPending=p=>{try{localStorage.setItem(PENDING_KEY,JSON.stringify(p))}catch{}};
 const clearPending=()=>{try{localStorage.removeItem(PENDING_KEY)}catch{}};
+// Kill any stale queued device snapshot left by older builds. Refreshes must never push it.
+clearPending();
 
 // Supabase is the Platoon source of truth. Local storage is only an immediate UI cache.
-// Writes go to Supabase; ordinary refreshes are pull-only and never send stale device data back.
+// Only explicit edits call save_state. Refresh/focus/open are read-only pulls.
 if(!window.__grSupabaseFirstSaveInstalled){
   window.__grSupabaseFirstSaveInstalled=true;
   window.savePlatoonLocal=function(p,push=true){
     try{if(typeof writePlatoonLocal==='function')writePlatoonLocal(p)}catch{}
     try{if(typeof render==='function')render()}catch{}
     if(push===false)return Promise.resolve(null);
-    setPending(p);
     if(typeof callPlatoonFunction!=='function'){
       alert('Platoon save failed: Supabase connection is unavailable.');
       return Promise.reject(new Error('Supabase connection unavailable'));
     }
     return callPlatoonFunction({action:'save_state',snapshot:p}).then(out=>{
-      if(out?.platoon){
-        if(typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
-        clearPending();
-      }
+      if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
       try{if(typeof platoonSyncError!=='undefined')platoonSyncError=''}catch{}
       try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
       return out?.platoon||null;
     }).catch(e=>{
       try{if(typeof platoonSyncError!=='undefined')platoonSyncError=String(e?.message||e||'Supabase save failed')}catch{}
-      alert('Supabase save failed. The change is queued on this device and will retry when Golf Recon reconnects.');
+      alert('Supabase save failed. This change was not saved to the server. Please retry.');
       throw e;
     });
   };
@@ -55,22 +50,8 @@ if(!window.__grSupabaseFirstSaveInstalled){
 async function refreshPlatoonFromSupabase(){
   if(typeof callPlatoonFunction!=='function')return;
   try{
-    // A real unsent edit gets first priority and is explicitly saved.
-    const pending=getPending();
-    if(pending){
-      const saved=await callPlatoonFunction({action:'save_state',snapshot:pending});
-      if(saved?.platoon){
-        if(typeof writePlatoonLocal==='function')writePlatoonLocal(saved.platoon);
-        clearPending();
-      }
-      try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
-      return;
-    }
-
-    // IMPORTANT: no snapshot is sent on refresh. This is a read from Supabase only.
     const out=await callPlatoonFunction({action:'bootstrap'});
     if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
-
     try{if(typeof platoonSyncError!=='undefined')platoonSyncError=''}catch{}
     try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
   }catch(e){
@@ -78,7 +59,6 @@ async function refreshPlatoonFromSupabase(){
   }
 }
 
-// Replace the older refresh routine too, so tapping Platoons cannot push stale phone/desktop data.
 try{window.syncPlatoonFromServer=refreshPlatoonFromSupabase}catch{}
 setTimeout(refreshPlatoonFromSupabase,250);
 setTimeout(refreshPlatoonFromSupabase,1800);
