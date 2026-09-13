@@ -2,6 +2,10 @@ name: Deploy Platoon Import Backend
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'deploy-platoon-import-trigger.txt'
 
 permissions:
   contents: read
