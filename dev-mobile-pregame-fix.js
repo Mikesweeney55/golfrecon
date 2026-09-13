@@ -22,10 +22,9 @@ const clone=v=>{try{return JSON.parse(JSON.stringify(v))}catch{return null}};
 const getPending=()=>{try{return JSON.parse(localStorage.getItem(PENDING_KEY)||'null')}catch{return null}};
 const setPending=p=>{try{localStorage.setItem(PENDING_KEY,JSON.stringify(p))}catch{}};
 const clearPending=()=>{try{localStorage.removeItem(PENDING_KEY)}catch{}};
-const startupLocal=(()=>{try{return clone(typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null)}catch{return null}})();
 
-// Platoons: Supabase is authoritative. Local storage is only an immediate UI cache.
-// Every change is also kept in a tiny pending queue until Supabase confirms the save.
+// Supabase is the Platoon source of truth. Local storage is only an immediate UI cache.
+// Writes go to Supabase; ordinary refreshes are pull-only and never send stale device data back.
 if(!window.__grSupabaseFirstSaveInstalled){
   window.__grSupabaseFirstSaveInstalled=true;
   window.savePlatoonLocal=function(p,push=true){
@@ -53,51 +52,24 @@ if(!window.__grSupabaseFirstSaveInstalled){
   };
 }
 
-function mergeLocalHoleDetails(server,local){
-  if(!server||!local)return {snapshot:server,changed:false};
-  const merged=clone(server),localMissions=Array.isArray(local.missions)?local.missions:[];
-  let changed=false;
-  for(const sm of (merged?.missions||[])){
-    const lm=localMissions.find(x=>String(x.id||'')===String(sm.id||''));if(!lm)continue;
-    const localRows=Array.isArray(lm.results)?lm.results:[],serverRows=Array.isArray(sm.results)?sm.results:[];
-    for(const lr of localRows){
-      if(!Array.isArray(lr?.holes)||!lr.holes.length)continue;
-      const sr=serverRows.find(r=>String(r?.player_name||'').trim().toLowerCase()===String(lr?.player_name||'').trim().toLowerCase());if(!sr)continue;
-      const lt=Date.parse(lr.hole_detail_saved_at||0)||0,st=Date.parse(sr.hole_detail_saved_at||0)||0;
-      if(!Array.isArray(sr.holes)||!sr.holes.length||lt>st){
-        sr.holes=clone(lr.holes);
-        sr.hole_detail_saved_at=lr.hole_detail_saved_at||new Date().toISOString();
-        sr.hole_detail_source_count=lr.hole_detail_source_count||null;
-        changed=true;
-      }
-    }
-  }
-  return {snapshot:merged,changed};
-}
-
 async function refreshPlatoonFromSupabase(){
-  if(typeof callPlatoonFunction!=='function'||typeof loadPlatoonLocal!=='function')return;
+  if(typeof callPlatoonFunction!=='function')return;
   try{
+    // A real unsent edit gets first priority and is explicitly saved.
     const pending=getPending();
     if(pending){
       const saved=await callPlatoonFunction({action:'save_state',snapshot:pending});
-      if(saved?.platoon){if(typeof writePlatoonLocal==='function')writePlatoonLocal(saved.platoon);clearPending()}
+      if(saved?.platoon){
+        if(typeof writePlatoonLocal==='function')writePlatoonLocal(saved.platoon);
+        clearPending();
+      }
       try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
       return;
     }
 
-    const localNow=loadPlatoonLocal();
-    const recoverySource=startupLocal||localNow;
-    const out=await callPlatoonFunction({action:'bootstrap',snapshot:recoverySource||{}});
-    if(!out?.platoon)return;
-
-    // Recover hole details that existed on this device before any server refresh had a chance to replace the cache.
-    const merged=mergeLocalHoleDetails(out.platoon,recoverySource);
-    if(merged.changed){
-      setPending(merged.snapshot);
-      const saved=await callPlatoonFunction({action:'save_state',snapshot:merged.snapshot});
-      if(saved?.platoon){if(typeof writePlatoonLocal==='function')writePlatoonLocal(saved.platoon);clearPending()}
-    }else if(typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
+    // IMPORTANT: no snapshot is sent on refresh. This is a read from Supabase only.
+    const out=await callPlatoonFunction({action:'bootstrap'});
+    if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
 
     try{if(typeof platoonSyncError!=='undefined')platoonSyncError=''}catch{}
     try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
@@ -106,6 +78,8 @@ async function refreshPlatoonFromSupabase(){
   }
 }
 
+// Replace the older refresh routine too, so tapping Platoons cannot push stale phone/desktop data.
+try{window.syncPlatoonFromServer=refreshPlatoonFromSupabase}catch{}
 setTimeout(refreshPlatoonFromSupabase,250);
 setTimeout(refreshPlatoonFromSupabase,1800);
 window.addEventListener('focus',refreshPlatoonFromSupabase);
