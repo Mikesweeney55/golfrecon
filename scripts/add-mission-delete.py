@@ -1,6 +1,5 @@
 from pathlib import Path
 
-# Patch backend with a guarded delete action.
 backend = Path('supabase/functions/platoon-import/index.ts')
 text = backend.read_text()
 if 'async function deleteMission(' not in text:
@@ -9,7 +8,6 @@ if 'async function deleteMission(' not in text:
     if marker not in text:
         raise SystemExit('bootstrap marker not found')
     text = text.replace(marker, fn + marker, 1)
-
 handler = 'if(body.action==="save_state")return response({platoon:await saveState(supabase,user,body.snapshot||{})});'
 if 'body.action==="delete_mission"' not in text:
     replacement = 'if(body.action==="delete_mission")return response({platoon:await deleteMission(supabase,user,body.mission_id)});\n    ' + handler
@@ -18,13 +16,14 @@ if 'body.action==="delete_mission"' not in text:
     text = text.replace(handler, replacement, 1)
 backend.write_text(text)
 
-# Load the isolated delete UI and bust cache versions.
 idx = Path('index.html')
 html = idx.read_text()
-if 'mission-delete.js?v=1' not in html:
-    html = html.replace('<script src="past-mission-import.js?v=4"></script>', '<script src="past-mission-import.js?v=4"></script>\n<script src="mission-delete.js?v=1"></script>')
+if 'mission-delete.js?v=2' not in html:
+    if 'mission-delete.js?v=1' in html:
+        html = html.replace('mission-delete.js?v=1','mission-delete.js?v=2')
+    else:
+        html = html.replace('<script src="past-mission-import.js?v=4"></script>', '<script src="past-mission-import.js?v=4"></script>\n<script src="mission-delete.js?v=2"></script>')
 idx.write_text(html)
 
-# Trigger the existing backend deployment workflow.
 trigger = Path('deploy-platoon-import-trigger.txt')
-trigger.write_text('mission-delete-v1\n')
+trigger.write_text('mission-delete-v2\n')
