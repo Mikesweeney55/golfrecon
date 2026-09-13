@@ -150,57 +150,66 @@ async function parseHoleDetails(body:any){
   if(!Array.isArray(body.images)||!body.images.length)throw new Error("Add at least one scorecard screenshot.");
   const mission=body.mission||{};
   const roster=Array.isArray(mission.roster)?mission.roster:[];
-  const content:any[]=[{
-    type:"input_text",
-    text:`You are the Golf Recon Platoon hole-by-hole scorecard parser.
-Read a set of golf scorecard screenshots. IMPORTANT: a single screenshot can contain TWO PLAYERS at the same time. A typical upload is FOUR screenshots total: two screenshots covering the front nine and two screenshots covering the back nine, with two player rows visible on each screenshot.
+  const players:any[]=[];
+  const warnings:string[]=[];
+  let confidence=1;
 
-Treat every visible player row independently. On every image:
-- identify every visible player name or abbreviation separately
-- keep each player's scores attached to the same visible row as that player name
-- determine the hole numbers from the visible card headings
-- never shift one player's scores onto the player above or below
-- never assume one screenshot belongs to only one golfer
-
-Across the full image set, merge front-nine and back-nine data only when the visible name or abbreviation clearly refers to the same player. It is normal for the same player to appear on two screenshots: once for holes 1-9 and once for holes 10-18.
-
-For each distinct player whose name and scores are actually visible, return:
-- player_name exactly as shown, using the most complete visible version available
-- holes with the visible hole number
-- par for that hole only when visible, otherwise null
-- player score for that hole only when visible, otherwise null
-
-Sort holes numerically and do not duplicate a hole. If the identity between a front-nine row and a back-nine row is uncertain, return them as separate player entries rather than guessing a merge.
-Never guess a score, par, player identity, or missing hole.
-Do NOT infer or overwrite gross, net, handicap, finish position, Mission points, or the official Mission leaderboard.
-A displayed gross total may be used only as a consistency check; do not return it as official scoring.
-If a screenshot is ambiguous, leave the uncertain value null and add a warning.
-
-Known Platoon master roster for identity matching only:
-${JSON.stringify(roster)}
-Use roster names and aliases only to help resolve a visible abbreviation or nickname. Do not attach a scorecard to a roster member unless the screenshot itself supports that identity.
-
-Selected Mission context is for matching only and must not be used to invent scores:
-${JSON.stringify({date:mission.date||null,course:mission.locationName||null,title:mission.title||null})}`
-  }];
-  for(const img of body.images){
+  for(let i=0;i<body.images.length;i++){
+    const img=body.images[i];
     if(!img?.type||!img?.data)continue;
-    content.push({type:"input_image",image_url:`data:${img.type};base64,${img.data}`,detail:"high"});
+    const content:any[]=[{
+      type:"input_text",
+      text:`You are the Golf Recon Platoon hole-by-hole scorecard parser.
+Read ONLY this ONE screenshot. Do not merge it with any other screenshot.
+
+This screenshot can contain TWO PLAYERS at the same time. Treat each visible player row independently.
+For every visible player row:
+- identify the player name or abbreviation shown on that row
+- keep every score attached to that same player row
+- determine hole numbers from the visible card headings
+- return only the holes visible in THIS screenshot
+- never shift scores from one player row to another
+- never infer a missing score, par, player, or hole
+
+Return a separate player entry for every visible player row, even if the same golfer may appear again in another screenshot. Golf Recon will merge front-nine and back-nine rows later after the user confirms the player identity.
+
+For each visible player row return:
+- player_name exactly as shown
+- holes with visible hole number
+- par only when visible, otherwise null
+- score only when visible, otherwise null
+
+Do NOT infer or overwrite gross, net, handicap, finish position, Mission points, or the official Mission leaderboard.
+If something is ambiguous, leave it null and add a warning.
+
+Known Platoon roster for resolving visible abbreviations only:
+${JSON.stringify(roster)}
+Do not attach a row to a roster member unless the screenshot itself supports that identity.
+
+Mission context for matching only:
+${JSON.stringify({date:mission.date||null,course:mission.locationName||null,title:mission.title||null})}`
+    },{
+      type:"input_image",image_url:`data:${img.type};base64,${img.data}`,detail:"high"
+    }];
+    const ai=await fetch("https://api.openai.com/v1/responses",{
+      method:"POST",
+      headers:{"Authorization":`Bearer ${key}`,"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"gpt-5.6",
+        input:[{role:"user",content}],
+        text:{format:{type:"json_schema",name:"golfrecon_platoon_hole_details",strict:true,schema:holeDetailSchema}}
+      })
+    });
+    const raw=await ai.json();
+    if(!ai.ok)throw new Error(raw?.error?.message||`Hole-by-hole parsing failed on screenshot ${i+1}.`);
+    const outputText=raw.output_text??raw.output?.flatMap((o:any)=>o.content||[]).find((c:any)=>c.type==="output_text")?.text;
+    if(!outputText)throw new Error(`No structured hole-by-hole detail returned for screenshot ${i+1}.`);
+    const parsed=JSON.parse(outputText);
+    if(Number.isFinite(Number(parsed?.confidence)))confidence=Math.min(confidence,Number(parsed.confidence));
+    for(const w of (Array.isArray(parsed?.warnings)?parsed.warnings:[]))warnings.push(`Screenshot ${i+1}: ${String(w)}`);
+    for(const player of (Array.isArray(parsed?.players)?parsed.players:[]))players.push(player);
   }
-  const ai=await fetch("https://api.openai.com/v1/responses",{
-    method:"POST",
-    headers:{"Authorization":`Bearer ${key}`,"Content-Type":"application/json"},
-    body:JSON.stringify({
-      model:"gpt-5.6",
-      input:[{role:"user",content}],
-      text:{format:{type:"json_schema",name:"golfrecon_platoon_hole_details",strict:true,schema:holeDetailSchema}}
-    })
-  });
-  const raw=await ai.json();
-  if(!ai.ok)throw new Error(raw?.error?.message||"Hole-by-hole parsing failed.");
-  const outputText=raw.output_text??raw.output?.flatMap((o:any)=>o.content||[]).find((c:any)=>c.type==="output_text")?.text;
-  if(!outputText)throw new Error("No structured hole-by-hole detail returned.");
-  return JSON.parse(outputText);
+  return {confidence,warnings,players};
 }
 
 async function activeMembership(supabase:any,userId:string){
