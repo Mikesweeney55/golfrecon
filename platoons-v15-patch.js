@@ -8,9 +8,9 @@ function renderGroups(){try{if(typeof render==='function')render()}catch{}}
 function ensureMenu(){
   if(platoonMenuDialog)return platoonMenuDialog;
   const d=document.createElement('dialog');d.id='grPlatoonNavMenu';d.className='platoon-modal';
-  d.innerHTML='<div class="dialog-card"><div class="dialog-head"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:5px 0 0">Navigate</h2></div><button class="icon-button" data-close type="button">✕</button></div><div class="grid" style="margin-top:14px"><button class="card" data-gr-platoon-nav="calendar" type="button" style="text-align:left;color:inherit"><strong>📅 Calendar</strong><div class="muted" style="font-size:11px;margin-top:4px">Full mission calendar</div></button><button class="card" data-gr-platoon-nav="blog" type="button" style="text-align:left;color:inherit"><strong>📝 Blog</strong><div class="muted" style="font-size:11px;margin-top:4px">Platoon clubhouse and posts</div></button><button class="card" data-gr-platoon-nav="missions" type="button" style="text-align:left;color:inherit"><strong>🎯 Missions</strong><div class="muted" style="font-size:11px;margin-top:4px">Upcoming, Wars and history</div></button></div></div>';
+  d.innerHTML='<div class="dialog-card"><div class="dialog-head"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:5px 0 0">Navigate</h2></div><button class="icon-button" data-close type="button">✕</button></div><div class="grid" style="margin-top:14px"><button class="card" data-gr-platoon-nav="calendar" type="button" style="text-align:left;color:inherit"><strong>📅 Calendar</strong><div class="muted" style="font-size:11px;margin-top:4px">Full mission calendar</div></button><button class="card" data-gr-platoon-nav="blog" type="button" style="text-align:left;color:inherit"><strong>📝 Blog</strong><div class="muted" style="font-size:11px;margin-top:4px">Platoon clubhouse and posts</div></button><button class="card" data-gr-platoon-nav="missions" type="button" style="text-align:left;color:inherit"><strong>🎯 Missions</strong><div class="muted" style="font-size:11px;margin-top:4px">Return to Platoon HQ missions view</div></button></div></div>';
   document.body.appendChild(d);d.querySelector('[data-close]').onclick=()=>d.close();
-  d.addEventListener('click',e=>{const b=e.target.closest('[data-gr-platoon-nav]');if(!b)return;d.close();goSubpage(b.dataset.grPlatoonNav)});
+  d.addEventListener('click',e=>{const b=e.target.closest('[data-gr-platoon-nav]');if(!b)return;const action=b.dataset.grPlatoonNav;d.close();goSubpage(action==='missions'?'home':action)});
   platoonMenuDialog=d;return d;
 }
 function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${esc(title)}</h2>${sub?`<div class="muted" style="font-size:12px;margin-top:4px">${esc(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
@@ -32,16 +32,11 @@ function calendarView(){
   return `${subHead('Calendar',p.name||'My Time')}<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><button class="icon-button" type="button" data-cal-prev>‹</button><strong style="font-size:18px">${esc(label)}</strong><button class="icon-button" type="button" data-cal-next>›</button></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div style="text-align:center;font-size:10px;font-weight:800;opacity:.65">${x}</div>`).join('')}</div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px">${cells}</div></div>`;
 }
 function blogView(){const p=pData();return `${subHead('Blog',(p.name||'My Time')+' Clubhouse')}<div class="card"><div class="empty" style="padding:34px 12px">No posts yet.</div></div>`}
-function missionsView(){
-  const p=pData(),rows=(p.missions||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-  return `${subHead('Missions','All Platoon Missions & Wars')}<div style="display:grid;gap:10px">${rows.length?rows.map(x=>`<button class="card" type="button" data-mission="${esc(x.id)}" style="width:100%;text-align:left;color:inherit"><div class="eyebrow">${x.type==='war'?'WAR':'MISSION'}</div><strong style="display:block;font-size:16px;margin-top:4px">${esc(x.title||x.locationName||'Untitled')}</strong><div class="muted" style="font-size:11px;margin-top:4px">${esc(x.date||'Date TBD')}${x.locationName?' · '+esc(x.locationName):''}</div></button>`).join(''):'<div class="empty">No Missions yet.</div>'}</div>`;
-}
 function applyPatch(){
   const base=window.grGroupsView;if(typeof base!=='function')return;
   const patched=()=>{
     if(platoonSubpage==='calendar')return calendarView();
     if(platoonSubpage==='blog')return blogView();
-    if(platoonSubpage==='missions')return missionsView();
     const p=pData();let html=base();
     html=html.replace('<div class="gr-standings-title">Platoon Standings</div>',`<div class="gr-standings-title">${esc(p.season||new Date().getFullYear())} Platoon Standings</div>`);
     html=html.replace(/<div class="chips"><span class="chip">[\s\S]*?<\/div><div class="gr-hq-actions">/,'<div class="gr-hq-actions">');
