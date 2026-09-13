@@ -338,9 +338,6 @@ async function bootstrapState(supabase:any,user:any,snapshot:any){
   if(created){
     await upsertMembers(supabase,user,membership.platoon_id,snapshot||{},true);
     await upsertMissions(supabase,user,membership.platoon_id,snapshot||{},true);
-  }else if(snapshot){
-    await upsertMembers(supabase,user,membership.platoon_id,snapshot,false);
-    await upsertMissions(supabase,user,membership.platoon_id,snapshot,false);
   }
   return readPlatoonState(supabase,membership.platoon_id);
 }
