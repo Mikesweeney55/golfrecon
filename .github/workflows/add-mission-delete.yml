@@ -18,11 +18,11 @@ jobs:
         run: |
           node --check mission-delete.js
           grep -q 'delete_mission' supabase/functions/platoon-import/index.ts
-          grep -q 'mission-delete.js?v=2' index.html
+          grep -q 'mission-delete.js?v=3' index.html
       - name: Commit and push
         run: |
           git config user.name github-actions-bot
           git config user.email actions@github.com
           git add supabase/functions/platoon-import/index.ts index.html deploy-platoon-import-trigger.txt
-          git commit -m 'Load Mission delete v2 in history and post-game'
+          git commit -m 'Load Mission UI fixes v3'
           git push
