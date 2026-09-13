@@ -1,4 +1,4 @@
-name: GolfRecon Maintenance
+name: GolfRecon Two-Player Scorecard Patch
 on:
   push:
     branches: [main]
@@ -10,61 +10,89 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch index
+      - name: Patch scorecard handling
         run: |
           python <<'PY'
           from pathlib import Path
-          p=Path("index.html")
+
+          p=Path('dev-v15.5-results.js')
           s=p.read_text()
-
-          assert "<title>GolfRecon v12.3 Beta</title>" in s
-          assert "<span>v12.3 Beta</span>" in s
-          s=s.replace("<title>GolfRecon v12.3 Beta</title>","<title>GolfRecon v12.4 Beta</title>",1)
-          s=s.replace("<span>v12.3 Beta</span>","<span>v12.4 Beta</span>",1)
-
-          old="""function missingRoundStats(r){
-  const c=course(r.courseId);
-  const n=r.holes||c?.holeNumbers?.length||0;
-  const pars=c?.pars||[];
-  let fw=0,gir=0,putts=0;
-  for(let i=0;i<n;i++){
-    if(pars[i]!==3 && (r.fairways?.[i]===null || r.fairways?.[i]===undefined))fw++;
-    if(r.gir?.[i]===null || r.gir?.[i]===undefined)gir++;
-    if(r.putts?.[i]===null || r.putts?.[i]===undefined)putts++;
-  }
-  const puttingKnown=new Set(db.puttingDetails.filter(p=>p.date===r.date && normalizeCourseName(p.course)===normalizeCourseName(c?.name)).map(p=>Number(p.hole)));
-  const firstPutts=Math.max(0,n-puttingKnown.size);
-  return {fw,gir,putts,firstPutts};
-}"""
-          new="""function validBinaryStat(v){return v===true||v===false||v===1||v===0}
-function validCountStat(v){return Number.isFinite(Number(v)) && String(v).trim()!==''}
-function missingRoundStats(r){
-  const c=course(r.courseId);
-  const n=r.holes||c?.holeNumbers?.length||0;
-  const pars=c?.pars||[];
-  let fw=0,gir=0,putts=0;
-  for(let i=0;i<n;i++){
-    if(pars[i]!==3 && !validBinaryStat(r.fairways?.[i]))fw++;
-    if(!validBinaryStat(r.gir?.[i]))gir++;
-    if(!validCountStat(r.putts?.[i]))putts++;
-  }
-  const puttingKnown=new Set(db.puttingDetails.filter(p=>p.date===r.date && normalizeCourseName(p.course)===normalizeCourseName(c?.name) && Number.isFinite(Number(p.distance))).map(p=>Number(p.hole)));
-  const firstPutts=Math.max(0,n-puttingKnown.size);
-  return {fw,gir,putts,firstPutts};
-}"""
+          old="""        let saved=0;
+        for(let i=0;i<details.length;i++){
+          const d0=details[i];if(!d0.holes.length)continue;
+          const memberId=out.querySelector(`[data-gr155-match=\"${i}\"]`)?.value;
+          const member=memberById(p,memberId);if(!member)continue;
+          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===member.id);if(!target)continue;
+          const sig=holeSig(d0.holes);
+          for(const other of locked){
+            if(other!==target&&((sig&&holeSig(other.holes)===sig)||other.hole_detail_canonical_id===member.id)){
+              delete other.holes;delete other.hole_detail_saved_at;delete other.hole_detail_source_name;delete other.hole_detail_canonical_id;
+            }
+          }
+          target.holes=d0.holes;target.hole_detail_saved_at=new Date().toISOString();target.hole_detail_source_name=d0.raw;target.hole_detail_canonical_id=member.id;saved++;
+        }
+        if(!saved){alert('Choose the correct player before saving.');return}
+"""
+          new="""        const grouped=new Map();
+        for(let i=0;i<details.length;i++){
+          const d0=details[i];if(!d0.holes.length)continue;
+          const memberId=out.querySelector(`[data-gr155-match=\"${i}\"]`)?.value;
+          const member=memberById(p,memberId);if(!member)continue;
+          const g=grouped.get(member.id)||{member,raw:[],holes:[]};
+          g.raw.push(d0.raw);g.holes=cleanHoles([...(g.holes||[]),...d0.holes]);grouped.set(member.id,g);
+        }
+        let saved=0;
+        for(const g of grouped.values()){
+          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===g.member.id);if(!target)continue;
+          for(const other of locked){if(other!==target&&other.hole_detail_canonical_id===g.member.id){delete other.holes;delete other.hole_detail_saved_at;delete other.hole_detail_source_name;delete other.hole_detail_canonical_id}}
+          target.holes=g.holes;target.hole_detail_saved_at=new Date().toISOString();target.hole_detail_source_name=[...new Set(g.raw.filter(Boolean))].join(' + ');target.hole_detail_canonical_id=g.member.id;saved++;
+        }
+        if(!saved){alert('Choose the correct player before saving.');return}
+"""
           assert old in s
           s=s.replace(old,new,1)
-
-          old_gir="gir:{label:'Greens in regulation',short:'GIR',domain:[0,100],value:r=>100*sum(r.gir)/(r.gir?.length||1),better:'high',fmt:v=>Math.round(v)+'%'},"
-          new_gir="gir:{label:'Greens in regulation',short:'GIR',domain:[0,100],value:r=>{const a=(r.gir||[]).filter(validBinaryStat);return a.length?100*sum(a)/a.length:null},better:'high',fmt:v=>Math.round(v)+'%'},"
-          old_fw="fairways:{label:'Fairways hit',short:'Fairways',domain:[0,100],value:r=>{const a=(r.fairways||[]).filter(x=>x!=null);return a.length?100*sum(a)/a.length:null},better:'high',fmt:v=>Math.round(v)+'%'},"
-          new_fw="fairways:{label:'Fairways hit',short:'Fairways',domain:[0,100],value:r=>{const a=(r.fairways||[]).filter(validBinaryStat);return a.length?100*sum(a)/a.length:null},better:'high',fmt:v=>Math.round(v)+'%'},"
-          assert old_gir in s and old_fw in s
-          s=s.replace(old_gir,new_gir,1).replace(old_fw,new_fw,1)
-
+          s=s.replace('Front 9, back 9, or full 18 · multiple images allowed','Four screenshots are OK · each image may show two players · front/back halves will be merged')
           p.write_text(s)
+
+          b=Path('supabase/functions/platoon-import/index.ts')
+          t=b.read_text()
+          oldp="""Read screenshots of individual player golf scorecards. Screenshots may show the front nine, back nine, or a full 18-hole card. Multiple screenshots may belong to the same player.
+
+For each player whose name and scores are actually visible, return:
+- player_name exactly as shown
+- holes with the visible hole number
+- par for that hole only when visible, otherwise null
+- player score for that hole only when visible, otherwise null
+
+Merge front-nine and back-nine screenshots for the same clearly identified player. Sort holes numerically and do not duplicate a hole.
+Never guess a score, par, player identity, or missing hole."""
+          newp="""Read a set of golf scorecard screenshots. IMPORTANT: one screenshot can contain TWO PLAYERS at the same time. A typical upload is FOUR screenshots total: two screenshots covering the front nine and two screenshots covering the back nine, with two players shown on each screenshot.
+
+Treat every visible player row independently. For each screenshot, identify every visible player name or abbreviation separately and keep each score row attached to the name on that same row. Determine hole numbers from the visible card headings. Do not copy or shift one player's scores onto the adjacent player's row.
+
+Across the full image set, merge front-nine and back-nine data only when the visible name or abbreviation clearly refers to the same player. It is valid for the same player to appear in two screenshots, once for holes 1-9 and once for holes 10-18.
+
+For each distinct player whose name and scores are actually visible, return:
+- player_name exactly as shown, using the most complete visible version
+- holes with the visible hole number
+- par for that hole only when visible, otherwise null
+- player score for that hole only when visible, otherwise null
+
+Sort holes numerically and do not duplicate a hole. If identity between a front-nine row and back-nine row is uncertain, return them as separate player entries rather than guessing a merge.
+Never guess a score, par, player identity, or missing hole."""
+          assert oldp in t
+          t=t.replace(oldp,newp,1)
+          b.write_text(t)
           PY
       - name: Verify
-        run: grep -q 'GolfRecon v12.4 Beta' index.html && grep -q '<span>v12.4 Beta</span>' index.html && grep -q 'function validBinaryStat' index.html && grep -q 'filter(validBinaryStat)' index.html
+        run: |
+          node --check dev-v15.5-results.js
+          grep -q 'const grouped=new Map' dev-v15.5-results.js
+          grep -q 'one screenshot can contain TWO PLAYERS' supabase/functions/platoon-import/index.ts
       - name: Commit
-        run: git config user.name github-actions-bot && git config user.email actions@github.com && git add index.html && git commit -m 'Fix missing FIR and GIR detection for v12.4' && git push
+        run: |
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add dev-v15.5-results.js supabase/functions/platoon-import/index.ts
+          git commit -m 'Handle two-player front and back scorecard screenshots'
+          git push
