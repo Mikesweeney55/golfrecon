@@ -1,0 +1,32 @@
+name: Restore Stable Golf Recon
+on:
+  push:
+    paths:
+      - 'restore-stable-trigger.txt'
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore last known stable app files
+        run: |
+          git checkout caab0e8d2210b0a097c25b04eebadbfd66ea7b3c -- index.html platoons-v15-real.js platoons-v15-patch-v5.js
+          git rm -f platoons-v15-patch-v6.js 2>/dev/null || true
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          s=s.replace('platoons-v15-real.js?v=154','platoons-v15-real.js?v=162')
+          p.write_text(s)
+          PY
+      - name: Commit stable restore
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Restore stable navigation and Platoons baseline"
+          git push
