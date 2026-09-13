@@ -76,30 +76,89 @@ function standings(m){
     return an-bn||a._i-b._i;
   });
 }
+function lowLeaders(rows,key){
+  const vals=rows.filter(r=>finite(r[key])).map(r=>Number(r[key]));
+  if(!vals.length)return[];
+  const best=Math.min(...vals);
+  return rows.filter(r=>finite(r[key])&&Number(r[key])===best);
+}
+function detailHigh(detail,getter){
+  const vals=detail.map(getter).filter(Number.isFinite);
+  if(!vals.length)return[];
+  const best=Math.max(...vals);
+  return best>0?detail.filter(x=>getter(x)===best):[];
+}
+function detailLow(detail,getter){
+  const vals=detail.map(getter).filter(Number.isFinite);
+  if(!vals.length)return[];
+  const best=Math.min(...vals);
+  return detail.filter(x=>getter(x)===best);
+}
+function namesOf(p,rows,detail=false){
+  return rows.map(x=>detail?detailDisplayName(p,x.r||x):displayName(p,(x.r||x).player_name)).join(' & ');
+}
+function missionNarrative(p,rows,detail,birds,back,clean){
+  const lines=[],net=lowLeaders(rows,'net');
+  if(net.length){
+    const score=Number(net[0].net);
+    if(net.length>1)lines.push(`${namesOf(p,net)} tied low net at ${score}. Bragging rights remain under review.`);
+    else{
+      const runner=rows.filter(r=>finite(r.net)&&r!==net[0]).sort((a,b)=>Number(a.net)-Number(b.net))[0];
+      const margin=runner?Number(runner.net)-score:null;
+      lines.push(`${displayName(p,net[0].player_name)} took low net at ${score}${margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${displayName(p,runner.player_name)}`:''}.`);
+    }
+  }
+  if(birds.length){
+    const birdBits=birds.map(x=>`${detailDisplayName(p,x.r)} birdied ${x.s.birds.map(h=>`#${h.hole}`).join(', ')}`).join('; ');
+    lines.push(`${birdBits}.${birds.length>1?' Nobody gets the birdie belt outright.':''}`);
+  }
+  if(back.length)lines.push(`${namesOf(p,back,true)} owned the best back nine at ${back[0].s.back}.`);
+  if(clean.length)lines.push(`${namesOf(p,clean,true)} kept the cleanest card with ${clean[0].s.doubles.length} double-or-worse hole${clean[0].s.doubles.length===1?'':'s'}.`);
+  if(!detail.some(x=>x.s.holes.length))lines.push('Hole-by-hole detail is still limited, so this recap stays with the official results.');
+  return lines.slice(0,4);
+}
 function summaryMarkup(p,m){
   const rows=standings(m);if(!rows.length)return '<div class="gr155-empty">No results yet.</div>';
-  const net=[...rows].filter(r=>finite(r.net)).sort((a,b)=>Number(a.net)-Number(b.net));
-  const gross=[...rows].filter(r=>finite(r.gross)).sort((a,b)=>Number(a.gross)-Number(b.gross));
-  const pts=[...rows].filter(r=>finite(r.raw_points)).sort((a,b)=>Number(b.raw_points)-Number(a.raw_points));
   const detail=rows.map(r=>({r,s:detailStats(r)}));
-  const birdLead=[...detail].filter(x=>x.s.birds.length).sort((a,b)=>b.s.birds.length-a.s.birds.length)[0];
-  const clean=[...detail].filter(x=>x.s.holes.length).sort((a,b)=>a.s.doubles.length-b.s.doubles.length)[0];
-  const back=[...detail].filter(x=>x.s.back!==null).sort((a,b)=>a.s.back-b.s.back)[0];
-  const blow=[...detail].filter(x=>x.s.doubles.length).sort((a,b)=>b.s.doubles.length-a.s.doubles.length)[0];
-  const cards=[];
-  if(net[0])cards.push(`<div class="gr155-kpi"><span>Low Net</span><strong>${esc(displayName(p,net[0].player_name))} · ${Number(net[0].net)}</strong></div>`);
-  if(gross[0])cards.push(`<div class="gr155-kpi"><span>Low Gross</span><strong>${esc(displayName(p,gross[0].player_name))} · ${Number(gross[0].gross)}</strong></div>`);
-  if(pts[0]&&Number(pts[0].raw_points)>0)cards.push(`<div class="gr155-kpi"><span>Points</span><strong>${esc(displayName(p,pts[0].player_name))} · ${Number(pts[0].raw_points)}</strong></div>`);
-  if(birdLead)cards.push(`<div class="gr155-kpi"><span>Birdies</span><strong>${esc(detailDisplayName(p,birdLead.r))} · ${birdLead.s.birds.length}</strong></div>`);
-  const recon=[];
-  if(net[0]){const margin=net[1]?Number(net[1].net)-Number(net[0].net):null;recon.push(`${displayName(p,net[0].player_name)} won low net at ${Number(net[0].net)}${margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${displayName(p,net[1].player_name)}`:''}.`)}
-  if(gross[0])recon.push(`${displayName(p,gross[0].player_name)} posted low gross at ${Number(gross[0].gross)}.`);
-  if(birdLead){const hs=birdLead.s.birds.map(h=>h.hole).join(', ');recon.push(`${detailDisplayName(p,birdLead.r)} led the birdies with ${birdLead.s.birds.length}${hs?` on hole${birdLead.s.birds.length===1?'':'s'} ${hs}`:''}.`)}
-  if(clean)recon.push(`${detailDisplayName(p,clean.r)} kept the cleanest card with ${clean.s.doubles.length} double-or-worse hole${clean.s.doubles.length===1?'':'s'}.`);
-  if(back)recon.push(`${detailDisplayName(p,back.r)} had the best back nine at ${back.s.back}.`);
-  if(blow&&blow.s.doubles.length>=2)recon.push(`${detailDisplayName(p,blow.r)} took the most damage: ${blow.s.doubles.length} double-or-worse holes.`);
-  const body=rows.map((r,i)=>`<tr><td>${finite(r.finish_position)?Number(r.finish_position):i+1}</td><td>${esc(displayName(p,r.player_name))}</td><td>${finite(r.net)?Number(r.net):'—'}</td><td>${finite(r.gross)?Number(r.gross):'—'}</td><td>${finite(r.raw_points)?Number(r.raw_points):'—'}</td></tr>`).join('');
-  return `<div class="gr155-results-wrap"><table class="gr155-results-table"><thead><tr><th>Pos</th><th>Player</th><th>Net</th><th>Gross</th><th>Pts</th></tr></thead><tbody>${body}</tbody></table>${cards.length?`<div class="gr155-kpis">${cards.join('')}</div>`:''}<div class="gr155-recon"><div class="gr155-recon-title">ROUND RECON</div>${recon.map(x=>`<div class="gr155-recon-line">${esc(x)}</div>`).join('')}</div></div>`;
+  const net=lowLeaders(rows,'net'),gross=lowLeaders(rows,'gross');
+  const birds=detailHigh(detail,x=>x.s.birds.length);
+  const back=detailLow(detail.filter(x=>x.s.back!==null),x=>x.s.back);
+  const clean=detailLow(detail.filter(x=>x.s.holes.length),x=>x.s.doubles.length);
+  const standingsRows=rows.map((r,i)=>`<div class="gr155-recap-row"><span><b>${finite(r.finish_position)?Number(r.finish_position):i+1}</b> ${esc(displayName(p,r.player_name))}</span><span>${finite(r.net)?`N ${Number(r.net)}`:'N —'} · ${finite(r.gross)?`G ${Number(r.gross)}`:'G —'}</span></div>`).join('');
+  const hi=[];
+  if(net.length)hi.push(`<div class="gr155-recap-hi"><span>Low Net</span><strong>${esc(namesOf(p,net))} · ${Number(net[0].net)}</strong></div>`);
+  if(gross.length)hi.push(`<div class="gr155-recap-hi"><span>Low Gross</span><strong>${esc(namesOf(p,gross))} · ${Number(gross[0].gross)}</strong></div>`);
+  if(birds.length)hi.push(`<div class="gr155-recap-hi"><span>Birdies</span><strong>${esc(namesOf(p,birds,true))} · ${birds[0].s.birds.length}</strong></div>`);
+  if(back.length)hi.push(`<div class="gr155-recap-hi"><span>Best Back 9</span><strong>${esc(namesOf(p,back,true))} · ${back[0].s.back}</strong></div>`);
+  const intel=missionNarrative(p,rows,detail,birds,back,clean);
+  return `<div class="gr155-recap-grid"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsRows}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${hi.join('')||'<div class="gr155-empty">No confirmed highlights yet.</div>'}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
+}
+function platoonRecapMarkup(p){
+  const complete=(p.missions||[]).filter(m=>m.type!=='war'&&m.status==='completed');
+  const map=new Map((p.members||[]).map(m=>[m.id,{member:m,points:0,birds:0,eagles:0,wins:0}]));
+  for(const m of complete)for(const r of (m.results||[])){
+    const mm=canonicalMember(p,r.player_name);if(!mm||!map.has(mm.id))continue;
+    const x=map.get(mm.id),st=detailStats(r);
+    x.points+=Number(r.raw_points||0);x.birds+=st.birds.length;x.eagles+=st.eagles.length;if(Number(r.finish_position)===1)x.wins++;
+  }
+  const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
+  const standing=rows.map((x,i)=>`<div class="gr155-recap-row"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span>${x.points} pts</span></div>`).join('')||'<div class="gr155-empty">No points yet.</div>';
+  const club=[...rows].sort((a,b)=>b.eagles-a.eagles||b.birds-a.birds).filter(x=>x.eagles||x.birds);
+  const eagle=club.map(x=>`<div class="gr155-recap-row"><span>${esc(x.member.name)}</span><span>${x.eagles?`${x.eagles} eagle${x.eagles===1?'':'s'} · `:''}${x.birds} birdie${x.birds===1?'':'s'}</span></div>`).join('')||'<div class="gr155-empty">No confirmed birdies or eagles yet.</div>';
+  const intel=[];
+  const latest=[...complete].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
+  if(latest){const r=standings(latest)[0];if(r)intel.push(`${displayName(p,r.player_name)} finished the latest Mission on top${finite(r.net)?` at net ${Number(r.net)}`:''}.`)}
+  if(rows.length){
+    const best=rows[0].points,leaders=rows.filter(x=>x.points===best);
+    intel.push(leaders.length>1?`${leaders.map(x=>x.member.name).join(' & ')} are tied atop the Platoon at ${best} point${best===1?'':'s'}.`:`${leaders[0].member.name} leads the Platoon with ${best} point${best===1?'':'s'}.`);
+    const b=Math.max(...rows.map(x=>x.birds));if(b>0){const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
+  }
+  if(!intel.length)intel.push('No completed Missions yet. The season story is still waiting to be written.');
+  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section><section class="gr155-recap-block"><div class="gr155-recap-title">EAGLE CLUB</div>${eagle}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
+}
+function enhancePlatoonRecap(){
+  const p=getP(),old=document.querySelector('.gr-platoon-standings');
+  if(p&&old&&!old.classList.contains('gr155-platoon-recap'))old.outerHTML=platoonRecapMarkup(p);
 }
 
 function missionIdFromCard(card){
@@ -117,7 +176,7 @@ function enhanceCard(card){
     const actions=card.querySelector('.gr-mini-actions');if(actions){let b=actions.querySelector('[data-gr-add-results]');if(!b){b=document.createElement('button');b.type='button';b.className='button secondary';b.dataset.grAddResults=id;b.textContent='📸 Add Results';actions.appendChild(b)}b.onclick=e=>{e.preventDefault();e.stopPropagation();openChooser(id)}}
   }
 }
-function enhanceAll(){document.querySelectorAll('.gr-mission').forEach(enhanceCard);document.querySelectorAll('.gr155-upload-status').forEach(x=>x.remove())}
+function enhanceAll(){document.querySelectorAll('.gr-mission').forEach(enhanceCard);document.querySelectorAll('.gr155-upload-status').forEach(x=>x.remove());enhancePlatoonRecap()}
 
 function openHoleImport(id){
   const p=getP(),m=p?(p.missions||[]).find(x=>x.id===id):null;if(!m)return;
@@ -197,8 +256,9 @@ window.grOpenSetup=()=>{
 function styles(){if(document.getElementById('gr155DevStyles'))return;const s=document.createElement('style');s.id='gr155DevStyles';s.textContent=`
 .gr155-format{font-size:10px;color:var(--muted);font-weight:750;margin-top:2px}.gr155-results-wrap{margin-top:8px}.gr155-results-table{width:100%;border-collapse:collapse;font-size:11px}.gr155-results-table th,.gr155-results-table td{padding:7px 6px;border-bottom:1px solid rgba(255,255,255,.07);text-align:right}.gr155-results-table th:first-child,.gr155-results-table td:first-child,.gr155-results-table th:nth-child(2),.gr155-results-table td:nth-child(2){text-align:left}.gr155-results-table th{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.gr155-results-table td:nth-child(2){font-weight:800}.gr155-empty{text-align:center;color:var(--muted);padding:14px}.gr155-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}.gr155-kpi{border:1px solid var(--line);background:#101914;border-radius:11px;padding:9px}.gr155-kpi span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.gr155-kpi strong{display:block;margin-top:3px;font-size:12px}.gr155-recon{margin-top:11px}.gr155-recon-title{font-size:9px;font-weight:900;letter-spacing:.12em;color:var(--accent);margin-bottom:6px}.gr155-recon-line{font-size:11px;line-height:1.35;color:#dce6e1;padding:7px 8px;border-left:2px solid rgba(184,234,104,.42);background:rgba(255,255,255,.025);margin-top:5px}.gr155-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.gr155-choice{text-align:left;color:inherit}.gr155-choice strong{display:block;margin-bottom:5px}.gr155-choice span{font-size:11px;color:var(--muted)}.gr155-hole-player{border:1px solid var(--line);border-radius:10px;padding:9px;margin-top:7px}.gr155-hole-player.warn{border-color:rgba(255,176,32,.45)}.gr155-hole-player>div:first-child{display:flex;justify-content:space-between;gap:8px}.gr155-hole-mini{font-size:10px;color:var(--muted);margin-top:4px}.gr155-roster-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px}.gr155-roster{display:grid;gap:8px;margin-top:8px}.gr155-roster-row{display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px}.gr155-roster-row label{margin-top:0}@media(max-width:700px){.gr155-choice-grid,.gr155-roster-row{grid-template-columns:1fr}.gr155-results-table{font-size:10px}.gr155-results-table th,.gr155-results-table td{padding:6px 4px}}
 `;document.head.appendChild(s)}
-styles();
+function recapStyles(){if(document.getElementById('gr155RecapStyles'))return;const s=document.createElement('style');s.id='gr155RecapStyles';s.textContent=`.gr155-recap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}.gr155-recap-block{border:1px solid var(--line);background:#101914;border-radius:14px;padding:12px;min-width:0}.gr155-recap-title{font-size:9px;font-weight:950;letter-spacing:.12em;color:var(--accent);margin-bottom:9px}.gr155-recap-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:10.5px}.gr155-recap-row:last-child{border-bottom:0}.gr155-recap-row span:last-child{white-space:nowrap;font-weight:800}.gr155-recap-hi{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}.gr155-recap-hi span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.gr155-recap-hi strong{display:block;font-size:11px;margin-top:2px}.gr155-recap-copy p{font-size:10.5px;line-height:1.4;margin:0 0 8px;color:#dce6e1}.gr155-recap-copy p:last-child{margin-bottom:0}.gr155-platoon-recap{margin-top:14px}@media(max-width:700px){.gr155-recap-grid{grid-template-columns:1fr}.gr155-recap-block{padding:11px}.gr155-recap-row,.gr155-recap-copy p{font-size:11px}}`;document.head.appendChild(s)}
+styles();recapStyles();
 let queued=false;function queue(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;enhanceAll()})}
-new MutationObserver(ms=>{if(ms.some(mu=>[...mu.addedNodes].some(n=>n?.nodeType===1&&(n.matches?.('.gr-mission')||n.querySelector?.('.gr-mission')))))queue()}).observe(document.body,{childList:true,subtree:true});
+new MutationObserver(ms=>{if(ms.some(mu=>[...mu.addedNodes].some(n=>n?.nodeType===1&&(n.matches?.('.gr-mission,.gr-platoon-standings')||n.querySelector?.('.gr-mission,.gr-platoon-standings')))))queue()}).observe(document.body,{childList:true,subtree:true});
 setTimeout(queue,0);setTimeout(queue,300);setTimeout(queue,900);
 })();
