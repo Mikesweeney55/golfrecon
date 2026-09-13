@@ -10,66 +10,19 @@
   </style>
 </head>
 <body>
-  <iframe id="previewApp" title="Golf Recon v15.5 Preview" src="index.html?preview=155b"></iframe>
+  <iframe id="previewApp" title="Golf Recon v15.5 Preview" src="index.html?preview=155"></iframe>
   <script>
     const frame=document.getElementById('previewApp');
-
-    function installPreviewSupport(){
+    frame.addEventListener('load',()=>{
       try{
         const doc=frame.contentDocument;
-        const win=frame.contentWindow;
-        if(!doc||!doc.body)return;
-
-        if(!doc.getElementById('grPreviewSandboxLoader')){
-          const s=doc.createElement('script');
-          s.id='grPreviewSandboxLoader';
-          s.src='dev-preview-sandbox.js?v=155b';
-          doc.body.appendChild(s);
-        }
-
-        if(!doc.getElementById('grPreviewPregameCourseFix')){
-          const style=doc.createElement('style');
-          style.id='grPreviewPregameCourseFix';
-          style.textContent=`
-            .pregame-hero,.pregame-hero-head{overflow:visible!important}
-            .pregame-course-picker{display:grid!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:500!important;width:100%!important;max-width:none!important;min-width:0!important;margin:6px 0 0!important;gap:6px!important}
-            .pregame-course-picker span{display:block!important;visibility:visible!important;opacity:1!important}
-            .pregame-course-select{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:501!important;width:100%!important;min-width:0!important;max-width:none!important;height:36px!important;color:#eef7f2!important;background:#0c1b15!important;border:1px solid rgba(184,234,104,.55)!important;-webkit-appearance:menulist!important;appearance:auto!important}
-            @media(max-width:760px){.pregame-course-picker{grid-template-columns:48px minmax(0,1fr)!important;align-items:center!important}}
-          `;
-          doc.head.appendChild(style);
-        }
-
-        const head=doc.querySelector('.pregame-hero-head');
-        if(!head)return;
-        let picker=head.querySelector('.pregame-course-picker');
-        let select=head.querySelector('.pregame-course-select');
-
-        if((!picker||!select)){
-          const global=doc.getElementById('globalCourseSelect');
-          if(global&&global.options&&global.options.length){
-            picker=doc.createElement('label');
-            picker.className='pregame-course-picker gr155-preview-fallback-picker';
-            picker.innerHTML='<span>COURSE</span><select class="pregame-course-select" aria-label="Pregame course"></select>';
-            select=picker.querySelector('select');
-            select.innerHTML=global.innerHTML;
-            select.value=global.value;
-            select.addEventListener('change',()=>{
-              global.value=select.value;
-              global.dispatchEvent(new win.Event('change',{bubbles:true}));
-            });
-            head.appendChild(picker);
-          }
-        }
-      }catch(err){console.error('Preview support failed',err)}
-    }
-
-    frame.addEventListener('load',()=>{
-      installPreviewSupport();
-      setTimeout(installPreviewSupport,150);
-      setTimeout(installPreviewSupport,600);
+        if(!doc||doc.getElementById('grPreviewSandboxLoader'))return;
+        const s=doc.createElement('script');
+        s.id='grPreviewSandboxLoader';
+        s.src='dev-preview-sandbox.js?v=155';
+        doc.body.appendChild(s);
+      }catch(err){console.error('Preview sandbox failed to load',err)}
     });
-    setInterval(installPreviewSupport,500);
   </script>
 </body>
 </html>
