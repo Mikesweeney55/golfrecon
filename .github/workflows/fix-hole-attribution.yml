@@ -1,0 +1,77 @@
+name: Fix hole attribution
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/fix-hole-attribution.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch hole attribution
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p=Path('dev-v15.5-results.js')
+          s=p.read_text()
+
+          old="""function displayName(p,raw){return canonicalMember(p,raw)?.name||raw||'Player'}
+function rosterForMission(p,m){"""
+          new="""function displayName(p,raw){return canonicalMember(p,raw)?.name||raw||'Player'}
+function memberById(p,id){return (p?.members||[]).find(m=>m.id===id)||null}
+function detailDisplayName(p,r){return memberById(p,r?.hole_detail_canonical_id)?.name||displayName(p,r?.player_name)}
+function rosterForMission(p,m){"""
+          assert old in s
+          s=s.replace(old,new,1)
+
+          s=s.replace("${esc(displayName(p,birdLead.r.player_name))} · ${birdLead.s.birds.length}","${esc(detailDisplayName(p,birdLead.r))} · ${birdLead.s.birds.length}")
+          s=s.replace("${displayName(p,birdLead.r.player_name)} led the birdies", "${detailDisplayName(p,birdLead.r)} led the birdies")
+          s=s.replace("${displayName(p,clean.r.player_name)} kept the cleanest card", "${detailDisplayName(p,clean.r)} kept the cleanest card")
+          s=s.replace("${displayName(p,back.r.player_name)} had the best back nine", "${detailDisplayName(p,back.r)} had the best back nine")
+          s=s.replace("${displayName(p,blow.r.player_name)} took the most damage", "${detailDisplayName(p,blow.r)} took the most damage")
+
+          old="""      const details=(parsed?.players||[]).map(x=>({raw:x.player_name,member:canonicalMember(p,x.player_name),holes:cleanHoles(x.holes)}));
+      const good=details.filter(x=>x.member&&x.holes.length);
+      out.innerHTML=details.map(x=>`<div class=\"gr155-hole-player ${x.member?'':'warn'}\"><div><strong>${esc(x.raw||'Unknown')}</strong><span>${x.member?`→ ${esc(x.member.name)}`:'NO ROSTER MATCH'}</span></div><div class=\"gr155-hole-mini\">${x.holes.length} holes</div></div>`).join('')+`<div class=\"dialog-actions\"><button class=\"button primary\" id=\"gr155HoleSave\" type=\"button\" ${good.length?'':'disabled'}>Save Hole-by-Hole</button></div>`;
+      const save=out.querySelector('#gr155HoleSave');
+      if(save&&!save.disabled)save.onclick=async()=>{
+        let saved=0;
+        for(const d0 of good){
+          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===d0.member.id);if(!target)continue;
+          const sig=holeSig(d0.holes);
+          for(const other of locked){if(other!==target&&sig&&holeSig(other.holes)===sig){delete other.holes;delete other.hole_detail_saved_at;delete other.hole_detail_source_name;delete other.hole_detail_canonical_id}}
+          target.holes=d0.holes;target.hole_detail_saved_at=new Date().toISOString();target.hole_detail_source_name=d0.raw;target.hole_detail_canonical_id=d0.member.id;saved++;
+        }
+"""
+          new="""      const details=(parsed?.players||[]).map(x=>({raw:x.player_name,member:canonicalMember(p,x.player_name),holes:cleanHoles(x.holes)}));
+      const roster=rosterForMission(p,m);
+      out.innerHTML=details.map((x,i)=>`<div class=\"gr155-hole-player ${x.member?'':'warn'}\"><div><strong>${esc(x.raw||'Unknown')}</strong><span>${x.holes.length} holes</span></div><label style=\"margin-top:7px\">Confirm player<select data-gr155-match=\"${i}\"><option value=\"\">Choose player…</option>${roster.map(r=>`<option value=\"${esc(r.id)}\" ${x.member?.id===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label></div>`).join('')+`<div class=\"dialog-actions\"><button class=\"button primary\" id=\"gr155HoleSave\" type=\"button\">Save Hole-by-Hole</button></div>`;
+      const save=out.querySelector('#gr155HoleSave');
+      if(save)save.onclick=async()=>{
+        let saved=0;
+        for(let i=0;i<details.length;i++){
+          const d0=details[i];if(!d0.holes.length)continue;
+          const memberId=out.querySelector(`[data-gr155-match=\"${i}\"]`)?.value;
+          const member=memberById(p,memberId);if(!member)continue;
+          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===member.id);if(!target)continue;
+          const sig=holeSig(d0.holes);
+          for(const other of locked){if(other!==target&&((sig&&holeSig(other.holes)===sig)||other.hole_detail_canonical_id===member.id)){delete other.holes;delete other.hole_detail_saved_at;delete other.hole_detail_source_name;delete other.hole_detail_canonical_id}}
+          target.holes=d0.holes;target.hole_detail_saved_at=new Date().toISOString();target.hole_detail_source_name=d0.raw;target.hole_detail_canonical_id=member.id;saved++;
+        }
+        if(!saved){alert('Choose the correct player before saving.');return}
+"""
+          assert old in s
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Verify syntax
+        run: node --check dev-v15.5-results.js
+      - name: Commit
+        run: |
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add dev-v15.5-results.js
+          git commit -m 'Make hole-by-hole player attribution explicit'
+          git push
