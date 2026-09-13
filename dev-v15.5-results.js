@@ -99,7 +99,7 @@ function namesOf(p,rows,detail=false){
 }
 function missionNarrative(p,m,rows,detail,birds,back,clean){
   const lines=[],net=lowLeaders(rows,'net');
-  const note=String(m?.recap_note||'').trim();if(note)lines.push(`From the field: ${note}`);
+  const note=String(m?.recap_note||m?.notes||'').trim();if(note)lines.push(`From the field: ${note}`);
   if(net.length){
     const score=Number(net[0].net);
     if(net.length>1)lines.push(`${namesOf(p,net)} finished dead even at net ${score}. Nobody gets to talk too much.`);
