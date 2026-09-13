@@ -40,8 +40,9 @@ if(!window.__grSupabaseFirstSaveInstalled){
       try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
       return out?.platoon||null;
     }).catch(e=>{
-      try{if(typeof platoonSyncError!=='undefined')platoonSyncError=String(e?.message||e||'Supabase save failed')}catch{}
-      alert('Supabase save failed. This change was not saved to the server. Please retry.');
+      const msg=String(e?.message||e||'Supabase save failed');
+      try{if(typeof platoonSyncError!=='undefined')platoonSyncError=msg}catch{}
+      alert(`Supabase save failed: ${msg}`);
       throw e;
     });
   };
