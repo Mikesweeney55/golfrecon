@@ -1,0 +1,28 @@
+name: Add Mission Delete
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/add-mission-delete.py'
+      - '.github/workflows/add-mission-delete.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply Mission delete patch
+        run: python scripts/add-mission-delete.py
+      - name: Verify
+        run: |
+          node --check mission-delete.js
+          grep -q 'delete_mission' supabase/functions/platoon-import/index.ts
+          grep -q 'mission-delete.js?v=1' index.html
+      - name: Commit and push
+        run: |
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add supabase/functions/platoon-import/index.ts index.html deploy-platoon-import-trigger.txt
+          git commit -m 'Add persistent Mission delete action'
+          git push
