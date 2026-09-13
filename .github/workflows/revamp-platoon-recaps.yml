@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/patch-recaps-v2.py'
+      - 'scripts/add-past-mission-import.py'
       - '.github/workflows/revamp-platoon-recaps.yml'
 permissions:
   contents: write
@@ -12,20 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply recap polish
-        run: python scripts/patch-recaps-v2.py
+      - name: Apply past Mission import patch
+        run: python scripts/add-past-mission-import.py
       - name: Verify
         run: |
-          node --check dev-v15.5-results.js
-          grep -q 'CLUB EAGLE' dev-v15.5-results.js
-          grep -q 'Kevin Cunningham' dev-v15.5-results.js
-          grep -q 'Josh Mankey' dev-v15.5-results.js
-          grep -q 'gr155RecapNote' dev-v15.5-results.js
-          grep -q 'dev-v15.5-results.js?v=157' index.html
+          node --check past-mission-import.js
+          grep -q 'parse_completed_mission' supabase/functions/platoon-import/index.ts
+          grep -q 'past-mission-import.js?v=1' index.html
+          grep -q 'past-mission-import-v1' deploy-platoon-import-trigger.txt
       - name: Commit and push
         run: |
           git config user.name github-actions-bot
           git config user.email actions@github.com
-          git add dev-v15.5-results.js index.html
-          git commit -m 'Polish Platoon recap voice, Club Eagle, and field notes'
+          git add supabase/functions/platoon-import/index.ts index.html deploy-platoon-import-trigger.txt
+          git commit -m 'Add automatic completed Mission import from screenshots'
           git push
