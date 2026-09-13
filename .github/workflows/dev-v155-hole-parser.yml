@@ -1,0 +1,49 @@
+name: Build v15.5 Hole-by-Hole Parser
+
+on:
+  push:
+    branches:
+      - dev-v15.5-platoon-results
+    paths:
+      - dev-v155-hole-parser-trigger.txt
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: dev-v15.5-platoon-results
+
+      - name: Patch parser source
+        run: |
+          python scripts/patch_v155_hole_parser.py
+          git diff --check
+          grep -q 'const holeDetailSchema=' supabase/functions/platoon-import/index.ts
+          grep -q 'async function parseHoleDetails' supabase/functions/platoon-import/index.ts
+          grep -q 'parse_hole_details' supabase/functions/platoon-import/index.ts
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Parse-check Edge Function
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          src=Path('supabase/functions/platoon-import/index.ts').read_text()
+          Path('/tmp/platoon-import-check.ts').write_text('// @ts-nocheck\n'+src)
+          PY
+          deno check /tmp/platoon-import-check.ts
+
+      - name: Commit parser development source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/platoon-import/index.ts
+          git diff --cached --quiet || git commit -m "Add Platoon hole-by-hole parser action"
+          git push origin HEAD:dev-v15.5-platoon-results

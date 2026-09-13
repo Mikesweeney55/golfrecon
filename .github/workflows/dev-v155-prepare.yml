@@ -1,0 +1,48 @@
+name: Prepare Golf Recon v15.5 Development
+
+on:
+  push:
+    branches:
+      - dev-v15.5-platoon-results
+    paths:
+      - dev-v155-trigger.txt
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: dev-v15.5-platoon-results
+
+      - name: Validate JavaScript
+        run: |
+          node --check platoons-v15-real.js
+          node --check platoons-v15-patch-v5.js
+          node --check dev-v15.5-results.js
+
+      - name: Wire development patch into development index
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text()
+          s = s.replace('<title>Golf Recon v15.4 Beta</title>', '<title>Golf Recon v15.5 Development</title>')
+          marker = '  <script src="dev-v15.5-results.js?v=155"></script>\n'
+          if marker not in s:
+              s = s.replace('</body>', marker + '</body>')
+          p.write_text(s)
+          PY
+          git diff --check
+
+      - name: Commit development wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "Wire v15.5 development patch"
+          git push origin HEAD:dev-v15.5-platoon-results
