@@ -9,7 +9,7 @@ function getPlatoon(){try{return typeof loadPlatoonLocal==='function'?loadPlatoo
 function getMission(id){const p=getPlatoon();return p?(p.missions||[]).find(m=>m.id===id):null}
 function hasOfficial(m){return !!(m&&Array.isArray(m.results)&&m.results.length)}
 function hasDetail(m){return !!(m&&(m.scorecardDetail?.savedAt||m.supplementalScorecards?.savedAt||(Array.isArray(m.results)&&m.results.some(r=>Array.isArray(r.holes)&&r.holes.length))))}
-function finite(v){return Number.isFinite(Number(v))}
+function finite(v){return v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))}
 function num(v){return finite(v)?Number(v):null}
 function birdies(r){for(const k of ['birdie_count','birdies','birdieCount']){if(finite(r?.[k]))return Number(r[k])}if(Array.isArray(r?.holes)){const n=r.holes.filter(h=>finite(h?.par)&&finite(h?.score)&&Number(h.score)<Number(h.par)).length;return n}return null}
 
