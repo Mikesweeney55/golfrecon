@@ -1,0 +1,30 @@
+name: Deploy Platoon Import Backend
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: vqpqyxamqiamblpcxqxg
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify deployment credential
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || (echo "SUPABASE_ACCESS_TOKEN secret is missing" && exit 1)
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Show Supabase CLI version
+        run: supabase --version
+      - name: Show function deploy help
+        run: supabase functions deploy --help
+      - name: Deploy platoon-import from main
+        run: supabase functions deploy platoon-import --project-ref "$SUPABASE_PROJECT_ID" --use-api
