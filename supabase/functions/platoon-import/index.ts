@@ -153,15 +153,24 @@ async function parseHoleDetails(body:any){
   const content:any[]=[{
     type:"input_text",
     text:`You are the Golf Recon Platoon hole-by-hole scorecard parser.
-Read screenshots of individual player golf scorecards. Screenshots may show the front nine, back nine, or a full 18-hole card. Multiple screenshots may belong to the same player.
+Read a set of golf scorecard screenshots. IMPORTANT: a single screenshot can contain TWO PLAYERS at the same time. A typical upload is FOUR screenshots total: two screenshots covering the front nine and two screenshots covering the back nine, with two player rows visible on each screenshot.
 
-For each player whose name and scores are actually visible, return:
-- player_name exactly as shown
+Treat every visible player row independently. On every image:
+- identify every visible player name or abbreviation separately
+- keep each player's scores attached to the same visible row as that player name
+- determine the hole numbers from the visible card headings
+- never shift one player's scores onto the player above or below
+- never assume one screenshot belongs to only one golfer
+
+Across the full image set, merge front-nine and back-nine data only when the visible name or abbreviation clearly refers to the same player. It is normal for the same player to appear on two screenshots: once for holes 1-9 and once for holes 10-18.
+
+For each distinct player whose name and scores are actually visible, return:
+- player_name exactly as shown, using the most complete visible version available
 - holes with the visible hole number
 - par for that hole only when visible, otherwise null
 - player score for that hole only when visible, otherwise null
 
-Merge front-nine and back-nine screenshots for the same clearly identified player. Sort holes numerically and do not duplicate a hole.
+Sort holes numerically and do not duplicate a hole. If the identity between a front-nine row and a back-nine row is uncertain, return them as separate player entries rather than guessing a merge.
 Never guess a score, par, player identity, or missing hole.
 Do NOT infer or overwrite gross, net, handicap, finish position, Mission points, or the official Mission leaderboard.
 A displayed gross total may be used only as a consistency check; do not return it as official scoring.
