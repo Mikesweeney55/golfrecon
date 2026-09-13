@@ -32,3 +32,5 @@ idx = Path('index.html')
 html = idx.read_text()
 html = html.replace('past-mission-import.js?v=2', 'past-mission-import.js?v=3')
 idx.write_text(html)
+
+# workflow trigger marker v1
