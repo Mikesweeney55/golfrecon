@@ -49,73 +49,11 @@ function addModalDelete(id){
     if(actions)actions.appendChild(makeDelete(id,m.title));
   },0);
 }
-function cleanCourseName(v){
-  let s=String(v||'').replace(/\s+/g,' ').trim();
-  const cut=s.search(/\.{3}|…/);if(cut>=0)s=s.slice(0,cut).trim();
-  s=s.replace(/\s*\([^)]*$/,'').trim();
-  s=s.replace(/\s*\?{2,}.*$/,'').trim();
-  return s||'Course TBD';
-}
-function sortedResults(m){
-  return Array.isArray(m?.results)?m.results.map((r,i)=>({...r,_i:i})).sort((a,b)=>{
-    const ap=Number.isFinite(Number(a.finish_position))?Number(a.finish_position):999;
-    const bp=Number.isFinite(Number(b.finish_position))?Number(b.finish_position):999;
-    if(ap!==bp)return ap-bp;
-    const an=Number.isFinite(Number(a.net))?Number(a.net):999;
-    const bn=Number.isFinite(Number(b.net))?Number(b.net):999;
-    return an-bn||a._i-b._i;
-  }):[];
-}
-function scoreText(r){
-  const n=Number.isFinite(Number(r?.net))?`N ${Number(r.net)}`:'N —';
-  const g=Number.isFinite(Number(r?.gross))?`G ${Number(r.gross)}`:'G —';
-  const p=Number.isFinite(Number(r?.raw_points))?`${Number(r.raw_points)} pts`:'0 pts';
-  return `${n} · ${g} · ${p}`;
-}
-function patchStandings(root,m){
-  if(!root||!m)return;
-  const rs=sortedResults(m);
-  const blocks=root.querySelectorAll('.gr155-recap-grid .gr155-recap-block:first-child, .grr-grid .grr-block:first-child');
-  blocks.forEach(block=>{
-    const rows=[...block.querySelectorAll('.gr155-recap-row,.grr-row')];
-    rows.forEach((row,i)=>{const r=rs[i];if(!r)return;const spans=row.querySelectorAll('span');const last=spans[spans.length-1],next=scoreText(r);if(last&&last.textContent!==next)last.textContent=next});
-  });
-}
-function patchCourse(root,m){
-  if(!root)return;
-  root.querySelectorAll('.gr-event-banner').forEach(x=>{
-    if(x.dataset.grStaticBanner==='1')return;
-    x.style.setProperty('position','static','important');x.style.setProperty('top','auto','important');x.style.setProperty('z-index','auto','important');x.dataset.grStaticBanner='1';
-  });
-  root.querySelectorAll('.gr-event-course').forEach(x=>{const next=cleanCourseName(m?.locationName||x.textContent);if(x.textContent!==next)x.textContent=next});
-}
-function patchMissionUi(id){
-  const m=missionFor(id);if(!m)return;
-  const d=document.getElementById('grPlatoonDialog');if(d?.open){patchCourse(d,m);patchStandings(d,m)}
-}
-function patchPastCourse(){
-  const input=document.getElementById('grPastCourse');if(input){const c=cleanCourseName(input.value);if(c&&input.value!==c)input.value=c}
-}
-function patchCard(card){
-  const id=missionIdFromEl(card);if(!id)return;const m=missionFor(id);if(!m)return;
-  const c=card.querySelector('.gr-mission-course'),next=cleanCourseName(m.locationName||c?.textContent);if(c&&c.textContent!==next)c.textContent=next;
-  patchStandings(card,m);
-}
-let activeMissionId='',running=false;
-function run(){
-  if(running)return;running=true;
-  try{
-    document.querySelectorAll('.gr-mission').forEach(card=>{enhanceCard(card);patchCard(card)});
-    document.querySelectorAll('.gr-archive-row').forEach(enhanceArchive);
-    patchPastCourse();
-    if(activeMissionId)patchMissionUi(activeMissionId);
-  }finally{running=false}
-}
+function run(){document.querySelectorAll('.gr-mission').forEach(enhanceCard);document.querySelectorAll('.gr-archive-row').forEach(enhanceArchive)}
 const originalView=window.grViewMission;
 if(typeof originalView==='function'){
-  window.grViewMission=function(id,...rest){activeMissionId=id;const r=originalView.call(this,id,...rest);addModalDelete(id);[20,100,250].forEach(ms=>setTimeout(()=>patchMissionUi(id),ms));return r};
+  window.grViewMission=function(id,...rest){const r=originalView.call(this,id,...rest);addModalDelete(id);return r};
 }
-let pending=false;
-new MutationObserver(()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;run()})}).observe(document.body,{childList:true,subtree:true});
+new MutationObserver(run).observe(document.body,{childList:true,subtree:true});
 setTimeout(run,0);setTimeout(run,400);setTimeout(run,1200);
 })();
