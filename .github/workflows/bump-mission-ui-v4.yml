@@ -1,0 +1,26 @@
+name: Bump Mission UI v4
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/bump-mission-ui-v4.py'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump Mission UI cache version
+        run: python scripts/bump-mission-ui-v4.py
+      - name: Verify
+        run: |
+          node --check mission-delete.js
+          grep -q 'mission-delete.js?v=4' index.html
+      - name: Commit and push
+        run: |
+          git config user.name github-actions-bot
+          git config user.email actions@github.com
+          git add index.html
+          git commit -m 'Load Mission UI v4 without mutation loop'
+          git push
