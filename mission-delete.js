@@ -56,4 +56,5 @@ if(typeof originalView==='function'){
 }
 new MutationObserver(run).observe(document.body,{childList:true,subtree:true});
 setTimeout(run,0);setTimeout(run,400);setTimeout(run,1200);
+setTimeout(()=>window.grInstallDisplayFixes?.(),0);
 })();
