@@ -78,13 +78,16 @@ function patchStandings(root,m){
   const blocks=root.querySelectorAll('.gr155-recap-grid .gr155-recap-block:first-child, .grr-grid .grr-block:first-child');
   blocks.forEach(block=>{
     const rows=[...block.querySelectorAll('.gr155-recap-row,.grr-row')];
-    rows.forEach((row,i)=>{const r=rs[i];if(!r)return;const spans=row.querySelectorAll('span');const last=spans[spans.length-1];if(last)last.textContent=scoreText(r)});
+    rows.forEach((row,i)=>{const r=rs[i];if(!r)return;const spans=row.querySelectorAll('span');const last=spans[spans.length-1],next=scoreText(r);if(last&&last.textContent!==next)last.textContent=next});
   });
 }
 function patchCourse(root,m){
   if(!root)return;
-  root.querySelectorAll('.gr-event-banner').forEach(x=>{x.style.setProperty('position','static','important');x.style.setProperty('top','auto','important');x.style.setProperty('z-index','auto','important')});
-  root.querySelectorAll('.gr-event-course').forEach(x=>{x.style.setProperty('position','static','important');x.style.setProperty('top','auto','important');x.textContent=cleanCourseName(m?.locationName||x.textContent)});
+  root.querySelectorAll('.gr-event-banner').forEach(x=>{
+    if(x.dataset.grStaticBanner==='1')return;
+    x.style.setProperty('position','static','important');x.style.setProperty('top','auto','important');x.style.setProperty('z-index','auto','important');x.dataset.grStaticBanner='1';
+  });
+  root.querySelectorAll('.gr-event-course').forEach(x=>{const next=cleanCourseName(m?.locationName||x.textContent);if(x.textContent!==next)x.textContent=next});
 }
 function patchMissionUi(id){
   const m=missionFor(id);if(!m)return;
@@ -95,20 +98,24 @@ function patchPastCourse(){
 }
 function patchCard(card){
   const id=missionIdFromEl(card);if(!id)return;const m=missionFor(id);if(!m)return;
-  const c=card.querySelector('.gr-mission-course');if(c)c.textContent=cleanCourseName(m.locationName||c.textContent);
+  const c=card.querySelector('.gr-mission-course'),next=cleanCourseName(m.locationName||c?.textContent);if(c&&c.textContent!==next)c.textContent=next;
   patchStandings(card,m);
 }
-let activeMissionId='';
+let activeMissionId='',running=false;
 function run(){
-  document.querySelectorAll('.gr-mission').forEach(card=>{enhanceCard(card);patchCard(card)});
-  document.querySelectorAll('.gr-archive-row').forEach(enhanceArchive);
-  patchPastCourse();
-  if(activeMissionId)patchMissionUi(activeMissionId);
+  if(running)return;running=true;
+  try{
+    document.querySelectorAll('.gr-mission').forEach(card=>{enhanceCard(card);patchCard(card)});
+    document.querySelectorAll('.gr-archive-row').forEach(enhanceArchive);
+    patchPastCourse();
+    if(activeMissionId)patchMissionUi(activeMissionId);
+  }finally{running=false}
 }
 const originalView=window.grViewMission;
 if(typeof originalView==='function'){
-  window.grViewMission=function(id,...rest){activeMissionId=id;const r=originalView.call(this,id,...rest);addModalDelete(id);[20,100,250,500].forEach(ms=>setTimeout(()=>patchMissionUi(id),ms));return r};
+  window.grViewMission=function(id,...rest){activeMissionId=id;const r=originalView.call(this,id,...rest);addModalDelete(id);[20,100,250].forEach(ms=>setTimeout(()=>patchMissionUi(id),ms));return r};
 }
-new MutationObserver(run).observe(document.body,{childList:true,subtree:true});
+let pending=false;
+new MutationObserver(()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;run()})}).observe(document.body,{childList:true,subtree:true});
 setTimeout(run,0);setTimeout(run,400);setTimeout(run,1200);
 })();
