@@ -68,6 +68,29 @@ const holeDetailSchema={
   required:["confidence","warnings","players"]
 };
 
+const personalRoundDirectionSchema={
+  type:"object",
+  additionalProperties:false,
+  properties:{
+    confidence:{type:"number"},
+    warnings:{type:"array",items:{type:"string"}},
+    holes:{
+      type:"array",
+      items:{
+        type:"object",
+        additionalProperties:false,
+        properties:{
+          hole:{type:"integer"},
+          fairway_direction:{type:["string","null"],enum:["hit","left","right","short","long","other",null]},
+          gir_direction:{type:["string","null"],enum:["hit","left","right","short","long","other",null]}
+        },
+        required:["hole","fairway_direction","gir_direction"]
+      }
+    }
+  },
+  required:["confidence","warnings","holes"]
+};
+
 
 const completedMissionSchema={
   type:"object",
@@ -292,6 +315,56 @@ ${JSON.stringify({date:mission.date||null,course:mission.locationName||null,titl
   return {confidence,warnings,players};
 }
 
+
+async function parsePersonalRoundDirections(body:any){
+  const key=Deno.env.get("OPENAI_API_KEY");
+  if(!key)throw new Error("OPENAI_API_KEY secret is not configured.");
+  if(!Array.isArray(body.images)||!body.images.length)throw new Error("Add at least one scorecard screenshot.");
+  const content:any[]=[{
+    type:"input_text",
+    text:`You are extracting per-hole directional results from 18Birdies scorecard-summary screenshots for Golf Recon.
+
+Read ONLY information actually visible. Return one row per visible hole.
+
+For FAIRWAY HIT:
+- green check = hit
+- directional miss arrow pointing left = left
+- arrow pointing right = right
+- arrow pointing down / short = short
+- arrow pointing up / long = long
+- red X or non-directional miss = other
+- par-3 holes or cells with no fairway result = null
+
+For GREEN IN REGULATION:
+- green check = hit
+- directional miss arrow pointing left = left
+- arrow pointing right = right
+- arrow pointing down = short
+- arrow pointing up = long
+- red X or non-directional miss = other
+- blank/unknown = null
+
+Be careful to preserve each icon on its exact hole. Do not infer a direction from score, club, or result. If screenshots overlap, merge the same hole and prefer the clearest visible icon. A 0-putt hole is valid and is unrelated to this directional extraction.`
+  }];
+  for(const img of body.images){
+    if(img?.type&&img?.data)content.push({type:"input_image",image_url:`data:${img.type};base64,${img.data}`,detail:"high"});
+  }
+  const ai=await fetch("https://api.openai.com/v1/responses",{
+    method:"POST",
+    headers:{"Authorization":`Bearer ${key}`,"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"gpt-5.6",
+      input:[{role:"user",content}],
+      text:{format:{type:"json_schema",name:"golfrecon_personal_round_directions",strict:true,schema:personalRoundDirectionSchema}}
+    })
+  });
+  const raw=await ai.json();
+  if(!ai.ok)throw new Error(raw?.error?.message||"Directional scorecard parsing failed.");
+  const outputText=raw.output_text??raw.output?.flatMap((o:any)=>o.content||[]).find((cc:any)=>cc.type==="output_text")?.text;
+  if(!outputText)throw new Error("No structured directional scorecard data returned.");
+  return JSON.parse(outputText);
+}
+
 async function activeMembership(supabase:any,userId:string){
   const {data,error}=await supabase.from("golfrecon_platoon_members")
     .select("id,platoon_id,role,status,client_key")
@@ -479,6 +552,7 @@ Deno.serve(async(req)=>{
     if(body.action==="parse_results")return response(await parseResults(body));
     if(body.action==="parse_completed_mission")return response(await parseCompletedMission(body));
     if(body.action==="parse_hole_details")return response(await parseHoleDetails(body));
+    if(body.action==="parse_personal_round_directions")return response(await parsePersonalRoundDirections(body));
     if(body.action==="bootstrap")return response({platoon:await bootstrapState(supabase,user,body.snapshot||{})});
     if(body.action==="delete_mission")return response({platoon:await deleteMission(supabase,user,body.mission_id)});
     if(body.action==="save_state")return response({platoon:await saveState(supabase,user,body.snapshot||{})});
