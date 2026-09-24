@@ -1446,6 +1446,13 @@ function applyDirectionalDataFromImports(imports){
     if(fd)r.fairwayDistribution={hitPct:Number(fd.hit_pct)||0,missLeftPct:Number(fd.left_pct)||0,missRightPct:Number(fd.right_pct)||0,missShortPct:Number(fd.short_pct)||0,missLongPct:Number(fd.long_pct)||0,missFairwaysHitPct:Number(fd.other_pct)||0};
     const gd=pr.gir_distribution;
     if(gd)r.girDistribution={hitPct:Number(gd.hit_pct)||0,missShortPct:Number(gd.short_pct)||0,missLeftPct:Number(gd.left_pct)||0,missRightPct:Number(gd.right_pct)||0,missLongPct:Number(gd.long_pct)||0,missGirPct:Number(gd.other_pct)||0,noChancePct:Number(gd.no_chance_pct)||0};
+    const hd=pr.holes_detail||pr.hole_details||[];
+    if(hd.length){
+      const cc=course(r.courseId);
+      const nums=cc?.holeNumbers||Array.from({length:r.holes||hd.length},(_,i)=>i+1);
+      r.fairwayDirections=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'fairway'));
+      r.girDirections=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'gir'));
+    }
   }
 }
 
@@ -3611,6 +3618,20 @@ function normalizeParsedRound(x){
   else x.warnings=cleanWarnings(x.warnings);
   return x;
 }
+function mergeHoleDirectionsIntoParsed(parsed,directional){
+  const r=parsed?.round||parsed;if(!r||!directional?.holes?.length)return parsed;
+  const holes=r.holes_detail||r.hole_details||[];
+  const byHole=new Map(directional.holes.map(h=>[Number(h.hole),h]));
+  holes.forEach(h=>{
+    const d=byHole.get(Number(h.hole));if(!d)return;
+    if(d.fairway_direction)h.fairway_direction=d.fairway_direction;
+    if(d.gir_direction)h.gir_direction=d.gir_direction;
+  });
+  if(!r.holes_detail&&holes.length)r.holes_detail=holes;
+  const fd=distributionFromHoles(holes,'fairway');if(fd)r.fairway_distribution=fd;
+  const gd=distributionFromHoles(holes,'gir');if(gd)r.gir_distribution=gd;
+  return normalizeParsedRound(parsed);
+}
 function directionMark(v){
   const d=normalizeDirection(v);
   return d==='left'?'←':d==='right'?'→':d==='short'?'↓':d==='long'?'↑':d==='hit'?'✓':d==='other'?'✕':'—';
@@ -3920,6 +3941,20 @@ function embeddedRoundSignatures(){
   });
   return sigs;
 }
+function findExistingRoundForParsed(pr){
+  const r=pr?.round||pr;if(!r)return null;
+  const wantedDate=String(r.date||r.played_on||'');
+  const wantedGross=Number(r.gross_score??r.gross);
+  const wantedHoles=Number(r.holes||((r.holes_detail||r.hole_details||[]).length)||0);
+  return db.rounds.find(x=>{
+    const cc=db.courses.find(c=>c.id===x.courseId);
+    const dateOk=String(x.date||'')===wantedDate;
+    const grossOk=Number(x.gross)===wantedGross;
+    const holesOk=!wantedHoles||!x.holes||Number(x.holes)===wantedHoles;
+    const courseOk=courseNameScore(r.course_name,cc?.baseName||cc?.name)>=58;
+    return dateOk&&grossOk&&holesOk&&courseOk;
+  })||null;
+}
 function mergeImportedRound(parsed, importId){
   const r=parsed?.round;
   if(!r)return false;
@@ -4071,6 +4106,13 @@ document.getElementById('analyzeImport').onclick=async()=>{
       images
     });
     normalizeParsedRound(result);
+    try{
+      importStatus.textContent='Reading hole-by-hole miss directions…';
+      const directional=await callPlatoonFunction({action:'parse_personal_round_directions',images});
+      mergeHoleDirectionsIntoParsed(result,directional);
+    }catch(e){
+      console.warn('Directional hole parser unavailable; continuing with standard round import.',e);
+    }
     pendingImport=result;
     importReview.innerHTML=reviewHtml(result);
     uploadStep.style.display='none';reviewStep.style.display='';
@@ -4084,22 +4126,28 @@ document.getElementById('analyzeImport').onclick=async()=>{
 document.getElementById('saveImport').onclick=async()=>{
   if(!pendingImport)return;
   const r=pendingImport.round||pendingImport;
-  const sig=importSignature(r);
-  const embedded=embeddedRoundSignatures();
-  if(embedded.has(sig)){
-    const ok=confirm('This round appears to already exist in GolfRecon. Save it to Supabase anyway?');
-    if(!ok)return;
-  }
+  const existing=findExistingRoundForParsed(pendingImport);
   const btn=document.getElementById('saveImport');
   try{
-    btn.disabled=true;btn.textContent='Saving…';
-    const result=await callImportFunction({action:'save',parsed:pendingImport});
-    if(result.duplicate){
-      alert('Duplicate detected. This round is already saved in GolfRecon.');
-      btn.disabled=false;btn.textContent='Save Round';
-      return;
+    btn.disabled=true;
+    if(existing){
+      btn.textContent='Updating…';
+      await callImportFunction({action:'backfill',round_id:existing.id,parsed:pendingImport});
+      btn.textContent='Updated ✓';
+    }else{
+      btn.textContent='Saving…';
+      const result=await callImportFunction({action:'save',parsed:pendingImport});
+      if(result.duplicate){
+        const nowExisting=findExistingRoundForParsed(pendingImport);
+        if(nowExisting){
+          btn.textContent='Updating…';
+          await callImportFunction({action:'backfill',round_id:nowExisting.id,parsed:pendingImport});
+          btn.textContent='Updated ✓';
+        }else{
+          throw new Error('This round already exists, but Golf Recon could not locate it for an update.');
+        }
+      }else btn.textContent='Saved ✓';
     }
-    btn.textContent='Saved ✓';
     await bootstrapGolfRecon();
     setTimeout(()=>{dlg.close()},400);
   }catch(e){
