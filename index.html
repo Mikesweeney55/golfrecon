@@ -3565,7 +3565,58 @@ function directionalReviewHtml(r){
     ${fd?`<div class="backfill-note" style="margin-bottom:8px"><strong>Fairways</strong></div><div class="import-summary">${row('Hit',fd.hit_pct)}${row('Left',fd.left_pct)}${row('Right',fd.right_pct)}${row('Short',fd.short_pct)}${row('Long',fd.long_pct)}</div>`:''}
     ${gd?`<div class="backfill-note" style="margin:12px 0 8px"><strong>GIR</strong></div><div class="import-summary">${row('Hit',gd.hit_pct)}${row('Short',gd.short_pct)}${row('Left',gd.left_pct)}${row('Right',gd.right_pct)}${row('Long',gd.long_pct)}${row('Other',gd.other_pct)}</div>`:''}`;
 }
+function normalizeDirection(v){
+  const s=String(v??'').trim().toLowerCase();
+  if(!s)return null;
+  if(['hit','center','centre','fairway','green','on'].includes(s))return 'hit';
+  if(s.includes('left')||s==='l'||s==='←')return 'left';
+  if(s.includes('right')||s==='r'||s==='→')return 'right';
+  if(s.includes('short')||s==='s'||s==='↓')return 'short';
+  if(s.includes('long')||s==='long'||s==='↑')return 'long';
+  if(s.includes('other')||s.includes('x')||s==='miss')return 'other';
+  return null;
+}
+function holeDirection(h,type){
+  const keys=type==='fairway'
+    ?['fairway_direction','fairway_miss_direction','fh_direction','fairway_result_direction']
+    :['gir_direction','gir_miss_direction','green_direction','gir_result_direction'];
+  for(const k of keys){const d=normalizeDirection(h?.[k]);if(d)return d}
+  return null;
+}
+function distributionFromHoles(holes,type){
+  const vals=(holes||[]).map(h=>holeDirection(h,type)).filter(Boolean);
+  if(!vals.length)return null;
+  const n=vals.length,count=k=>100*vals.filter(v=>v===k).length/n;
+  return {hit_pct:count('hit'),left_pct:count('left'),right_pct:count('right'),short_pct:count('short'),long_pct:count('long'),other_pct:count('other')};
+}
+function normalizeParsedRound(x){
+  const r=x?.round||x;if(!r)return x;
+  const holes=r.holes_detail||r.hole_details||[];
+  holes.forEach(h=>{
+    if(Number(h?.putts)===0){
+      h.first_putt_distance_ft=null;
+      h.putting_sg=null;
+      h.zero_putt_chip_in=true;
+    }
+  });
+  if(!r.fairway_distribution){const d=distributionFromHoles(holes,'fairway');if(d)r.fairway_distribution=d}
+  if(!r.gir_distribution){const d=distributionFromHoles(holes,'gir');if(d)r.gir_distribution=d}
+  const cleanWarnings=a=>(Array.isArray(a)?a:[]).filter(w=>{
+    const s=String(w||'').toLowerCase();
+    if(s.includes('zero putt')||s.includes('zero putts')||s.includes('0 putt')||s.includes('first-putt distance')&&s.includes('null'))return false;
+    if((s.includes('red x')||s.includes('red ×'))&&s.includes('gir'))return false;
+    return true;
+  });
+  if(x?.round){x.warnings=cleanWarnings(x.warnings);r.warnings=cleanWarnings(r.warnings)}
+  else x.warnings=cleanWarnings(x.warnings);
+  return x;
+}
+function directionMark(v){
+  const d=normalizeDirection(v);
+  return d==='left'?'←':d==='right'?'→':d==='short'?'↓':d==='long'?'↑':d==='hit'?'✓':d==='other'?'✕':'—';
+}
 function reviewHtml(x){
+  x=normalizeParsedRound(x);
   const r=x.round||x;
   const holes=r.holes_detail||r.hole_details||[];
   const warnings=[...(x.warnings||[]),...(r.warnings||[])];
@@ -3581,7 +3632,7 @@ function reviewHtml(x){
       <div class="import-kpi"><div class="k">GIR</div><div class="v">${val(r.gir)}</div></div>
     </div>
     ${directionalReviewHtml(r)}
-    ${holes.length?`<div style="overflow-x:auto"><table class="import-hole-table"><thead><tr><th>Hole</th><th>Score</th><th>FH</th><th>GIR</th><th>Putts</th><th>1st putt</th></tr></thead><tbody>${holes.map(h=>`<tr><td>${val(h.hole)}</td><td>${val(h.score)}</td><td>${boolMark(h.fairway_hit)}</td><td>${boolMark(h.gir)}</td><td>${val(h.putts)}</td><td>${h.first_putt_distance_ft!=null?val(h.first_putt_distance_ft)+'′':'—'}</td></tr>`).join('')}</tbody></table></div>`:''}
+    ${holes.length?`<div style="overflow-x:auto"><table class="import-hole-table"><thead><tr><th>Hole</th><th>Score</th><th>FH</th><th>FH Dir</th><th>GIR</th><th>GIR Dir</th><th>Putts</th><th>1st putt</th></tr></thead><tbody>${holes.map(h=>`<tr><td>${val(h.hole)}</td><td>${val(h.score)}</td><td>${boolMark(h.fairway_hit)}</td><td>${directionMark(holeDirection(h,'fairway'))}</td><td>${boolMark(h.gir)}</td><td>${directionMark(holeDirection(h,'gir'))}</td><td>${val(h.putts)}</td><td>${Number(h.putts)===0?'Chip-in':(h.first_putt_distance_ft!=null?val(h.first_putt_distance_ft)+'′':'—')}</td></tr>`).join('')}</tbody></table></div>`:''}
     <div class="import-confidence">Extraction confidence: ${Math.round(100*(x.confidence??r.confidence??0))}%</div>`;
 }
 function jwtSubject(token){
@@ -3917,10 +3968,14 @@ function mergeImportedRound(parsed, importId){
     chips:arr('chips'),
     sand:arr('sand'),
     penalties:arr('penalties'),
+    fairwayDirections:arr('fairway_direction').map((v,i)=>normalizeDirection(v)||holeDirection(hd.find(x=>Number(x.hole)===Number(c.holeNumbers?.[i]??i+1))||hd[i],'fairway')),
+    girDirections:arr('gir_direction').map((v,i)=>normalizeDirection(v)||holeDirection(hd.find(x=>Number(x.hole)===Number(c.holeNumbers?.[i]??i+1))||hd[i],'gir')),
     source:r.source_app||'18Birdies',
     importConfidence:parsed.confidence??null,
     supabaseImportId:importId||null
   };
+  if(!r.fairway_distribution){const d=distributionFromHoles(hd,'fairway');if(d)r.fairway_distribution=d}
+  if(!r.gir_distribution){const d=distributionFromHoles(hd,'gir');if(d)r.gir_distribution=d}
   if(r.fairway_distribution){
     nr.fairwayDistribution={
       hitPct:r.fairway_distribution.hit_pct,
@@ -4007,12 +4062,15 @@ document.getElementById('analyzeImport').onclick=async()=>{
       images.push(await compressImage(files[i]));
     }
     importStatus.textContent='Reading round data…';
+    const userNote=document.getElementById('importNote').value;
+    const parserHint='18Birdies scorecard summary now shows per-hole directional misses in the Fairway Hit and Green in Regulation rows. Read those arrows hole-by-hole when visible: left, right, short, long, hit, or other/X. Preserve them on each hole as fairway_direction and gir_direction and use them to build directional distributions. A hole with 0 putts is valid and means a chip-in/holed shot from off the green; do not warn, do not invent a first-putt distance, and keep putts=0.';
     const result=await callImportFunction({
       action:'parse',
       source:document.getElementById('sourceSelect').value,
-      note:document.getElementById('importNote').value,
+      note:[userNote,parserHint].filter(Boolean).join('\n\n'),
       images
     });
+    normalizeParsedRound(result);
     pendingImport=result;
     importReview.innerHTML=reviewHtml(result);
     uploadStep.style.display='none';reviewStep.style.display='';
