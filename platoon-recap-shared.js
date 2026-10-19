@@ -204,12 +204,16 @@ function afterActionMarkup(lines){
 
 /** Single shared Mission recap: standings + highlights + After Action Report. */
 function missionRecapMarkup(p,m){
-  const rows=missionStandingsRows(m);
+  // Prefer Phase 2 official-results normalization when available; never invent scores.
+  const source=typeof window.grOfficialResultsForRecap==='function'
+    ? Object.assign({},m,{results:window.grOfficialResultsForRecap(m)})
+    : m;
+  const rows=missionStandingsRows(source);
   if(!rows.length)return'<div class="gr155-empty">No results yet.</div>';
   const detail=rows.map(r=>({r,s:detailStats(r)}));
-  const hi=missionHighlights(p,m,rows,detail);
-  const intel=afterActionLines(p,m,rows,detail,hi);
-  return `<div class="gr155-recap-grid" data-gr-shared-recap="1"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsTableMarkup(p,m)}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${highlightsMarkup(p,hi)}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${afterActionMarkup(intel)}</section></div>`;
+  const hi=missionHighlights(p,source,rows,detail);
+  const intel=afterActionLines(p,source,rows,detail,hi);
+  return `<div class="gr155-recap-grid" data-gr-shared-recap="1"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsTableMarkup(p,source)}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${highlightsMarkup(p,hi)}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${afterActionMarkup(intel)}</section></div>`;
 }
 
 function installStyles(){
