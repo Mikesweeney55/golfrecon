@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Golf Recon V16.0</title>
+  <title>Golf Recon V16.1</title>
   <script src="gr-test-env.js?v=1"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
@@ -1111,7 +1111,7 @@ button.calendar-day{appearance:none}
 @media(max-width:700px){.platoon-logo{width:58px;height:58px;right:13px;top:13px}.platoon-command-head{padding-right:66px}}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=160-b1">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=161">
 </head>
 <body>
   <div id="authGate" class="auth-gate">
@@ -1149,7 +1149,7 @@ button.calendar-day{appearance:none}
     <header class="topbar">
       <div class="topbar-left">
         <div class="gr-brand" aria-label="Golf Recon"><div class="gr-mark"><span class="gr-cross">GR</span><span class="gr-flag">⌖</span></div><div class="gr-word"><strong>GOLF RECON</strong><small>SCOUT · PLAN · PLAY · IMPROVE</small></div></div>
-        <div class="brand-meta"><span>V16.0</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-meta"><span>V16.1</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
       <div class="giq-logo" aria-label="GR">
@@ -1822,43 +1822,106 @@ async function osmFetchJson(url,opts={}){
   if(!r.ok)throw new Error(`Course map service returned ${r.status}`);
   return r.json();
 }
-async function geocodeGolfCourse(c){
-  const key=`geo:${c.id}`;
+function courseMapQueryVariants(base){
+  const out=[];
+  const add=q=>{q=String(q||'').replace(/\s+/g,' ').trim();if(q&&!out.includes(q))out.push(q)};
+  add(`${base} golf course`);add(`${base} golf club`);add(`${base} country club`);add(base);
+  // Owner/possessive prefix: "Campbell's Scottish Highlands" → "Scottish Highlands"
+  const stripped=base.replace(/^[A-Za-z][A-Za-z.]*(?:'s|’s)\s+/,'');
+  if(stripped&&stripped!==base){
+    add(`${stripped} golf course`);add(`${stripped} golf club`);add(`${stripped} country club`);add(stripped);
+  }
+  const parts=base.split(/\s+/);
+  if(parts.length>=3){
+    const rest=parts.slice(1).join(' ');
+    add(`${rest} golf course`);add(rest);
+  }
+  return out;
+}
+function knownPreviewCentroids(){
+  const pts=[];
+  try{
+    for(const [k,v] of coursePreviewCache.entries()){
+      if(!String(k).startsWith('geo:v3:'))continue;
+      if(v&&Number.isFinite(v.lat)&&Number.isFinite(v.lon)&&Number(v.matchScore||0)>=70)pts.push([Number(v.lon),Number(v.lat)]);
+    }
+  }catch{}
+  return pts;
+}
+function regionBonusForHit(hit,centroids){
+  if(!centroids.length)return 0;
+  const lat=Number(hit.lat),lon=Number(hit.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon))return 0;
+  let best=Infinity;
+  for(const [clon,clat] of centroids){
+    const dlat=(clat-lat)*110540,dlon=(clon-lon)*111320*Math.cos(((clat+lat)/2)*Math.PI/180);
+    best=Math.min(best,Math.hypot(dlat,dlon)/1000);
+  }
+  if(best<40)return 22;
+  if(best<120)return 14;
+  if(best<250)return 8;
+  return 0;
+}
+async function warmNearbyCourseGeocodes(exceptId){
+  if(window.__grWarmingGeo)return;
+  window.__grWarmingGeo=true;
+  try{
+    const others=(typeof db!=='undefined'&&Array.isArray(db.courses)?db.courses:[])
+      .filter(x=>x&&String(x.id)!==String(exceptId))
+      .slice(0,5);
+    for(const o of others){
+      const k=`geo:v3:${o.id}`;
+      if(coursePreviewCache.has(k))continue;
+      try{await geocodeGolfCourse(o,{skipWarm:true})}catch{}
+    }
+  }finally{window.__grWarmingGeo=false}
+}
+async function geocodeGolfCourse(c,opts={}){
+  const key=`geo:v3:${c.id}`;
   if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
+  if(!opts.skipWarm){try{await warmNearbyCourseGeocodes(c.id)}catch{}}
+  const storedLat=Number(c.lat??c.mapLat??c.geoLat??c.latitude);
+  const storedLon=Number(c.lon??c.mapLon??c.geoLon??c.longitude);
+  if(Number.isFinite(storedLat)&&Number.isFinite(storedLon)){
+    const result={lat:storedLat,lon:storedLon,displayName:c.name||c.baseName||'Stored course location',matchScore:100,query:'stored-coords',source:'course'};
+    coursePreviewCache.set(key,result);return result;
+  }
   const base=cleanCourseForMap(c.baseName||c.name);
   if(!base)throw new Error('This course has no usable name for map lookup.');
-  const tries=[`${base} golf course`,`${base} golf club`,base];
+  const tries=courseMapQueryVariants(base);
   let candidates=[];
   for(const q of tries){
     const url=`${OSM_NOMINATIM}?format=jsonv2&limit=8&q=${encodeURIComponent(q)}`;
     const data=await osmFetchJson(url);
-    if(Array.isArray(data)&&data.length){candidates=candidates.concat(data)}
+    if(Array.isArray(data)&&data.length){for(const hit of data)candidates.push({...hit,__q:q})}
   }
-  // Prefer US hits when available, but do not discard better-named foreign matches.
-  const uniq=[];
-  const seen=new Set();
+  const uniq=[];const seen=new Set();
   for(const hit of candidates){
     const id=String(hit?.place_id||`${hit?.lat},${hit?.lon}`);
     if(seen.has(id))continue;seen.add(id);uniq.push(hit);
   }
-  if(!uniq.length)throw new Error(`No OpenStreetMap location matched “${base}”.`);
+  if(!uniq.length)throw new Error(`No OpenStreetMap location matched “${base}”. Hole details from your scorecard still show below when available.`);
+  const centroids=knownPreviewCentroids();
+  const strippedBase=cleanCourseForMap(base.replace(/^[A-Za-z][A-Za-z.]*(?:'s|’s)\s+/,''));
   const score=x=>{
     const d=String(x.display_name||'');
-    const nameScore=typeof courseNameScore==='function'?courseNameScore(base,d):0;
-    const golfBonus=/golf|country club|links/i.test(d)?18:0;
+    const nameScore=Math.max(
+      typeof courseNameScore==='function'?courseNameScore(base,d):0,
+      (strippedBase&&typeof courseNameScore==='function')?courseNameScore(strippedBase,d):0
+    );
+    const golfBonus=/golf|country club|links|highlands/i.test(d)?18:0;
     const usBonus=/, United States|, USA\b/i.test(d)?6:0;
-    return nameScore+golfBonus+usBonus;
+    const region=regionBonusForHit(x,centroids);
+    return nameScore+golfBonus+usBonus+region;
   };
   uniq.sort((a,b)=>score(b)-score(a));
   const best=uniq[0], bestScore=score(best);
-  // Reject weak matches so we never render another course's holes.
   if(bestScore<70)throw new Error(`Could not confidently match “${base}” on the map. Hole Preview will not use a different course.`);
-  const result={lat:Number(best.lat),lon:Number(best.lon),displayName:best.display_name,matchScore:bestScore,query:base};
+  const result={lat:Number(best.lat),lon:Number(best.lon),displayName:best.display_name,matchScore:bestScore,query:best.__q||base,source:'nominatim'};
   coursePreviewCache.set(key,result);
   return result;
 }
 async function loadOsmCourse(c){
-  const key=`osm:${c.id}`;
+  const key=`osm:v3:${c.id}`;
   if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
   const geo=await geocodeGolfCourse(c);
   const q=`[out:json][timeout:25];
@@ -2769,6 +2832,8 @@ function loadPlatoonLocal(){
     const p={...d,...x};
     p.members=Array.isArray(x.members)&&x.members.length?x.members:d.members;
     p.missions=Array.isArray(x.missions)?x.missions:[];
+    if(x.hqMeta&&typeof x.hqMeta==='object')p.hqMeta=x.hqMeta;
+    else if(!p.hqMeta)p.hqMeta=(typeof window.grHqMetaDefault==='function'?window.grHqMetaDefault():{version:1,modes:{},records:[],eagleBalances:[],eagleDetails:[],suppressedAuto:[]});
     return p;
   }catch{return d}
 }
@@ -2782,7 +2847,11 @@ async function pushPlatoonServer(p){
   if(window.grTestEnvActive){console.warn('[gr-test-env] Platoon server push skipped (TEST build)');return}
   try{
     const out=await callPlatoonFunction({action:'save_state',snapshot:p});
-    if(out?.platoon)writePlatoonLocal(out.platoon);
+    if(out?.platoon){
+      const merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,p):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||p.hqMeta});
+      window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
+      writePlatoonLocal(merged);
+    }
     platoonSyncError='';
     if(state.view==='groups')render();
   }catch(e){
@@ -2794,8 +2863,13 @@ async function syncPlatoonFromServer(){
   if(platoonSyncBusy)return;
   platoonSyncBusy=true;
   try{
-    const out=await callPlatoonFunction({action:'bootstrap',snapshot:loadPlatoonLocal()});
-    if(out?.platoon)writePlatoonLocal(out.platoon);
+    const localBefore=loadPlatoonLocal();
+    const out=await callPlatoonFunction({action:'bootstrap',snapshot:localBefore});
+    if(out?.platoon){
+      const merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,localBefore):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore.hqMeta});
+      window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
+      writePlatoonLocal(merged);
+    }
     platoonSyncError='';
     if(state.view==='groups')render();
   }catch(e){
@@ -4282,10 +4356,11 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=3"></script>
   <script src="platoon-mission-core.js?v=3"></script>
-  <script src="platoons-v15-real.js?v=160-b1"></script>
-  <script src="platoons-v15-patch-v5.js?v=160-b1"></script>
+  <script src="platoon-hq-records.js?v=161"></script>
+  <script src="platoons-v15-real.js?v=161"></script>
+  <script src="platoons-v15-patch-v5.js?v=161"></script>
   <script src="dev-mobile-pregame-fix.js?v=157"></script>
-  <script src="dev-v15.5-results.js?v=160-b1"></script>
+  <script src="dev-v15.5-results.js?v=161"></script>
 <script src="past-mission-import.js?v=5"></script>
 <script src="mission-delete.js?v=3"></script>
 </body>

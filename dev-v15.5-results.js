@@ -127,37 +127,12 @@ function platoonRecapMarkup(p){
   const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
   const standing=rows.map((x,i)=>`<div class="gr155-recap-row"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span>${x.points} pts</span></div>`).join('')||'<div class="gr155-empty">No points yet.</div>';
 
-  const eagleLeaders=rows.filter(x=>x.eagles>0).sort((a,b)=>b.eagles-a.eagles||String(a.member.name).localeCompare(String(b.member.name)));
-  const eagleTotal=eagleLeaders.reduce((s,x)=>s+x.eagles,0);
-  let eagle;
-  if(eagleLeaders.length){
-    eagle=`<div class="gr155-eagle-hero"><span>🦅</span><div><strong>${eagleTotal}</strong><small>PLATOON EAGLES</small></div></div>${eagleLeaders.slice(0,4).map(x=>`<div class="gr155-recap-row gr155-eagle-row"><span>${esc(x.member.name)}</span><span>${x.eagles} eagle${x.eagles===1?'':'s'}</span></div>`).join('')}`;
-  }else{
-    eagle=`<div class="gr155-empty">No verified eagles recorded yet.</div>`;
-  }
-
-  // Records from verified hole-by-hole data only — never invent zeros.
-  let recordsBody;
-  if(!anyHoleDetail){
-    recordsBody=`<div class="gr155-empty">Records unlock when hole-by-hole detail is saved for a Mission.</div>`;
-  }else{
-    const bits=[];
-    if(birdieRounds.length){
-      const best=Math.max(...birdieRounds.map(x=>x.count));
-      const tops=birdieRounds.filter(x=>x.count===best).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-      const t=tops[0];
-      bits.push(`<div class="gr155-record"><span class="gr155-record-label">Most Birdies in a Round</span><strong>${esc(t.player)} · ${t.count}</strong><small>${esc(t.mission)}${t.date?` · ${esc(fmtRecapDate(t.date))}`:''}</small></div>`);
-    }else{
-      bits.push(`<div class="gr155-record"><span class="gr155-record-label">Most Birdies in a Round</span><div class="gr155-empty">No verified birdie rounds yet.</div></div>`);
-    }
-    if(aces.length){
-      bits.push(aces.map(a=>`<div class="gr155-record"><span class="gr155-record-label">Hole in One</span><strong>${esc(a.player)}</strong><small>${esc(a.course)} · Hole ${a.hole}${a.date?` · ${esc(fmtRecapDate(a.date))}`:''}</small></div>`).join(''));
-    }else{
-      bits.push(`<div class="gr155-record"><span class="gr155-record-label">Holes in One</span><div class="gr155-empty">No verified aces yet.</div></div>`);
-    }
-    bits.push(`<div class="gr155-record gr155-record-future"><span class="gr155-record-label">More records</span><small>Additional categories coming in a future release.</small></div>`);
-    recordsBody=bits.join('');
-  }
+  const eagle=typeof window.grRenderClubEagleBubble==='function'
+    ? window.grRenderClubEagleBubble(p)
+    : `<section class="gr155-recap-block"><div class="gr155-recap-title">CLUB EAGLE</div><div class="gr155-empty">No verified eagles recorded yet.</div></section>`;
+  const records=typeof window.grRenderRecordsBubble==='function'
+    ? window.grRenderRecordsBubble(p)
+    : `<section class="gr155-recap-block"><div class="gr155-recap-title">RECORDS</div><div class="gr155-empty">Records unlock when hole-by-hole detail is saved for a Mission.</div></section>`;
 
   const intel=[];
   const latest=[...complete].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
@@ -169,7 +144,7 @@ function platoonRecapMarkup(p){
     if(birdVals.length){const b=Math.max(...birdVals);const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
   }
   if(!intel.length)intel.push('No completed Missions yet. The season story is still waiting to be written.');
-  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section><section class="gr155-recap-block"><div class="gr155-recap-title">CLUB EAGLE</div>${eagle}</section><section class="gr155-recap-block"><div class="gr155-recap-title">RECORDS</div>${recordsBody}</section><section class="gr155-recap-block gr155-recap-copy gr155-intel-wide"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
+  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section>${eagle}${records}<section class="gr155-recap-block gr155-recap-copy gr155-intel-wide"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
 }
 function enhancePlatoonRecap(){
   const p=getP(),old=document.querySelector('.gr-platoon-standings');

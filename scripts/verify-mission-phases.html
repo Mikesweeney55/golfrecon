@@ -84,10 +84,11 @@ document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=
 </script>
 <script src="/platoon-recap-shared.js?v=3"></script>
 <script src="/platoon-mission-core.js?v=3"></script>
-<script src="/platoons-v15-real.js?v=160-b1"></script>
-<script src="/platoons-v15-patch-v5.js?v=160-b1"></script>
+<script src="/platoon-hq-records.js?v=161"></script>
+<script src="/platoons-v15-real.js?v=161"></script>
+<script src="/platoons-v15-patch-v5.js?v=161"></script>
 <script src="/dev-mobile-pregame-fix.js?v=157"></script>
-<script src="/dev-v15.5-results.js?v=160-b1"></script>
+<script src="/dev-v15.5-results.js?v=161"></script>
 <script src="/past-mission-import.js?v=5"></script>
 <script src="/mission-delete.js?v=3"></script>
 <script>
@@ -103,6 +104,8 @@ async function run(){
   report.steps.upcomingSection=appHtml.includes('Upcoming Missions');
   report.steps.subnav=!!document.querySelector('.gr-platoon-subnav')&&!!document.querySelector('[data-gr-subnav="calendar"]')&&!!document.querySelector('[data-gr-subnav="blog"]');
   report.steps.recordsBubble=appHtml.includes('RECORDS')||document.body.innerHTML.includes('RECORDS');
+  report.steps.hqEditIcons=!!document.querySelector('[data-gr-hq-edit="records"]')&&!!document.querySelector('[data-gr-hq-edit="eagles"]');
+  report.steps.hqRecordsReady=!!window.grHqRecordsReady;
   report.steps.statusDraft=!![...document.querySelectorAll('[data-mission-phase="draft"]')].length || document.body.innerHTML.includes('DRAFT');
   report.steps.warStandingsLabel=document.body.innerHTML.includes('War Standings')&&document.body.innerHTML.includes('Mission Results');
   const warBoard=grWarStandings(loadPlatoonLocal(), loadPlatoonLocal().missions.find(m=>m.id==='war-spring'));
