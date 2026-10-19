@@ -4,6 +4,18 @@
 .gr-ready{border:1px solid rgba(184,234,104,.28);background:rgba(184,234,104,.08)}
 .gr-war-standings-label{font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:10px 0 4px}
 .gr-war-footnote{font-size:10px;margin-top:6px}
+.gr-empty-upcoming{display:grid;gap:4px;padding:18px 14px;text-align:left}
+.gr-empty-upcoming strong{font-size:14px}
+.gr-empty-upcoming .muted{font-size:11px}
+.gr-mission-accordion{padding:0;overflow:hidden}
+.gr-mission-accordion-sum{list-style:none;cursor:pointer;padding:12px;display:block}
+.gr-mission-accordion-sum::-webkit-details-marker{display:none}
+.gr-mission-accordion-sum::marker{content:''}
+.gr-mission-accordion-sum .gr-mission-head{position:relative;padding-right:18px}
+.gr-mission-accordion-sum .gr-mission-head::after{content:'▸';position:absolute;right:0;top:50%;transform:translateY(-50%);color:var(--accent);font-size:14px;font-weight:900;opacity:.85}
+.gr-mission-accordion[open] .gr-mission-accordion-sum .gr-mission-head::after{content:'▾'}
+.gr-mission-accordion-body{padding:0 12px 12px;border-top:1px solid rgba(255,255,255,.06)}
+.gr-platoons-home{min-width:0}
 .sticky-actions{position:sticky;bottom:0;background:#16221d;padding:12px 0 4px;z-index:5;margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
 .gr-import-review input,.gr-import-review select{width:100%;min-width:0;box-sizing:border-box;font-size:11px;padding:6px}
 .gr-import-review td{vertical-align:middle}
