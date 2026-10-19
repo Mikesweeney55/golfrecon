@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Golf Recon v15.5</title>
+  <title>Golf Recon V16.0</title>
   <script src="gr-test-env.js?v=1"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
@@ -1111,7 +1111,7 @@ button.calendar-day{appearance:none}
 @media(max-width:700px){.platoon-logo{width:58px;height:58px;right:13px;top:13px}.platoon-command-head{padding-right:66px}}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=165">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=160-b1">
 </head>
 <body>
   <div id="authGate" class="auth-gate">
@@ -1149,7 +1149,7 @@ button.calendar-day{appearance:none}
     <header class="topbar">
       <div class="topbar-left">
         <div class="gr-brand" aria-label="Golf Recon"><div class="gr-mark"><span class="gr-cross">GR</span><span class="gr-flag">⌖</span></div><div class="gr-word"><strong>GOLF RECON</strong><small>SCOUT · PLAN · PLAY · IMPROVE</small></div></div>
-        <div class="brand-meta"><span>v15.4 Beta</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-meta"><span>V16.0</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
       <div class="giq-logo" aria-label="GR">
@@ -1609,10 +1609,19 @@ function refreshGlobalCourseSelector(){
 }
 async function setGlobalCourse(id){
   if(!db.courses.some(c=>c.id===id))return;
+  const courseChanged=String(state.selectedCourseId||'')!==String(id);
   state.selectedCourseId=id;
   state.gameCourseId=id;
   state.roundCourseId=id;
   state.selectedRoundId=null;
+  if(courseChanged){
+    state.coursePreviewCourseId=id;
+    state.coursePreviewHole=1;
+    state.coursePreviewError=null;
+    state.coursePreviewLoading=false;
+    state.coursePreviewShowAll=false;
+    try{if(typeof destroyCoursePreviewMap==='function')destroyCoursePreviewMap()}catch{}
+  }
   try{localStorage.setItem('golfreconSelectedCourseId',id)}catch{}
   refreshGlobalCourseSelector();
   render();
@@ -1758,10 +1767,12 @@ const OSM_NOMINATIM='https://nominatim.openstreetmap.org/search';
 const OSM_OVERPASS='https://overpass-api.de/api/interpreter';
 
 function cleanCourseForMap(name){
-  return String(name||'')
-    .replace(/[—–]\s*(Blue|Green)\b.*$/i,'')
+  let s=typeof window.grCleanCourseName==='function'?window.grCleanCourseName(name):String(name||'');
+  return String(s||'')
+    .replace(/[—–-]\s*(Blue|White|Red|Gold|Black|Green|Championship|Forward|Member)\b.*$/i,'')
     .replace(/\b(Front|Back)\s*9\b/ig,'')
     .replace(/\b(9|18)\s*holes?\b/ig,'')
+    .replace(/\btees?\b/ig,'')
     .replace(/\bScot\.\b/ig,'Scottish')
     .replace(/\s+/g,' ').trim();
 }
@@ -1815,23 +1826,34 @@ async function geocodeGolfCourse(c){
   const key=`geo:${c.id}`;
   if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
   const base=cleanCourseForMap(c.baseName||c.name);
-  const tries=[`${base} golf course`,base];
+  if(!base)throw new Error('This course has no usable name for map lookup.');
+  const tries=[`${base} golf course`,`${base} golf club`,base];
   let candidates=[];
   for(const q of tries){
-    const url=`${OSM_NOMINATIM}?format=jsonv2&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`;
+    const url=`${OSM_NOMINATIM}?format=jsonv2&limit=8&q=${encodeURIComponent(q)}`;
     const data=await osmFetchJson(url);
-    if(Array.isArray(data)&&data.length){candidates=data;break}
+    if(Array.isArray(data)&&data.length){candidates=candidates.concat(data)}
   }
-  if(!candidates.length)throw new Error('Course location was not found in OpenStreetMap.');
+  // Prefer US hits when available, but do not discard better-named foreign matches.
+  const uniq=[];
+  const seen=new Set();
+  for(const hit of candidates){
+    const id=String(hit?.place_id||`${hit?.lat},${hit?.lon}`);
+    if(seen.has(id))continue;seen.add(id);uniq.push(hit);
+  }
+  if(!uniq.length)throw new Error(`No OpenStreetMap location matched “${base}”.`);
   const score=x=>{
     const d=String(x.display_name||'');
     const nameScore=typeof courseNameScore==='function'?courseNameScore(base,d):0;
-    const golfBonus=/golf|country club/i.test(d)?15:0;
-    return nameScore+golfBonus;
+    const golfBonus=/golf|country club|links/i.test(d)?18:0;
+    const usBonus=/, United States|, USA\b/i.test(d)?6:0;
+    return nameScore+golfBonus+usBonus;
   };
-  candidates.sort((a,b)=>score(b)-score(a));
-  const best=candidates[0];
-  const result={lat:Number(best.lat),lon:Number(best.lon),displayName:best.display_name};
+  uniq.sort((a,b)=>score(b)-score(a));
+  const best=uniq[0], bestScore=score(best);
+  // Reject weak matches so we never render another course's holes.
+  if(bestScore<70)throw new Error(`Could not confidently match “${base}” on the map. Hole Preview will not use a different course.`);
+  const result={lat:Number(best.lat),lon:Number(best.lon),displayName:best.display_name,matchScore:bestScore,query:base};
   coursePreviewCache.set(key,result);
   return result;
 }
@@ -2253,7 +2275,9 @@ window.resetCoursePreviewMap=()=>fitCoursePreviewMap(false);
 function initInteractiveCourseMap(){
   if(!['pregame','coursePreview'].includes(state.view))return;
   const container=document.getElementById('coursePreviewMap'),token=mapboxToken();if(!container||!token||!window.mapboxgl)return;
-  const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);if(!cached?.geom)return;
+  const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);
+  if(!cached?.geom)return;
+  if(cached.courseId&&String(cached.courseId)!==String(state.selectedCourseId))return;
   const built=buildCoursePreviewGeoJSON(cached.geom);if(!built)return;
   destroyCoursePreviewMap();
   window.mapboxgl.accessToken=token;
@@ -2280,21 +2304,39 @@ function initInteractiveCourseMap(){
 async function ensureCoursePreviewLoaded(courseId,hole){
   const c=course(courseId); if(!c||!['pregame','coursePreview'].includes(state.view))return;
   const key=`preview:${courseId}:${hole}`;
-  if(coursePreviewCache.has(key)||state.coursePreviewLoading)return;
-  state.coursePreviewLoading=true;state.coursePreviewError=null;
+  if(coursePreviewCache.has(key))return;
+  // Track in-flight loads per course/hole so switching courses is never blocked.
+  if(!window.__grPreviewLoading)window.__grPreviewLoading=new Set();
+  if(window.__grPreviewLoading.has(key))return;
+  window.__grPreviewLoading.add(key);
+  if(String(state.selectedCourseId)===String(courseId)){
+    state.coursePreviewLoading=true;
+    state.coursePreviewError=null;
+  }
   const map=document.getElementById('coursePreviewMapBody');
-  if(map)map.innerHTML=`<div class="preview-map-empty"><div><strong>Loading Hole ${hole}…</strong><span>Finding golf-specific OpenStreetMap geometry.</span></div></div>`;
+  if(map&&String(state.selectedCourseId)===String(courseId)){
+    map.innerHTML=`<div class="preview-map-empty"><div><strong>Loading Hole ${hole}…</strong><span>Finding golf-specific OpenStreetMap geometry for ${safeText(cleanCourseForMap(c.baseName||c.name))}.</span></div></div>`;
+  }
   try{
     const courseData=await loadOsmCourse(c);
+    // Guard against late responses from a previously selected course.
+    if(String(state.selectedCourseId)!==String(courseId)&&state.view==='pregame'){
+      coursePreviewCache.set(key,{courseData,geom:selectedHoleGeometry(courseData,hole)});
+      return;
+    }
     const geom=selectedHoleGeometry(courseData,hole);
-    coursePreviewCache.set(key,{courseData,geom});
-    if(!geom)state.coursePreviewError='The free course map does not have enough tee/green/hole data to locate this hole yet.';
+    coursePreviewCache.set(key,{courseData,geom,courseId:String(courseId)});
+    if(!geom&&String(state.selectedCourseId)===String(courseId)){
+      state.coursePreviewError='The free course map does not have enough tee/green/hole data to locate this hole yet.';
+    }
   }catch(e){
-    state.coursePreviewError=e.message||String(e);
-    coursePreviewCache.set(key,{courseData:null,geom:null,error:state.coursePreviewError});
+    const msg=e.message||String(e);
+    coursePreviewCache.set(key,{courseData:null,geom:null,error:msg,courseId:String(courseId)});
+    if(String(state.selectedCourseId)===String(courseId))state.coursePreviewError=msg;
   }finally{
-    state.coursePreviewLoading=false;
-    if(state.view==='pregame'||state.view==='coursePreview')render();
+    window.__grPreviewLoading.delete(key);
+    if(String(state.selectedCourseId)===String(courseId))state.coursePreviewLoading=false;
+    if((state.view==='pregame'||state.view==='coursePreview')&&String(state.selectedCourseId)===String(courseId))render();
   }
 }
 window.openHolePreview=(hole,courseId=state.selectedCourseId)=>{
@@ -2443,12 +2485,17 @@ function pregameHoleInsightsHtml(c,priority=[]){
   state.coursePreviewHole=hole;
   const mem=holeMemory(c.id),h=mem.find(x=>Number(x.hole)===hole);
   const last=h?holeLastRound(c.id,hole):null;
-  const cached=coursePreviewCache.get(`preview:${c.id}:${hole}`);
+  let cached=coursePreviewCache.get(`preview:${c.id}:${hole}`);
+  // Never reuse geometry tied to a different course id.
+  if(cached&&cached.courseId&&String(cached.courseId)!==String(c.id)){
+    coursePreviewCache.delete(`preview:${c.id}:${hole}`);
+    cached=null;
+  }
   const avgScore=h?.avgScore;
   const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
   const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is loading the golf-course data for this hole.';
   const mb=mapboxToken();
-  const mapReady=Boolean(mb&&cached?.geom);
+  const mapReady=Boolean(mb&&cached?.geom&&(!cached.courseId||String(cached.courseId)===String(c.id)));
   const waiting=!cached&&!state.coursePreviewError;
   const mapBody=mapReady
     ? `<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`
@@ -2638,12 +2685,16 @@ function coursePreviewView(){
   state.coursePreviewHole=hole;
   const mem=holeMemory(c.id),h=mem.find(x=>Number(x.hole)===hole);
   const last=h?holeLastRound(c.id,hole):null;
-  const cached=coursePreviewCache.get(`preview:${c.id}:${hole}`);
+  let cached=coursePreviewCache.get(`preview:${c.id}:${hole}`);
+  if(cached&&cached.courseId&&String(cached.courseId)!==String(c.id)){
+    coursePreviewCache.delete(`preview:${c.id}:${hole}`);
+    cached=null;
+  }
   const avgScore=h?.avgScore;
   const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
   const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is checking the golf-course data for this hole.';
   const mb=mapboxToken();
-  const mapReady=Boolean(mb&&cached?.geom);
+  const mapReady=Boolean(mb&&cached?.geom&&(!cached.courseId||String(cached.courseId)===String(c.id)));
   const mapBody=mapReady?`<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`:`<div class="preview-map-empty"><div><strong>${state.coursePreviewLoading?`Loading Hole ${hole}…`:(!mb?'Mapbox token required':'Hole geometry not available yet')}</strong><span>${safeText(!mb?'Set your Mapbox token above to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
   const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
   const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
@@ -4231,10 +4282,10 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=3"></script>
   <script src="platoon-mission-core.js?v=3"></script>
-  <script src="platoons-v15-real.js?v=165"></script>
-  <script src="platoons-v15-patch-v5.js"></script>
+  <script src="platoons-v15-real.js?v=160-b1"></script>
+  <script src="platoons-v15-patch-v5.js?v=160-b1"></script>
   <script src="dev-mobile-pregame-fix.js?v=157"></script>
-  <script src="dev-v15.5-results.js?v=160"></script>
+  <script src="dev-v15.5-results.js?v=160-b1"></script>
 <script src="past-mission-import.js?v=5"></script>
 <script src="mission-delete.js?v=3"></script>
 </body>

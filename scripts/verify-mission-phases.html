@@ -84,10 +84,10 @@ document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=
 </script>
 <script src="/platoon-recap-shared.js?v=3"></script>
 <script src="/platoon-mission-core.js?v=3"></script>
-<script src="/platoons-v15-real.js?v=165"></script>
-<script src="/platoons-v15-patch-v5.js"></script>
+<script src="/platoons-v15-real.js?v=160-b1"></script>
+<script src="/platoons-v15-patch-v5.js?v=160-b1"></script>
 <script src="/dev-mobile-pregame-fix.js?v=157"></script>
-<script src="/dev-v15.5-results.js?v=160"></script>
+<script src="/dev-v15.5-results.js?v=160-b1"></script>
 <script src="/past-mission-import.js?v=5"></script>
 <script src="/mission-delete.js?v=3"></script>
 <script>
@@ -98,7 +98,11 @@ async function run(){
   setView('pregame'); await sleep(40); report.steps.navPersonal=state.view==='pregame'&&document.body.innerHTML.includes('Personal golf');
   setView('groups'); await sleep(300);
   report.steps.platoons=document.getElementById('app').innerHTML.includes('PLATOON HQ');
-  report.steps.history=document.body.innerHTML.includes('Mission History')&&document.body.innerHTML.includes('Fearsome Foursome');
+  const appHtml=document.getElementById('app')?.innerHTML||'';
+  report.steps.history=appHtml.includes('Completed Missions')&&appHtml.includes('Fearsome Foursome')&&!appHtml.includes('Mission History');
+  report.steps.upcomingSection=appHtml.includes('Upcoming Missions');
+  report.steps.subnav=!!document.querySelector('.gr-platoon-subnav')&&!!document.querySelector('[data-gr-subnav="calendar"]')&&!!document.querySelector('[data-gr-subnav="blog"]');
+  report.steps.recordsBubble=appHtml.includes('RECORDS')||document.body.innerHTML.includes('RECORDS');
   report.steps.statusDraft=!![...document.querySelectorAll('[data-mission-phase="draft"]')].length || document.body.innerHTML.includes('DRAFT');
   report.steps.warStandingsLabel=document.body.innerHTML.includes('War Standings')&&document.body.innerHTML.includes('Mission Results');
   const warBoard=grWarStandings(loadPlatoonLocal(), loadPlatoonLocal().missions.find(m=>m.id==='war-spring'));

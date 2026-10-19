@@ -97,27 +97,79 @@ function summaryMarkup(p,m){
   if(typeof window.grMissionRecapMarkup==='function')return window.grMissionRecapMarkup(p,m);
   return '<div class="gr155-empty">No results yet.</div>';
 }
+function fmtRecapDate(v){if(!v)return '';try{return new Date(v+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}catch{return String(v)}}
 function platoonRecapMarkup(p){
   const complete=(p.missions||[]).filter(m=>m.type!=='war'&&m.status==='completed');
-  const map=new Map((p.members||[]).map(m=>[m.id,{member:m,points:0,birds:0,eagles:0,wins:0}]));
+  const map=new Map((p.members||[]).map(m=>[m.id,{member:m,points:0,birds:0,eagles:0,wins:0,detailRounds:0}]));
+  const birdieRounds=[]; // {player,count,mission,date}
+  const aces=[]; // {player,course,hole,date,mission}
+  let anyHoleDetail=false;
   for(const m of complete)for(const r of (m.results||[])){
-    const mm=canonicalMember(p,r.player_name);if(!mm||!map.has(mm.id))continue;
+    const mm=canonicalMember(p,r.player_name)||memberById(p,r.hole_detail_canonical_id);
+    if(!mm||!map.has(mm.id))continue;
     const x=map.get(mm.id),st=detailStats(r);
-    x.points+=Number(r.raw_points||0);x.birds+=st.birds.length;x.eagles+=st.eagles.length;if(Number(r.finish_position)===1)x.wins++;
+    x.points+=Number(r.raw_points||0);
+    if(Number(r.finish_position)===1)x.wins++;
+    // Prefer verified hole-by-hole for eagles/birdies; fall back to official eagle_count when present.
+    if(st.holes.length){
+      anyHoleDetail=true;
+      x.detailRounds++;
+      x.birds+=st.birds.length;
+      x.eagles+=st.eagles.length;
+      if(st.birds.length)birdieRounds.push({player:mm.name,count:st.birds.length,mission:m.title||m.locationName||'Mission',date:m.date||'',course:m.locationName||''});
+      for(const h of st.holes){
+        if(Number(h.score)===1)aces.push({player:mm.name,course:m.locationName||'Course TBD',hole:h.hole,date:m.date||'',mission:m.title||m.locationName||'Mission'});
+      }
+    }else if(finite(r.eagle_count)&&Number(r.eagle_count)>0){
+      x.eagles+=Number(r.eagle_count);
+    }
   }
   const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
   const standing=rows.map((x,i)=>`<div class="gr155-recap-row"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span>${x.points} pts</span></div>`).join('')||'<div class="gr155-empty">No points yet.</div>';
-  const eagle=`<div class="gr155-eagle-hero"><span>🦅</span><div><strong>3</strong><small>PLATOON EAGLES</small></div></div><div class="gr155-recap-row gr155-eagle-row"><span>Kevin Cunningham</span><span>2 eagles</span></div><div class="gr155-recap-row gr155-eagle-row"><span>Josh Mankey</span><span>1 eagle</span></div>`;
+
+  const eagleLeaders=rows.filter(x=>x.eagles>0).sort((a,b)=>b.eagles-a.eagles||String(a.member.name).localeCompare(String(b.member.name)));
+  const eagleTotal=eagleLeaders.reduce((s,x)=>s+x.eagles,0);
+  let eagle;
+  if(eagleLeaders.length){
+    eagle=`<div class="gr155-eagle-hero"><span>🦅</span><div><strong>${eagleTotal}</strong><small>PLATOON EAGLES</small></div></div>${eagleLeaders.slice(0,4).map(x=>`<div class="gr155-recap-row gr155-eagle-row"><span>${esc(x.member.name)}</span><span>${x.eagles} eagle${x.eagles===1?'':'s'}</span></div>`).join('')}`;
+  }else{
+    eagle=`<div class="gr155-empty">No verified eagles recorded yet.</div>`;
+  }
+
+  // Records from verified hole-by-hole data only — never invent zeros.
+  let recordsBody;
+  if(!anyHoleDetail){
+    recordsBody=`<div class="gr155-empty">Records unlock when hole-by-hole detail is saved for a Mission.</div>`;
+  }else{
+    const bits=[];
+    if(birdieRounds.length){
+      const best=Math.max(...birdieRounds.map(x=>x.count));
+      const tops=birdieRounds.filter(x=>x.count===best).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+      const t=tops[0];
+      bits.push(`<div class="gr155-record"><span class="gr155-record-label">Most Birdies in a Round</span><strong>${esc(t.player)} · ${t.count}</strong><small>${esc(t.mission)}${t.date?` · ${esc(fmtRecapDate(t.date))}`:''}</small></div>`);
+    }else{
+      bits.push(`<div class="gr155-record"><span class="gr155-record-label">Most Birdies in a Round</span><div class="gr155-empty">No verified birdie rounds yet.</div></div>`);
+    }
+    if(aces.length){
+      bits.push(aces.map(a=>`<div class="gr155-record"><span class="gr155-record-label">Hole in One</span><strong>${esc(a.player)}</strong><small>${esc(a.course)} · Hole ${a.hole}${a.date?` · ${esc(fmtRecapDate(a.date))}`:''}</small></div>`).join(''));
+    }else{
+      bits.push(`<div class="gr155-record"><span class="gr155-record-label">Holes in One</span><div class="gr155-empty">No verified aces yet.</div></div>`);
+    }
+    bits.push(`<div class="gr155-record gr155-record-future"><span class="gr155-record-label">More records</span><small>Additional categories coming in a future release.</small></div>`);
+    recordsBody=bits.join('');
+  }
+
   const intel=[];
   const latest=[...complete].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
   if(latest){const r=standings(latest)[0];if(r)intel.push(`${displayName(p,r.player_name)} finished the latest Mission on top${finite(r.net)?` at net ${Number(r.net)}`:''}.`)}
   if(rows.length){
     const best=rows[0].points,leaders=rows.filter(x=>x.points===best);
     intel.push(leaders.length>1?`${leaders.map(x=>x.member.name).join(' & ')} are tied atop the Platoon at ${best} point${best===1?'':'s'}.`:`${leaders[0].member.name} leads the Platoon with ${best} point${best===1?'':'s'}.`);
-    const b=Math.max(...rows.map(x=>x.birds));if(b>0){const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
+    const birdVals=rows.map(x=>x.birds).filter(n=>n>0);
+    if(birdVals.length){const b=Math.max(...birdVals);const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
   }
   if(!intel.length)intel.push('No completed Missions yet. The season story is still waiting to be written.');
-  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section><section class="gr155-recap-block"><div class="gr155-recap-title">CLUB EAGLE</div>${eagle}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
+  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section><section class="gr155-recap-block"><div class="gr155-recap-title">CLUB EAGLE</div>${eagle}</section><section class="gr155-recap-block"><div class="gr155-recap-title">RECORDS</div>${recordsBody}</section><section class="gr155-recap-block gr155-recap-copy gr155-intel-wide"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
 }
 function enhancePlatoonRecap(){
   const p=getP(),old=document.querySelector('.gr-platoon-standings');
@@ -208,7 +260,7 @@ window.grOpenSetup=()=>{
 function styles(){if(document.getElementById('gr155DevStyles'))return;const s=document.createElement('style');s.id='gr155DevStyles';s.textContent=`
 .gr155-format{font-size:10px;color:var(--muted);font-weight:750;margin-top:2px}.gr155-results-wrap{margin-top:8px}.gr155-results-table{width:100%;border-collapse:collapse;font-size:11px}.gr155-results-table th,.gr155-results-table td{padding:7px 6px;border-bottom:1px solid rgba(255,255,255,.07);text-align:right}.gr155-results-table th:first-child,.gr155-results-table td:first-child,.gr155-results-table th:nth-child(2),.gr155-results-table td:nth-child(2){text-align:left}.gr155-results-table th{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.gr155-results-table td:nth-child(2){font-weight:800}.gr155-empty{text-align:center;color:var(--muted);padding:14px}.gr155-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}.gr155-kpi{border:1px solid var(--line);background:#101914;border-radius:11px;padding:9px}.gr155-kpi span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.gr155-kpi strong{display:block;margin-top:3px;font-size:12px}.gr155-recon{margin-top:11px}.gr155-recon-title{font-size:9px;font-weight:900;letter-spacing:.12em;color:var(--accent);margin-bottom:6px}.gr155-recon-line{font-size:11px;line-height:1.35;color:#dce6e1;padding:7px 8px;border-left:2px solid rgba(184,234,104,.42);background:rgba(255,255,255,.025);margin-top:5px}.gr155-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.gr155-choice{text-align:left;color:inherit}.gr155-choice strong{display:block;margin-bottom:5px}.gr155-choice span{font-size:11px;color:var(--muted)}.gr155-hole-player{border:1px solid var(--line);border-radius:10px;padding:9px;margin-top:7px}.gr155-hole-player.warn{border-color:rgba(255,176,32,.45)}.gr155-hole-player>div:first-child{display:flex;justify-content:space-between;gap:8px}.gr155-hole-mini{font-size:10px;color:var(--muted);margin-top:4px}.gr155-roster-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px}.gr155-roster{display:grid;gap:8px;margin-top:8px}.gr155-roster-row{display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px}.gr155-roster-row label{margin-top:0}@media(max-width:700px){.gr155-choice-grid,.gr155-roster-row{grid-template-columns:1fr}.gr155-results-table{font-size:10px}.gr155-results-table th,.gr155-results-table td{padding:6px 4px}}
 `;document.head.appendChild(s)}
-function recapStyles(){if(document.getElementById('gr155RecapStyles'))return;const s=document.createElement('style');s.id='gr155RecapStyles';s.textContent=`.gr155-recap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}.gr155-recap-block{border:1px solid var(--line);background:#101914;border-radius:14px;padding:12px;min-width:0}.gr155-recap-title{font-size:9px;font-weight:950;letter-spacing:.12em;color:var(--accent);margin-bottom:9px}.gr155-recap-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:10.5px}.gr155-recap-row:last-child{border-bottom:0}.gr155-recap-row span:last-child{white-space:nowrap;font-weight:800}.gr155-recap-hi{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}.gr155-recap-hi span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.gr155-recap-hi strong{display:block;font-size:11px;margin-top:2px}.gr155-recap-copy p{font-size:10.5px;line-height:1.4;margin:0 0 8px;color:#dce6e1}.gr155-recap-copy p:last-child{margin-bottom:0}.gr155-platoon-recap{margin-top:14px}.gr155-eagle-hero{display:flex;align-items:center;gap:10px;padding:4px 0 9px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:3px}.gr155-eagle-hero>span{font-size:30px}.gr155-eagle-hero strong{display:block;font-size:22px;color:var(--accent);line-height:1}.gr155-eagle-hero small{display:block;font-size:7px;color:var(--muted);letter-spacing:.1em;margin-top:3px}.gr155-eagle-row span:last-child{color:var(--accent)}@media(max-width:700px){.gr155-platoon-recap{margin-right:-74px}.gr155-recap-grid{grid-template-columns:1fr}.gr155-recap-block{padding:11px}.gr155-recap-row,.gr155-recap-copy p{font-size:11px}}`;document.head.appendChild(s)}
+function recapStyles(){if(document.getElementById('gr155RecapStyles'))return;const s=document.createElement('style');s.id='gr155RecapStyles';s.textContent=`.gr155-recap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}.gr155-recap-block{border:1px solid var(--line);background:#101914;border-radius:14px;padding:12px;min-width:0}.gr155-recap-title{font-size:9px;font-weight:950;letter-spacing:.12em;color:var(--accent);margin-bottom:9px}.gr155-recap-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:10.5px}.gr155-recap-row:last-child{border-bottom:0}.gr155-recap-row span:last-child{white-space:nowrap;font-weight:800}.gr155-recap-hi{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}.gr155-recap-hi span{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.gr155-recap-hi strong{display:block;font-size:11px;margin-top:2px}.gr155-recap-copy p{font-size:13px;line-height:1.45;margin:0 0 10px;color:#dce6e1}.gr155-recap-copy p:last-child{margin-bottom:0}.gr155-platoon-recap{margin-top:14px}.gr155-intel-wide{grid-column:1/-1}.gr155-eagle-hero{display:flex;align-items:center;gap:10px;padding:4px 0 9px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:3px}.gr155-eagle-hero>span{font-size:30px}.gr155-eagle-hero strong{display:block;font-size:22px;color:var(--accent);line-height:1}.gr155-eagle-hero small{display:block;font-size:7px;color:var(--muted);letter-spacing:.1em;margin-top:3px}.gr155-eagle-row span:last-child{color:var(--accent)}.gr155-record{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}.gr155-record:last-child{border-bottom:0}.gr155-record-label{display:block;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}.gr155-record strong{display:block;font-size:12px}.gr155-record small{display:block;font-size:10px;color:#c5d4cd;margin-top:2px;line-height:1.3}.gr155-record-future{opacity:.75}@media(max-width:900px){.gr155-recap-grid{grid-template-columns:1fr 1fr}.gr155-intel-wide{grid-column:1/-1}}@media(max-width:700px){.gr155-platoon-recap{margin-right:0}.gr155-recap-grid{grid-template-columns:1fr}.gr155-recap-block{padding:11px}.gr155-recap-row{font-size:11px}.gr155-recap-copy p{font-size:13.5px}}`;document.head.appendChild(s)}
 styles();recapStyles();
 let queued=false;function queue(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;enhanceAll()})}
 new MutationObserver(ms=>{if(ms.some(mu=>[...mu.addedNodes].some(n=>n?.nodeType===1&&(n.matches?.('.gr-mission,.gr-platoon-standings')||n.querySelector?.('.gr-mission,.gr-platoon-standings')))))queue()}).observe(document.body,{childList:true,subtree:true});
