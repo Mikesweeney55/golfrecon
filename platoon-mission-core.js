@@ -202,6 +202,225 @@ function officialResultsForRecap(mission){
   return normalizeOfficialResults(mission?.results||[]);
 }
 
+/* ── Phase 3–5 workflow helpers (persist extras in notes tags; no DB schema change) ── */
+
+function stripTag(notes,re){return String(notes||'').replace(re,'').trim()}
+function readTag(notes,re){const m=String(notes||'').match(re);return m?m[1]:''}
+function writeTag(notes,token,payload){
+  let s=stripTag(notes,new RegExp(`\\n?\\[\\[${token}:[\\s\\S]*?\\]\\]`,'g'));
+  if(payload==null||payload==='')return s;
+  return `${s}${s?'\n':''}[[${token}:${payload}]]`;
+}
+
+function isLive(m){return /\[\[GR_LIVE:1\]\]/.test(String(m?.notes||''))}
+function setLiveNotes(notes,on){return writeTag(notes,'GR_LIVE',on?'1':'')}
+function previewJsonOf(m){
+  const raw=readTag(m?.notes||'',/\[\[GR_PREVIEW:([\s\S]*?)\]\]/);
+  if(!raw)return null;
+  try{return JSON.parse(raw)}catch{return null}
+}
+function setPreviewNotes(notes,preview){
+  return writeTag(notes,'GR_PREVIEW',preview?JSON.stringify(preview):'');
+}
+function importFpOf(m){return readTag(m?.notes||'',/\[\[GR_IMPORT_FP:([^\]]*)\]\]/)}
+function setImportFpNotes(notes,fp){return writeTag(notes,'GR_IMPORT_FP',fp||'')}
+
+/** Display phase without changing DB status enum (planned|ready|completed|cancelled). */
+function missionPhase(m){
+  const s=m?.status||'planned';
+  if(s==='completed')return'completed';
+  if(s==='cancelled')return'cancelled';
+  if(s==='ready'&&isLive(m))return'in_progress';
+  if(s==='ready')return'ready';
+  return'draft';
+}
+
+function resultsFingerprint(rows){
+  const norm=normalizeOfficialResults(rows).map(r=>[
+    String(r.player_name||'').toLowerCase(),
+    r.gross,r.net,r.finish_position,r.raw_points
+  ].join('|')).sort();
+  return norm.join(';');
+}
+
+/**
+ * Build Mission Preview from existing completed Platoon Missions only.
+ * Never invents stats that are not present in official results.
+ */
+function buildMissionPreview(p,m){
+  const course=cleanCourse(m?.locationName||'');
+  const people=Array.isArray(m?.participants)?m.participants:[];
+  const memberName=id=>{
+    const hit=(p?.members||[]).find(x=>String(x.id)===String(id));
+    return hit?.name||null;
+  };
+  const fieldNames=people.map(memberName).filter(Boolean);
+  const prior=(p?.missions||[]).filter(x=>
+    x&&x.id!==m?.id&&x.type!=='war'&&x.status==='completed'&&
+    cleanCourse(x.locationName||'')===course
+  );
+  const lines=[];
+  if(!prior.length){
+    lines.push(`First recorded Platoon Mission at ${course||'this course'}.`);
+  }else{
+    lines.push(`${prior.length} prior completed Platoon Mission${prior.length===1?'':'s'} at ${course}.`);
+  }
+
+  // Head-to-head among this Mission's field using only official prior results.
+  const rivalStats=new Map();
+  for(const name of fieldNames)rivalStats.set(name,{name,starts:0,wins:0,points:0,bestNet:null});
+  for(const pm of prior){
+    const rows=normalizeOfficialResults(pm.results||[]);
+    for(const r of rows){
+      const mem=canon(p,r.player_name);
+      const name=mem?.name;
+      if(!name||!rivalStats.has(name))continue;
+      const s=rivalStats.get(name);
+      s.starts+=1;
+      s.points+=Number(r.raw_points||0);
+      if(finite(r.net))s.bestNet=s.bestNet==null?Number(r.net):Math.min(s.bestNet,Number(r.net));
+      if(Number(r.finish_position)===1)s.wins+=1;
+    }
+  }
+  const rivals=[...rivalStats.values()].filter(x=>x.starts>0).sort((a,b)=>b.points-a.points||b.wins-a.wins||a.name.localeCompare(b.name));
+  if(rivals.length){
+    const top=rivals[0];
+    lines.push(`${top.name} leads this field historically at ${course} with ${top.points} pt${top.points===1?'':'s'} across ${top.starts} start${top.starts===1?'':'s'}${top.wins?` · ${top.wins} win${top.wins===1?'':'s'}`:''}.`);
+    const withNet=rivals.filter(x=>x.bestNet!=null).sort((a,b)=>a.bestNet-b.bestNet);
+    if(withNet.length)lines.push(`Best prior net among the field here: ${withNet[0].name} (${withNet[0].bestNet}).`);
+  }else if(fieldNames.length){
+    lines.push(`No prior completed results yet for ${fieldNames.slice(0,4).join(', ')} at this course.`);
+  }
+
+  // Notable marks only when eagle_count exists on official rows.
+  let eagleBits=[];
+  for(const pm of prior){
+    for(const r of normalizeOfficialResults(pm.results||[])){
+      if(Number(r.eagle_count)>0){
+        const name=canon(p,r.player_name)?.name||r.player_name;
+        if(fieldNames.includes(name))eagleBits.push(`${name} (${r.eagle_count})`);
+      }
+    }
+  }
+  if(eagleBits.length)lines.push(`Eagles on record for this field here: ${[...new Set(eagleBits)].slice(0,4).join(', ')}.`);
+
+  return {
+    builtAt:new Date().toISOString(),
+    course,
+    field:fieldNames,
+    priorCount:prior.length,
+    battlefield:lines[0]||`Mission at ${course||'Course TBD'}.`,
+    watch:fieldNames.length?fieldNames.slice(0,6).join(' · '):'Field TBD',
+    intel:lines.slice(0,5)
+  };
+}
+
+function applyPreviewToMission(mission,preview){
+  if(!mission)return mission;
+  mission.notes=setPreviewNotes(mission.notes||'',preview);
+  mission.preview=preview;
+  return mission;
+}
+
+function lockMissionForPreview(p,missionId){
+  const m=findMission(p,missionId);if(!m)return {ok:false,error:'Mission not found.'};
+  if(m.status==='completed')return {ok:false,error:'Completed Missions cannot be re-locked.'};
+  const preview=buildMissionPreview(p,m);
+  m.status='ready';
+  m.notes=setLiveNotes(setPreviewNotes(m.notes||'',preview),false);
+  m.preview=preview;
+  return {ok:true,mission:m,preview};
+}
+
+function startMissionLive(p,missionId){
+  const m=findMission(p,missionId);if(!m)return {ok:false,error:'Mission not found.'};
+  if(m.status==='completed')return {ok:false,error:'Mission already completed.'};
+  if(m.status!=='ready'&&m.status!=='planned')return {ok:false,error:'Mission must be Ready before starting.'};
+  if(m.status==='planned'){
+    const locked=lockMissionForPreview(p,missionId);
+    if(!locked.ok)return locked;
+  }
+  m.status='ready';
+  m.notes=setLiveNotes(m.notes||'',true);
+  return {ok:true,mission:m};
+}
+
+function reopenMissionDraft(p,missionId){
+  const m=findMission(p,missionId);if(!m)return {ok:false,error:'Mission not found.'};
+  if(m.status==='completed')return {ok:false,error:'Completed Missions keep official results; edit setup only without unlocking.'};
+  m.status='planned';
+  m.notes=setLiveNotes(m.notes||'',false);
+  return {ok:true,mission:m};
+}
+
+/**
+ * Cumulative War standings from completed child Missions only.
+ * Missing rounds do not invent scores or points — played count reflects actual starts.
+ */
+function warIdFromNotes(notes){
+  const x=String(notes||'').match(/\[\[GR_WAR:([^\]]+)\]\]/);
+  return x?x[1]:'';
+}
+
+function warChildMissions(p,war){
+  const wid=war?.id;
+  return (p?.missions||[])
+    .filter(m=>m&&m.type!=='war'&&warIdFromNotes(m.notes)===wid)
+    .sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+}
+
+function warStandings(p,war){
+  const kids=warChildMissions(p,war).filter(m=>m.status==='completed');
+  const mode=String(war?.format||'Points').toLowerCase();
+  // Union of players who actually posted an official result in any completed round.
+  const map=new Map();
+  for(const m of kids){
+    for(const r of normalizeOfficialResults(m.results||[])){
+      const mem=canon(p,r.player_name);
+      const name=mem?.name||r.player_name||'Player';
+      const key=mem?.id||String(name).toLowerCase();
+      const row=map.get(key)||{id:key,name,played:0,points:0,net:0,gross:0,nets:[],grosses:[]};
+      row.played+=1;
+      row.points+=Number(r.raw_points||0);
+      if(finite(r.net)){row.net+=Number(r.net);row.nets.push(Number(r.net))}
+      if(finite(r.gross)){row.gross+=Number(r.gross);row.grosses.push(Number(r.gross))}
+      map.set(key,row);
+    }
+  }
+  const rows=[...map.values()].map(r=>({
+    ...r,
+    avgNet:r.nets.length?r.net/r.nets.length:null,
+    avgGross:r.grosses.length?r.gross/r.grosses.length:null
+  }));
+  rows.sort((a,b)=>{
+    if(mode.includes('net')){
+      const an=a.avgNet==null?9999:a.avgNet,bn=b.avgNet==null?9999:b.avgNet;
+      return an-bn||b.played-a.played||a.name.localeCompare(b.name);
+    }
+    if(mode.includes('gross')){
+      const ag=a.avgGross==null?9999:a.avgGross,bg=b.avgGross==null?9999:b.avgGross;
+      return ag-bg||b.played-a.played||a.name.localeCompare(b.name);
+    }
+    return b.points-a.points||b.played-a.played||a.name.localeCompare(b.name);
+  });
+  return {kids,completed:kids.length,total:warChildMissions(p,war).length,mode,rows};
+}
+
+function wouldDuplicateOfficialImport(mission,rows){
+  const next=resultsFingerprint(rows);
+  if(!next)return false;
+  const prev=importFpOf(mission)||resultsFingerprint(mission?.results||[]);
+  return !!(prev&&prev===next);
+}
+
+function stampOfficialImport(mission,rows){
+  const set=setOfficialResults(mission,rows,{markCompleted:true});
+  if(!set.ok)return set;
+  mission.notes=setImportFpNotes(mission.notes||'',resultsFingerprint(rows));
+  mission.notes=setLiveNotes(mission.notes,false);
+  return {ok:true,mission};
+}
+
 window.grMissionUid=uid;
 window.grFindMission=findMission;
 window.grCleanHoles=cleanHoles;
@@ -215,5 +434,18 @@ window.grMergeHoleDetailsOntoOfficial=mergeHoleDetailsOntoOfficial;
 window.grBuildCompletedMissionFromImport=buildCompletedMissionFromImport;
 window.grReadOnlyMission=readOnlyMission;
 window.grOfficialResultsForRecap=officialResultsForRecap;
+window.grMissionPhase=missionPhase;
+window.grBuildMissionPreview=buildMissionPreview;
+window.grApplyPreviewToMission=applyPreviewToMission;
+window.grLockMissionForPreview=lockMissionForPreview;
+window.grStartMissionLive=startMissionLive;
+window.grReopenMissionDraft=reopenMissionDraft;
+window.grPreviewFromMission=previewJsonOf;
+window.grWarChildMissions=warChildMissions;
+window.grWarStandings=warStandings;
+window.grResultsFingerprint=resultsFingerprint;
+window.grWouldDuplicateOfficialImport=wouldDuplicateOfficialImport;
+window.grStampOfficialImport=stampOfficialImport;
 window.grMissionCoreReady=true;
 })();
+
