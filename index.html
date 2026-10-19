@@ -1773,7 +1773,7 @@ function cleanCourseForMap(name){
     .replace(/\b(Front|Back)\s*9\b/ig,'')
     .replace(/\b(9|18)\s*holes?\b/ig,'')
     .replace(/\btees?\b/ig,'')
-    .replace(/\bScot\.\b/ig,'Scottish')
+    .replace(/\bScot\./ig,'Scottish')
     .replace(/\s+/g,' ').trim();
 }
 function holeLinkifyHtml(htmlText){
