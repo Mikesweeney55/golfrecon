@@ -16,28 +16,9 @@ const DEFAULT_ALIASES={
   kevin:['Kevin','Kevin C.','Cunny'],
   josh:['Josh','Joshua','Mannke']
 };
-function aliasesOf(m){
-  let a=[];
-  if(Array.isArray(m?.aliases))a=m.aliases;
-  else if(typeof m?.aliases==='string')a=m.aliases.split(/[,|]/);
-  else if(typeof m?.nickname==='string')a=m.nickname.split(/[,|]/);
-  a=a.map(x=>String(x||'').trim()).filter(Boolean);
-  if(!a.length){const first=norm(m?.name).split(' ')[0];a=DEFAULT_ALIASES[first]||[]}
-  return [...new Set(a)];
-}
-function canonicalMember(p,raw){
-  const n=norm(raw);if(!n)return null;
-  const exact=[];
-  for(const m of (p?.members||[])){
-    const vals=[m.name,...aliasesOf(m)].map(norm).filter(Boolean);
-    if(vals.includes(n))exact.push(m);
-  }
-  if(exact.length===1)return exact[0];
-  const first=n.split(' ')[0];
-  const firstMatches=(p?.members||[]).filter(m=>norm(m.name).split(' ')[0]===first);
-  return firstMatches.length===1?firstMatches[0]:null;
-}
-function displayName(p,raw){return canonicalMember(p,raw)?.name||raw||'Player'}
+function aliasesOf(m){return typeof window.grAliasesOf==='function'?window.grAliasesOf(m):(function(){let a=[];if(Array.isArray(m?.aliases))a=m.aliases;else if(typeof m?.aliases==='string')a=m.aliases.split(/[,|]/);else if(typeof m?.nickname==='string')a=m.nickname.split(/[,|]/);a=a.map(x=>String(x||'').trim()).filter(Boolean);if(!a.length){const first=norm(m?.name).split(' ')[0];a=DEFAULT_ALIASES[first]||[]}return [...new Set(a)]}())}
+function canonicalMember(p,raw){return typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,raw):null}
+function displayName(p,raw){return typeof window.grDisplayName==='function'?window.grDisplayName(p,raw):(canonicalMember(p,raw)?.name||raw||'Player')}
 function memberById(p,id){return (p?.members||[]).find(m=>m.id===id)||null}
 function detailDisplayName(p,r){return memberById(p,r?.hole_detail_canonical_id)?.name||displayName(p,r?.player_name)}
 function rosterForMission(p,m){
@@ -45,14 +26,7 @@ function rosterForMission(p,m){
   return (p?.members||[]).filter(x=>!ids.size||ids.has(x.id)).map(x=>({id:x.id,name:x.name,aliases:aliasesOf(x)}));
 }
 
-function cleanHoles(holes){
-  const map=new Map();
-  for(const h of (Array.isArray(holes)?holes:[])){
-    const hole=Number(h?.hole);if(!Number.isInteger(hole)||hole<1||hole>18)continue;
-    map.set(hole,{hole,par:finite(h?.par)?Number(h.par):null,score:finite(h?.score)?Number(h.score):null});
-  }
-  return [...map.values()].sort((a,b)=>a.hole-b.hole);
-}
+function cleanHoles(holes){return typeof window.grCleanHoles==='function'?window.grCleanHoles(holes):(function(){const map=new Map();for(const h of (Array.isArray(holes)?holes:[])){const hole=Number(h?.hole);if(!Number.isInteger(hole)||hole<1||hole>18)continue;map.set(hole,{hole,par:finite(h?.par)?Number(h.par):null,score:finite(h?.score)?Number(h.score):null})}return [...map.values()].sort((a,b)=>a.hole-b.hole)}())}
 function holeSig(holes){return cleanHoles(holes).map(h=>`${h.hole}:${h.par??''}:${h.score??''}`).join('|')}
 function detailStats(r){
   const holes=cleanHoles(r?.holes).filter(h=>finite(h.score));
@@ -68,6 +42,7 @@ function detailStats(r){
   return {holes,birds,eagles,pars,bogeys,doubles,worst,front,back};
 }
 function standings(m){
+  if(typeof window.grMissionStandingsRows==='function')return window.grMissionStandingsRows(m);
   const rows=Array.isArray(m?.results)?m.results.map((r,i)=>({...r,_i:i})):[];
   return rows.sort((a,b)=>{
     const ap=finite(a.finish_position)?Number(a.finish_position):999,bp=finite(b.finish_position)?Number(b.finish_position):999;
@@ -170,7 +145,7 @@ function openHoleImport(id){
   const p=getP(),m=p?(p.missions||[]).find(x=>x.id===id):null;if(!m)return;
   if(!Array.isArray(m.results)||!m.results.length){alert('Upload Official Results first.');return}
   if(typeof platoonDialog!=='function'||typeof callPlatoonFunction!=='function'||typeof platoonFilePayload!=='function'){alert('Hole-by-hole import is unavailable.');return}
-  const locked=clone(m.results);
+  const locked=typeof window.grLockOfficialResults==='function'?window.grLockOfficialResults(m):(clone(m.results)||[]);
   const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">HOLE-BY-HOLE DETAIL</div><h2>${esc(m.title||m.locationName||'Mission')}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div><div class="platoon-notice"><strong>Confirm each player before saving.</strong><br>Official gross, net, finish and points stay locked.</div><label>Round story / anything worth highlighting<textarea id="gr155RecapNote" style="min-height:82px" placeholder="Crazy shot, trash talk, weather, side story, anything memorable...">${esc(m.recap_note||'')}</textarea><span class="muted" style="font-size:9px">This will help shape the After Action Report.</span></label><label class="upload-zone" style="cursor:pointer"><strong>Add player scorecard screenshots</strong><span>Four screenshots are OK · each image may show two players · front/back halves will be merged</span><input id="gr155HoleFiles" type="file" accept="image/*" multiple></label><div id="gr155HoleOut"></div><div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="gr155HoleParse" type="button">Read Scorecards</button></div>`);
   const input=d.querySelector('#gr155HoleFiles'),out=d.querySelector('#gr155HoleOut'),btn=d.querySelector('#gr155HoleParse');
   btn.onclick=async()=>{
@@ -194,23 +169,13 @@ function openHoleImport(id){
           g.holes=cleanHoles([...(g.holes||[]),...d0.holes]);
           grouped.set(member.id,g);
         }
-        let saved=0;
-        for(const g of grouped.values()){
-          const target=locked.find(r=>canonicalMember(p,r.player_name)?.id===g.member.id);if(!target)continue;
-          for(const other of locked){
-            if(other!==target&&other.hole_detail_canonical_id===g.member.id){
-              delete other.holes;delete other.hole_detail_saved_at;delete other.hole_detail_source_name;delete other.hole_detail_canonical_id;
-            }
-          }
-          target.holes=g.holes;
-          target.hole_detail_saved_at=new Date().toISOString();
-          target.hole_detail_source_name=[...new Set(g.raw.filter(Boolean))].join(' + ');
-          target.hole_detail_canonical_id=g.member.id;
-          saved++;
-        }
-        if(!saved){alert('Choose the correct player before saving.');return}
-        m.results=locked;m.recap_note=String(d.querySelector('#gr155RecapNote')?.value||'').trim();
-        try{await Promise.resolve(savePlatoonLocal(p));d.close();setTimeout(()=>{if(typeof render==='function')render();else enhanceAll()},0);alert(`Saved hole-by-hole detail for ${saved} player${saved===1?'':'s'}.`)}catch{}
+        const merged=typeof window.grMergeHoleDetailsOntoOfficial==='function'
+          ? window.grMergeHoleDetailsOntoOfficial(locked,[...grouped.values()],p)
+          : {ok:false,saved:0,results:locked};
+        if(!merged.ok){alert('Choose the correct player before saving.');return}
+        // Official gross/net/finish/points remain from locked snapshot; only hole detail attaches.
+        m.results=merged.results;m.recap_note=String(d.querySelector('#gr155RecapNote')?.value||'').trim();
+        try{await Promise.resolve(savePlatoonLocal(p));d.close();setTimeout(()=>{if(typeof render==='function')render();else enhanceAll()},0);alert(`Saved hole-by-hole detail for ${merged.saved} player${merged.saved===1?'':'s'}.`)}catch{}
       };
     }catch(e){out.innerHTML=`<div class="platoon-notice">${esc(e?.message||String(e))}</div>`}
     finally{btn.disabled=false;btn.textContent='Read Scorecards'}

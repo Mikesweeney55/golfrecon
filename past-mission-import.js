@@ -20,13 +20,12 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
 const uid=()=>`mission-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-const DEFAULT_ALIASES={mike:['Mike','Mike S.','Sweeney'],ryan:['Ryan','Ryan S.','Sully'],steve:['Steve','Stephen'],charlie:['Charlie','Chuck'],kevin:['Kevin','Kevin C.','Cunny'],josh:['Josh','Joshua','Mannke']};
-function aliasesOf(m){let a=[];if(Array.isArray(m?.aliases))a=m.aliases;else if(typeof m?.aliases==='string')a=m.aliases.split(/[,|]/);else if(typeof m?.nickname==='string')a=m.nickname.split(/[,|]/);a=a.map(x=>String(x||'').trim()).filter(Boolean);if(!a.length){const first=norm(m?.name).split(' ')[0];a=DEFAULT_ALIASES[first]||[]}return [...new Set(a)]}
-function canonicalMember(p,raw){const n=norm(raw);if(!n)return null;const exact=(p?.members||[]).filter(m=>[m.name,...aliasesOf(m)].map(norm).includes(n));if(exact.length===1)return exact[0];const first=n.split(' ')[0];const aliasFirst=(p?.members||[]).filter(m=>[m.name,...aliasesOf(m)].map(norm).some(v=>v.split(' ')[0]===first));if(aliasFirst.length===1)return aliasFirst[0];return null}
+function aliasesOf(m){return typeof window.grAliasesOf==='function'?window.grAliasesOf(m):[]}
+function canonicalMember(p,raw){return typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,raw):null}
 function dialog(inner){let d=document.getElementById('grPastMissionDialog');if(!d){d=document.createElement('dialog');d.id='grPastMissionDialog';document.body.appendChild(d)}d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
 function close(){document.getElementById('grPastMissionDialog')?.close()}
 function fmtBytes(n){if(!Number.isFinite(n))return'';if(n<1024)return`${n} B`;if(n<1048576)return`${(n/1024).toFixed(1)} KB`;return`${(n/1048576).toFixed(1)} MB`}
-function cleanCourseName(v){return String(v||'').replace(/\s*\([^)]*(?:\.\.\.|…)[^)]*\)\s*/g,' ').replace(/\s*\?{2,}\s*$/,'').replace(/\s{2,}/g,' ').trim()}
+function cleanCourseName(v){return typeof window.grCleanCourseName==='function'?window.grCleanCourseName(v):String(v||'').trim()}
 async function compactImageFile(file,maxDim=1600,quality=.82){
   try{
     const bmp=await createImageBitmap(file),scale=Math.min(1,maxDim/Math.max(bmp.width,bmp.height));
@@ -72,13 +71,18 @@ async function openImport(){
         const participants=[],saved=[];
         for(const row of out.querySelectorAll('.gr-past-result')){
           const i=Number(row.dataset.i),r=results[i],memberId=row.querySelector('[data-match]')?.value;if(!memberId)continue;
-          const member=roster.find(x=>x.id===memberId);if(!member)continue;participants.push(member.id);saved.push({player_name:member.name,gross:finite(r.gross)?Number(r.gross):null,net:finite(r.net)?Number(r.net):null,finish_position:finite(r.finish_position)?Number(r.finish_position):null,raw_points:finite(r.raw_points)?Number(r.raw_points):null,eagle_count:finite(r.eagle_count)?Number(r.eagle_count):null});
+          const member=roster.find(x=>x.id===memberId);if(!member)continue;participants.push(member.id);saved.push(typeof window.grNormalizeOfficialResultRow==='function'?window.grNormalizeOfficialResultRow({player_name:member.name,gross:r.gross,net:r.net,finish_position:r.finish_position,raw_points:r.raw_points,eagle_count:r.eagle_count}):{player_name:member.name,gross:finite(r.gross)?Number(r.gross):null,net:finite(r.net)?Number(r.net):null,finish_position:finite(r.finish_position)?Number(r.finish_position):null,raw_points:finite(r.raw_points)?Number(r.raw_points):null,eagle_count:finite(r.eagle_count)?Number(r.eagle_count):null});
         }
         if(!saved.length)return alert('Match at least one player before creating the Mission.');
         if(saved.length<results.length){const missing=[...out.querySelectorAll('.gr-past-result')].filter(row=>!row.querySelector('[data-match]')?.value).map(row=>results[Number(row.dataset.i)]?.player_name).filter(Boolean);return alert(`Match every player before creating the Mission.${missing.length?` Still unmatched: ${missing.join(', ')}`:''}`)}
         const story=d.querySelector('#grPastStory')?.value.trim()||'';
-        const mission={id:uid(),date,teeTime,type:'battle',courseId:'',locationName,title,format,notes:story,status:'completed',participants:[...new Set(participants)],results:saved};if(story)mission.recap_note=story;
-        p.missions=p.missions||[];p.missions.push(mission);
+        const built=typeof window.grBuildCompletedMissionFromImport==='function'
+          ? window.grBuildCompletedMissionFromImport({id:uid(),date,teeTime,locationName,title,format,notes:story,recap_note:story,participants,results:saved})
+          : {ok:true,mission:{id:uid(),date,teeTime,type:'battle',courseId:'',locationName,title,format,notes:story,status:'completed',participants:[...new Set(participants)],results:saved,recap_note:story||undefined}};
+        if(!built.ok){alert(built.error||'Could not create Mission.');return}
+        const mission=built.mission;
+        if(typeof window.grUpsertMission==='function')window.grUpsertMission(p,mission);
+        else{p.missions=p.missions||[];p.missions.push(mission)}
         const createBtn=out.querySelector('#grPastCreate');createBtn.disabled=true;createBtn.textContent='Saving…';
         try{await Promise.resolve(window.savePlatoonLocal(p));close();setTimeout(()=>{if(typeof window.render==='function')window.render();else location.reload()},50);alert(`Created completed Mission: ${title}`)}catch(e){p.missions=p.missions.filter(x=>x.id!==mission.id);createBtn.disabled=false;createBtn.textContent='Create Completed Mission';alert(e?.message||String(e))}
       };

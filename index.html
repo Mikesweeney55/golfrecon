@@ -2809,12 +2809,21 @@ function openMissionEditor(date='',missionId=''){
     <div class="eyebrow" style="margin-top:14px">CADETS</div><div class="platoon-roster-checks">${memberChecks}</div>
     <div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="saveMissionBtn" type="button">Save Mission</button></div>`);
   d.querySelector('#saveMissionBtn').onclick=()=>{
-    const dt=String(d.querySelector('#missionDate').value||'');if(!dt){alert('Choose a Mission date.');return}
+    const dt=String(d.querySelector('#missionDate').value||'');
     const cid=String(d.querySelector('#missionCourse').value||'');const c=courses.find(x=>x.id===cid);const other=String(d.querySelector('#missionLocation').value||'').trim();
-    if(!c&&!other){alert('Choose a course or enter a location.');return}
     const participants=[...d.querySelectorAll('[data-mission-member]:checked')].map(x=>x.dataset.missionMember);
-    const row={id:existing?.id||'mission-'+Date.now(),date:dt,teeTime:String(d.querySelector('#missionTime').value||''),type:String(d.querySelector('#missionType').value||'battle'),courseId:c?.id||'',locationName:c?courseMenuLabel(c):other,title:String(d.querySelector('#missionTitle').value||'').trim(),format:String(d.querySelector('#missionFormat').value||'').trim(),notes:String(d.querySelector('#missionNotes').value||'').trim(),participants,status:existing?.status||'planned',results:existing?.results||null};
-    if(existing)Object.assign(existing,row);else p.missions.push(row);
+    const draftInput={id:existing?.id,date:dt,teeTime:String(d.querySelector('#missionTime').value||''),type:String(d.querySelector('#missionType').value||'battle'),courseId:c?.id||'',locationName:c?courseMenuLabel(c):other,title:String(d.querySelector('#missionTitle').value||'').trim(),format:String(d.querySelector('#missionFormat').value||'').trim(),notes:String(d.querySelector('#missionNotes').value||'').trim(),participants,status:existing?.status||'planned'};
+    if(typeof window.grPrepareMissionDraft==='function'){
+      const prepared=window.grPrepareMissionDraft(draftInput,{existing});
+      if(!prepared.ok){alert(prepared.error||'Could not save Mission.');return}
+      if(typeof window.grUpsertMission==='function')window.grUpsertMission(p,prepared.mission);
+      else if(existing)Object.assign(existing,prepared.mission);else p.missions.push(prepared.mission);
+    }else{
+      if(!dt){alert('Choose a Mission date.');return}
+      if(!c&&!other){alert('Choose a course or enter a location.');return}
+      const row={id:existing?.id||'mission-'+Date.now(),...draftInput,results:existing?.results||null};
+      if(existing)Object.assign(existing,row);else p.missions.push(row);
+    }
     savePlatoonLocal(p);d.close();
   };
 }
@@ -2862,7 +2871,11 @@ function openMissionImport(id){
       const parsed=await callPlatoonFunction({action:'parse_results',mission:{date:m.date,locationName:m.locationName,title:m.title},images});
       const rows=parsed.results||[];
       out.innerHTML=`<div class="platoon-notice">Confidence ${Math.round(100*(parsed.confidence||0))}%${(parsed.warnings||[]).length?` · ${safeText(parsed.warnings.join(' · '))}`:''}</div><table class="platoon-results-table"><thead><tr><th>Player</th><th>Gross</th><th>Net</th><th>Pos</th><th>Pts</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${safeText(r.player_name)}</td><td>${r.gross??'—'}</td><td>${r.net??'—'}</td><td>${r.finish_position??'—'}</td><td>${r.raw_points??'—'}</td></tr>`).join('')}</tbody></table><div class="dialog-actions"><button class="button primary" id="saveParsedMissionResults" type="button">Save Results</button></div>`;
-      out.querySelector('#saveParsedMissionResults').onclick=()=>{m.results=rows;m.status='completed';savePlatoonLocal(p);d.close();};
+      out.querySelector('#saveParsedMissionResults').onclick=()=>{
+        if(typeof window.grSetOfficialResults==='function')window.grSetOfficialResults(m,rows,{markCompleted:true});
+        else{m.results=rows;m.status='completed'}
+        savePlatoonLocal(p);d.close();
+      };
     }catch(e){out.innerHTML=`<div class="platoon-notice" style="border-color:rgba(255,77,79,.35);color:#ffadad">${safeText(e.message||String(e))}</div>`}finally{btn.disabled=false;btn.textContent='Parse Results'}
   };
 }
@@ -4158,12 +4171,13 @@ document.getElementById('saveImport').onclick=async()=>{
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=1"></script>
-  <script src="platoons-v15-real.js?v=163"></script>
+  <script src="platoon-recap-shared.js?v=2"></script>
+  <script src="platoon-mission-core.js?v=1"></script>
+  <script src="platoons-v15-real.js?v=164"></script>
   <script src="platoons-v15-patch-v5.js"></script>
   <script src="dev-mobile-pregame-fix.js?v=157"></script>
-  <script src="dev-v15.5-results.js?v=159"></script>
-<script src="past-mission-import.js?v=4"></script>
+  <script src="dev-v15.5-results.js?v=160"></script>
+<script src="past-mission-import.js?v=5"></script>
 <script src="mission-delete.js?v=3"></script>
 </body>
 </html>
