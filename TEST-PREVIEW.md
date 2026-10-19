@@ -6,13 +6,13 @@ Production GitHub Pages (`main` → https://golfrecon.app) is unchanged.
 
 Open on iPad:
 
-**https://cdn.jsdelivr.net/gh/Mikesweeney55/golfrecon@cursor-golfrecon-integration/index.html**
+**https://raw.githack.com/Mikesweeney55/golfrecon/cursor-golfrecon-integration/index.html**
 
-This serves the `cursor-golfrecon-integration` branch from GitHub via jsDelivr (no production Pages deploy).
+This serves the `cursor-golfrecon-integration` branch directly from GitHub with correct HTML/JS Content-Types. Production GitHub Pages (`main` → golfrecon.app) is not modified.
 
 Pinned commit (cache-safe):
 
-`https://cdn.jsdelivr.net/gh/Mikesweeney55/golfrecon@COMMIT_SHA/index.html`
+**https://rawcdn.githack.com/Mikesweeney55/golfrecon/a151744d2f125e7546b947ea96ff7ff909b0ba1a/index.html**
 
 ## Data protection
 
