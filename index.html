@@ -2723,8 +2723,12 @@ function loadPlatoonLocal(){
 }
 function writePlatoonLocal(p){try{localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(p))}catch{}}
 function savePlatoonLocal(p,push=true){writePlatoonLocal(p);render();if(push)queuePlatoonServerSave(p)}
-function queuePlatoonServerSave(p){clearTimeout(platoonSyncTimer);platoonSyncTimer=setTimeout(()=>pushPlatoonServer(p),250)}
+function queuePlatoonServerSave(p){
+  if(window.grTestEnvActive){console.warn('[gr-test-env] Platoon server save skipped (TEST build)');return}
+  clearTimeout(platoonSyncTimer);platoonSyncTimer=setTimeout(()=>pushPlatoonServer(p),250)
+}
 async function pushPlatoonServer(p){
+  if(window.grTestEnvActive){console.warn('[gr-test-env] Platoon server push skipped (TEST build)');return}
   try{
     const out=await callPlatoonFunction({action:'save_state',snapshot:p});
     if(out?.platoon)writePlatoonLocal(out.platoon);
@@ -2842,6 +2846,9 @@ function openMissionDetail(id){
 }
 async function platoonFilePayload(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve({type:file.type||'image/jpeg',data:String(r.result||'').split(',')[1]||''});r.onerror=reject;r.readAsDataURL(file)})}
 async function callPlatoonFunction(payload,retry=true){
+  if(window.grTestEnvActive&&payload&&['save_state','delete_mission'].includes(String(payload.action||''))){
+    throw new Error(`Platoon action "${payload.action}" is disabled in the TEST build to protect production data.`);
+  }
   const session=await ensureAuthSession();if(!session?.access_token)throw new Error('Please sign in again.');
   let res;
   try{
@@ -3796,6 +3803,9 @@ function authCallbackFromUrl(){
   return {session,type};
 }
 async function callImportFunction(payload,retry=true){
+  if(window.grTestEnvActive&&payload&&['save','update','delete','backfill','save_swing_thoughts'].includes(String(payload.action||''))){
+    throw new Error(`Import action "${payload.action}" is disabled in the TEST build to protect production data.`);
+  }
   const session=await ensureAuthSession();
   if(!session?.access_token)throw new Error('Please sign in again.');
   const res=await fetch(`${SUPABASE_URL}/functions/v1/golfiq-import`,{
@@ -4215,6 +4225,7 @@ document.getElementById('saveImport').onclick=async()=>{
     btn.disabled=false;btn.textContent='Save Round';
   }
 };
+if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>

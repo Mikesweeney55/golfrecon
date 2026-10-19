@@ -72,6 +72,8 @@ try{
     })()`,returnByValue:true});
     const v=out?.result?.value;
     if(!v||!v.hasCore||!v.testActive)return null;
+    // Ensure guards after app script finished.
+    await send('Runtime.evaluate',{expression:`typeof grInstallTestGuards==='function'&&grInstallTestGuards()`,returnByValue:true});
     return v;
   },30000);
 
