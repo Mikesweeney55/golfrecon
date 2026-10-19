@@ -398,10 +398,22 @@ async function ensurePlatoon(supabase:any,user:any,snapshot:any){
   return {membership,created:true};
 }
 
+async function readHqMetaColumn(supabase:any,platoonId:string){
+  // hq_meta ships in platoons-v4; tolerate environments that have not applied the migration yet.
+  try{
+    const {data,error}=await supabase.from("golfrecon_platoons").select("hq_meta").eq("id",platoonId).maybeSingle();
+    if(error)return {supported:false,hqMeta:null};
+    return {supported:true,hqMeta:(data?.hq_meta&&typeof data.hq_meta==="object")?data.hq_meta:{}};
+  }catch{
+    return {supported:false,hqMeta:null};
+  }
+}
+
 async function readPlatoonState(supabase:any,platoonId:string){
   const {data:p,error:pErr}=await supabase.from("golfrecon_platoons")
     .select("id,name,motto,season_year,visibility,logo_data_url,created_by").eq("id",platoonId).single();
   if(pErr)throw pErr;
+  const hq=await readHqMetaColumn(supabase,platoonId);
   const {data:members,error:mErr}=await supabase.from("golfrecon_platoon_members")
     .select("id,user_id,display_name,nickname,role,status,client_key").eq("platoon_id",platoonId).eq("status","active").order("joined_at");
   if(mErr)throw mErr;
@@ -419,7 +431,7 @@ async function readPlatoonState(supabase:any,platoonId:string){
   const memberKeyById=new Map((members||[]).map((m:any)=>[m.id,m.client_key||m.id]));
   const chief=(members||[]).find((m:any)=>m.role==="chief");
   const co=(members||[]).find((m:any)=>m.role==="co_chief");
-  return {
+  const state:any={
     id:p.id,serverId:p.id,name:p.name,motto:p.motto||"",season:p.season_year,
     visibility:p.visibility==="invite_only"?"Invite only":"Private",logoData:p.logo_data_url||"",
     chief:chief?.display_name||"",coChief:co?.client_key||co?.id||"",
@@ -432,8 +444,11 @@ async function readPlatoonState(supabase:any,platoonId:string){
       format:m.format||"",notes:m.rules_notes||"",status:m.status,
       participants:participants.filter((x:any)=>x.mission_id===m.id&&x.participant_status!=="withdrawn").map((x:any)=>memberKeyById.get(x.platoon_member_id)).filter(Boolean),
       results:Array.isArray(m.results_snapshot)?m.results_snapshot:[]
-    }))
+    })),
+    hqMetaSupported:hq.supported
   };
+  if(hq.supported)state.hqMeta=hq.hqMeta||{};
+  return state;
 }
 
 async function upsertMembers(supabase:any,user:any,platoonId:string,snapshot:any,allowRoleChanges:boolean){
@@ -536,6 +551,11 @@ async function saveState(supabase:any,user:any,snapshot:any){
     visibility:text(snapshot?.visibility).toLowerCase().includes("invite")?"invite_only":"private",
     logo_data_url:text(snapshot?.logoData)||null,updated_at:new Date().toISOString()
   };
+  // Persist HQ meta when the v4 column exists; never fail the whole save if it does not.
+  if(snapshot?.hqMeta&&typeof snapshot.hqMeta==="object"){
+    const probe=await readHqMetaColumn(supabase,membership.platoon_id);
+    if(probe.supported)update.hq_meta=snapshot.hqMeta;
+  }
   const {error}=await supabase.from("golfrecon_platoons").update(update).eq("id",membership.platoon_id);
   if(error)throw error;
   await upsertMembers(supabase,user,membership.platoon_id,snapshot||{},true);
