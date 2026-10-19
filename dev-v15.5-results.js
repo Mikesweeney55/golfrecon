@@ -119,20 +119,8 @@ function missionNarrative(p,m,rows,detail,birds,back,clean){
   return lines.slice(0,5);
 }
 function summaryMarkup(p,m){
-  const rows=standings(m);if(!rows.length)return '<div class="gr155-empty">No results yet.</div>';
-  const detail=rows.map(r=>({r,s:detailStats(r)}));
-  const net=lowLeaders(rows,'net'),gross=lowLeaders(rows,'gross');
-  const birds=detailHigh(detail,x=>x.s.birds.length);
-  const back=detailLow(detail.filter(x=>x.s.back!==null),x=>x.s.back);
-  const clean=detailLow(detail.filter(x=>x.s.holes.length),x=>x.s.doubles.length);
-  const standingsRows=rows.map((r,i)=>`<div class="gr155-recap-row"><span><b>${finite(r.finish_position)?Number(r.finish_position):i+1}</b> ${esc(displayName(p,r.player_name))}</span><span>${finite(r.net)?`N ${Number(r.net)}`:'N —'} · ${finite(r.gross)?`G ${Number(r.gross)}`:'G —'}</span></div>`).join('');
-  const hi=[];
-  if(net.length)hi.push(`<div class="gr155-recap-hi"><span>Low Net</span><strong>${esc(namesOf(p,net))} · ${Number(net[0].net)}</strong></div>`);
-  if(gross.length)hi.push(`<div class="gr155-recap-hi"><span>Low Gross</span><strong>${esc(namesOf(p,gross))} · ${Number(gross[0].gross)}</strong></div>`);
-  if(birds.length)hi.push(`<div class="gr155-recap-hi"><span>Birdies</span><strong>${esc(namesOf(p,birds,true))} · ${birds[0].s.birds.length}</strong></div>`);
-  if(back.length)hi.push(`<div class="gr155-recap-hi"><span>Best Back 9</span><strong>${esc(namesOf(p,back,true))} · ${back[0].s.back}</strong></div>`);
-  const intel=missionNarrative(p,m,rows,detail,birds,back,clean);
-  return `<div class="gr155-recap-grid"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsRows}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${hi.join('')||'<div class="gr155-empty">No confirmed highlights yet.</div>'}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
+  if(typeof window.grMissionRecapMarkup==='function')return window.grMissionRecapMarkup(p,m);
+  return '<div class="gr155-empty">No results yet.</div>';
 }
 function platoonRecapMarkup(p){
   const complete=(p.missions||[]).filter(m=>m.type!=='war'&&m.status==='completed');
@@ -172,7 +160,7 @@ function enhanceCard(card){
   const meta=card.querySelector('.gr-meta');if(meta)meta.remove();
   const course=card.querySelector('.gr-mission-course');if(course&&!card.querySelector('.gr155-format')){const f=document.createElement('div');f.className='gr155-format';f.textContent=m.format||'Format TBD';course.insertAdjacentElement('afterend',f)}
   if(m.status==='completed'){
-    const s=card.querySelector('.gr-summary'),markup=summaryMarkup(p,m);if(s&&s.dataset.grRecon!=='1'){s.innerHTML=markup;s.dataset.grRecon='1'}
+    // Mission standings / highlights / AAR come from grMissionRecapMarkup via real.js — do not rewrite.
     const actions=card.querySelector('.gr-mini-actions');if(actions){let b=actions.querySelector('[data-gr-add-results]');if(!b){b=document.createElement('button');b.type='button';b.className='button secondary';b.dataset.grAddResults=id;b.textContent='📸 Add Results';actions.appendChild(b)}b.onclick=e=>{e.preventDefault();e.stopPropagation();openChooser(id)}}
   }
 }
@@ -222,7 +210,7 @@ function openHoleImport(id){
         }
         if(!saved){alert('Choose the correct player before saving.');return}
         m.results=locked;m.recap_note=String(d.querySelector('#gr155RecapNote')?.value||'').trim();
-        try{await Promise.resolve(savePlatoonLocal(p));d.close();setTimeout(()=>{document.querySelectorAll('.gr-summary').forEach(x=>delete x.dataset.grRecon);enhanceAll()},0);alert(`Saved hole-by-hole detail for ${saved} player${saved===1?'':'s'}.`)}catch{}
+        try{await Promise.resolve(savePlatoonLocal(p));d.close();setTimeout(()=>{if(typeof render==='function')render();else enhanceAll()},0);alert(`Saved hole-by-hole detail for ${saved} player${saved===1?'':'s'}.`)}catch{}
       };
     }catch(e){out.innerHTML=`<div class="platoon-notice">${esc(e?.message||String(e))}</div>`}
     finally{btn.disabled=false;btn.textContent='Read Scorecards'}
@@ -236,8 +224,7 @@ function openChooser(id){
 }
 window.grUploadScores=openChooser;
 
-const baseView=window.grViewMission;
-if(baseView)window.grViewMission=id=>{baseView(id);setTimeout(()=>{const p=getP(),m=p?(p.missions||[]).find(x=>x.id===id):null,d=document.getElementById('grPlatoonDialog');if(m?.status==='completed'&&d?.open){d.querySelectorAll('.gr155-upload-status').forEach(x=>x.remove());const s=d.querySelector('.gr-summary.gr-after-action');if(s)s.innerHTML=summaryMarkup(p,m)}},20)};
+// After Action / standings markup is owned by grMissionRecapMarkup (via real.js grViewMission).
 
 const baseSetup=window.grOpenSetup;
 window.grOpenSetup=()=>{
