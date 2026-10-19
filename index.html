@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Golf Recon v15.5</title>
+  <script src="gr-test-env.js?v=1"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
   <style>
@@ -4225,5 +4226,6 @@ initializeAuth();
   <script src="dev-v15.5-results.js?v=160"></script>
 <script src="past-mission-import.js?v=5"></script>
 <script src="mission-delete.js?v=3"></script>
+  <script>if(window.grTestEnvActive&&typeof window.callPlatoonFunction==='function'){/* guards already installed by gr-test-env.js */}</script>
 </body>
 </html>
