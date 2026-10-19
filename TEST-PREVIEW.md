@@ -1,27 +1,27 @@
 # Golf Recon — Integration Test Preview (Phases 1–5)
 
-Production GitHub Pages (`main` → https://golfrecon.app) is unchanged.
+Production GitHub Pages (`main` → https://golfrecon.app) is **unchanged**.
 
-## Test URL
+## Test URL (open on iPad)
 
-Open on iPad:
+**https://companies-programmer-projected-cpu.trycloudflare.com/index.html**
 
-**https://raw.githack.com/Mikesweeney55/golfrecon/cursor-golfrecon-integration/index.html**
+This tunnel serves the `cursor-golfrecon-integration` branch from this Cloud Agent. It stays up while the agent session is running.
 
-This serves the `cursor-golfrecon-integration` branch directly from GitHub with correct HTML/JS Content-Types. Production GitHub Pages (`main` → golfrecon.app) is not modified.
+### Durable GitHub Pages URL (pending)
 
-Pinned commit (cache-safe):
-
-**https://rawcdn.githack.com/Mikesweeney55/golfrecon/a151744d2f125e7546b947ea96ff7ff909b0ba1a/index.html**
+A separate public repo `golfrecon-preview` is required for a permanent
+`https://mikesweeney55.github.io/golfrecon-preview/` site without touching
+production Pages settings. Create that empty repo and tell the agent to finish the publish.
 
 ## Data protection
 
-The test host activates `gr-test-env.js`:
+TEST BUILD mode (`gr-test-env.js` + inline guards):
 
-- Banner: TEST BUILD
+- Fixed banner: TEST BUILD
 - Platoon `save_state` / `delete_mission` blocked
 - Personal round `save` / `update` / `delete` / `backfill` blocked
 - OCR parse still allowed (does not write Mission results by itself)
 - Platoon edits use an isolated localStorage key on the test origin
 
-Use disposable Missions only. Do not treat this as a place to edit official history.
+Use disposable Missions only. Do not edit official historical results here.
