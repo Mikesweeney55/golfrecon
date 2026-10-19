@@ -1110,7 +1110,7 @@ button.calendar-day{appearance:none}
 @media(max-width:700px){.platoon-logo{width:58px;height:58px;right:13px;top:13px}.platoon-command-head{padding-right:66px}}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=154">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=165">
 </head>
 <body>
   <div id="authGate" class="auth-gate">
@@ -2856,13 +2856,56 @@ async function callPlatoonFunction(payload,retry=true){
 }
 function openMissionImport(id){
   const p=loadPlatoonLocal(),m=(p.missions||[]).find(x=>x.id===id);if(!m)return;
+  const roster=(p.members||[]).filter(x=>x.status!=='inactive');
   const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">MISSION RESULTS IMPORT</div><h2 style="margin:5px 0 0">${safeText(m.title||m.locationName)}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
-    <div class="platoon-notice">Upload the 18Birdies event/league results screen. This import is separate from a golfer's detailed Golf Recon round.</div>
+    <div class="platoon-notice">Upload the 18Birdies results screen. Review and correct before saving.</div>
     <label class="upload-zone" style="cursor:pointer"><strong>Add results screenshots</strong><span>Gross · Net · Finish · Points</span><input id="platoonImportFiles" type="file" accept="image/*" multiple></label>
     <div id="platoonImportFileList" class="platoon-file-list"></div><div id="platoonImportOutput"></div>
-    <div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="parsePlatoonResultsBtn" type="button">Parse Results</button></div>`);
+    <div class="dialog-actions sticky-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="parsePlatoonResultsBtn" type="button">Parse Results</button></div>`);
   const input=d.querySelector('#platoonImportFiles'),list=d.querySelector('#platoonImportFileList'),out=d.querySelector('#platoonImportOutput'),btn=d.querySelector('#parsePlatoonResultsBtn');
   input.onchange=()=>{list.textContent=[...input.files].map(f=>f.name).join(' · ')};
+  const numOrNull=v=>{const t=String(v??'').trim();if(t===''||t==='—')return null;const n=Number(t);return Number.isFinite(n)?n:null};
+  const collectReviewed=()=>{
+    const reviewed=[];
+    for(const tr of out.querySelectorAll('tr[data-import-row]')){
+      const memberId=tr.querySelector('[data-match]')?.value||'';
+      const member=roster.find(x=>x.id===memberId);
+      const name=member?.name||String(tr.querySelector('[data-name]')?.value||'').trim();
+      if(!name)continue;
+      reviewed.push(typeof window.grNormalizeOfficialResultRow==='function'
+        ? window.grNormalizeOfficialResultRow({
+            player_name:name,
+            gross:numOrNull(tr.querySelector('[data-gross]')?.value),
+            net:numOrNull(tr.querySelector('[data-net]')?.value),
+            finish_position:numOrNull(tr.querySelector('[data-pos]')?.value),
+            raw_points:numOrNull(tr.querySelector('[data-pts]')?.value),
+            eagle_count:numOrNull(tr.querySelector('[data-eagles]')?.value)
+          })
+        : {
+            player_name:name,
+            gross:numOrNull(tr.querySelector('[data-gross]')?.value),
+            net:numOrNull(tr.querySelector('[data-net]')?.value),
+            finish_position:numOrNull(tr.querySelector('[data-pos]')?.value),
+            raw_points:numOrNull(tr.querySelector('[data-pts]')?.value),
+            eagle_count:numOrNull(tr.querySelector('[data-eagles]')?.value)
+          });
+    }
+    return reviewed;
+  };
+  const saveReviewed=()=>{
+    const rows=collectReviewed();
+    if(!rows.length){alert('Keep at least one player row before saving.');return}
+    if(typeof window.grWouldDuplicateOfficialImport==='function'&&window.grWouldDuplicateOfficialImport(m,rows)){
+      if(!confirm('These results match an import already saved for this Mission. Save again anyway?'))return;
+    }
+    if(typeof window.grStampOfficialImport==='function'){
+      const stamped=window.grStampOfficialImport(m,rows);
+      if(!stamped.ok){alert(stamped.error||'Could not save results.');return}
+    }else if(typeof window.grSetOfficialResults==='function'){
+      window.grSetOfficialResults(m,rows,{markCompleted:true});
+    }else{m.results=rows;m.status='completed'}
+    savePlatoonLocal(p);d.close();
+  };
   btn.onclick=async()=>{
     const files=[...input.files];if(!files.length){out.innerHTML='<div class="platoon-notice">Add at least one screenshot.</div>';return}
     btn.disabled=true;btn.textContent='Parsing…';out.innerHTML='<div class="platoon-notice">Reading Mission results…</div>';
@@ -2870,12 +2913,15 @@ function openMissionImport(id){
       const images=[];for(const f of files)images.push(await platoonFilePayload(f));
       const parsed=await callPlatoonFunction({action:'parse_results',mission:{date:m.date,locationName:m.locationName,title:m.title},images});
       const rows=parsed.results||[];
-      out.innerHTML=`<div class="platoon-notice">Confidence ${Math.round(100*(parsed.confidence||0))}%${(parsed.warnings||[]).length?` · ${safeText(parsed.warnings.join(' · '))}`:''}</div><table class="platoon-results-table"><thead><tr><th>Player</th><th>Gross</th><th>Net</th><th>Pos</th><th>Pts</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${safeText(r.player_name)}</td><td>${r.gross??'—'}</td><td>${r.net??'—'}</td><td>${r.finish_position??'—'}</td><td>${r.raw_points??'—'}</td></tr>`).join('')}</tbody></table><div class="dialog-actions"><button class="button primary" id="saveParsedMissionResults" type="button">Save Results</button></div>`;
-      out.querySelector('#saveParsedMissionResults').onclick=()=>{
-        if(typeof window.grSetOfficialResults==='function')window.grSetOfficialResults(m,rows,{markCompleted:true});
-        else{m.results=rows;m.status='completed'}
-        savePlatoonLocal(p);d.close();
-      };
+      out.innerHTML=`<div class="platoon-notice">Confidence ${Math.round(100*(parsed.confidence||0))}%${(parsed.warnings||[]).length?` · ${safeText(parsed.warnings.join(' · '))}`:''}</div>
+        <div class="eyebrow" style="margin-top:10px">REVIEW BEFORE SAVE</div>
+        <table class="platoon-results-table gr-import-review"><thead><tr><th>Player</th><th>Match</th><th>Gross</th><th>Net</th><th>Pos</th><th>Pts</th><th>Eagles</th></tr></thead><tbody>${rows.map((r,i)=>{
+          const hit=typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,r.player_name):null;
+          return `<tr data-import-row="${i}"><td><input data-name value="${safeText(r.player_name||'')}"></td><td><select data-match><option value="">—</option>${roster.map(x=>`<option value="${safeText(x.id)}" ${hit?.id===x.id?'selected':''}>${safeText(x.name)}</option>`).join('')}</select></td><td><input data-gross inputmode="decimal" value="${r.gross??''}"></td><td><input data-net inputmode="decimal" value="${r.net??''}"></td><td><input data-pos inputmode="numeric" value="${r.finish_position??''}"></td><td><input data-pts inputmode="decimal" value="${r.raw_points??''}"></td><td><input data-eagles inputmode="numeric" value="${r.eagle_count??''}"></td></tr>`;
+        }).join('')}</tbody></table>
+        <div class="dialog-actions sticky-actions"><button class="button secondary" id="discardParsedMissionResults" type="button">Discard</button><button class="button primary" id="saveParsedMissionResults" type="button">Save Official Results</button></div>`;
+      out.querySelector('#discardParsedMissionResults').onclick=()=>{out.innerHTML=''};
+      out.querySelector('#saveParsedMissionResults').onclick=saveReviewed;
     }catch(e){out.innerHTML=`<div class="platoon-notice" style="border-color:rgba(255,77,79,.35);color:#ffadad">${safeText(e.message||String(e))}</div>`}finally{btn.disabled=false;btn.textContent='Parse Results'}
   };
 }
@@ -4171,9 +4217,9 @@ document.getElementById('saveImport').onclick=async()=>{
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=2"></script>
-  <script src="platoon-mission-core.js?v=1"></script>
-  <script src="platoons-v15-real.js?v=164"></script>
+  <script src="platoon-recap-shared.js?v=3"></script>
+  <script src="platoon-mission-core.js?v=3"></script>
+  <script src="platoons-v15-real.js?v=165"></script>
   <script src="platoons-v15-patch-v5.js"></script>
   <script src="dev-mobile-pregame-fix.js?v=157"></script>
   <script src="dev-v15.5-results.js?v=160"></script>
