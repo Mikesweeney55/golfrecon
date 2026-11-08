@@ -16,6 +16,7 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_ID: vqpqyxamqiamblpcxqxg
+      SUPABASE_YES: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,7 +29,11 @@ jobs:
           version: latest
       - name: Show Supabase CLI version
         run: supabase --version
-      - name: Show function deploy help
-        run: supabase functions deploy --help
+      - name: Apply platoons-v4 hq_meta migration
+        run: |
+          # Additive column only; IF NOT EXISTS makes this safe to re-run.
+          supabase db query --remote="$SUPABASE_PROJECT_ID" --yes -f supabase/platoons-v4-hq-meta.sql
       - name: Deploy platoon-import from main
-        run: supabase functions deploy platoon-import --project-ref "$SUPABASE_PROJECT_ID" --use-api
+        run: |
+          # Newer CLI requires --yes for non-interactive deploys.
+          supabase functions deploy platoon-import --remote="$SUPABASE_PROJECT_ID" --use-api --yes
