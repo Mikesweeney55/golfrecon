@@ -1,12 +1,12 @@
 -- Golf Recon Platoons v4 — HQ meta (manual Records + Club Eagle)
--- AWAITING APPROVAL: do not apply to production until reviewed.
+-- Approved for production apply with V16.1 deploy.
 --
 -- Purpose: Persist administrator-maintained Platoon Records, Club Eagle
 -- starting balances, overrides, and display modes across devices.
 -- Stored as jsonb on the existing golfrecon_platoons row so save_state /
 -- bootstrap can round-trip without a new table.
 --
--- Does NOT modify or delete existing rows beyond adding a nullable column
+-- Does NOT modify or delete existing rows beyond adding a column
 -- with a safe default. No data migrations of missions/results/members.
 
 alter table public.golfrecon_platoons
