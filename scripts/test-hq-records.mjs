@@ -65,5 +65,11 @@ const htmlRec=ctx.window.grRenderRecordsBubble(p);
 assert(htmlEagle.includes('data-gr-hq-edit="eagles"'),'eagle edit icon');
 assert(htmlRec.includes('data-gr-hq-edit="records"'),'records edit icon');
 
+// Authz: linked cadet cannot edit; linked chief can; fail-closed for empty platoon
+assert(ctx.window.grCanEditHq({members:[{id:'cadet',name:'Josh',role:'cadet',linked:true}]})===false,'linked cadet cannot edit HQ');
+assert(ctx.window.grCanEditHq({members:[{id:'chief',name:'Mike',role:'chief',linked:true}]})===true,'linked chief can edit HQ');
+assert(ctx.window.grCanEditHq({members:[{id:'co',name:'Ryan',role:'co_chief',linked:true}]})===true,'linked co-chief can edit HQ');
+assert(ctx.window.grCanEditHq({members:[]})===false,'empty roster cannot edit HQ');
+
 console.log(JSON.stringify({pass:passes.length,failures},null,2));
 if(failures.length)process.exit(1);

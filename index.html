@@ -1111,7 +1111,7 @@ button.calendar-day{appearance:none}
 @media(max-width:700px){.platoon-logo{width:58px;height:58px;right:13px;top:13px}.platoon-command-head{padding-right:66px}}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=161">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=162">
 </head>
 <body>
   <div id="authGate" class="auth-gate">
@@ -1842,7 +1842,7 @@ function knownPreviewCentroids(){
   const pts=[];
   try{
     for(const [k,v] of coursePreviewCache.entries()){
-      if(!String(k).startsWith('geo:v3:'))continue;
+      if(!String(k).startsWith('geo:v4:'))continue;
       if(v&&Number.isFinite(v.lat)&&Number.isFinite(v.lon)&&Number(v.matchScore||0)>=70)pts.push([Number(v.lon),Number(v.lat)]);
     }
   }catch{}
@@ -1861,6 +1861,35 @@ function regionBonusForHit(hit,centroids){
   if(best<250)return 8;
   return 0;
 }
+function nominatimViewboxParams(centroids){
+  if(!centroids?.length)return '';
+  let minLon=Infinity,maxLon=-Infinity,minLat=Infinity,maxLat=-Infinity;
+  for(const [lon,lat] of centroids){
+    minLon=Math.min(minLon,lon);maxLon=Math.max(maxLon,lon);
+    minLat=Math.min(minLat,lat);maxLat=Math.max(maxLat,lat);
+  }
+  // ~180km pad so nearby New England courses share one search window without hardcoding states.
+  const padLon=2.2,padLat=1.6;
+  const left=minLon-padLon,right=maxLon+padLon,top=maxLat+padLat,bottom=minLat-padLat;
+  return `&viewbox=${encodeURIComponent(`${left},${top},${right},${bottom}`)}&bounded=0`;
+}
+function scoreCourseGeocodeHit(hit,base,centroids=[],strippedBase=''){
+  const d=String(hit.display_name||'');
+  const q=String(hit.__q||'');
+  const nameScore=Math.max(
+    typeof courseNameScore==='function'?courseNameScore(base,d):0,
+    (strippedBase&&typeof courseNameScore==='function')?courseNameScore(strippedBase,d):0
+  );
+  const golfBonus=/golf|country club|links|highlands/i.test(d)?18:0;
+  const usBonus=/, United States|, USA\b/i.test(d)?6:0;
+  // Prefer Country Club hits for short/generic names (e.g. Four Oaks → Dracut MA, not Kansas).
+  const countryClubBonus=/country club/i.test(d)?12:0;
+  const countryClubQueryBonus=/country club/i.test(q)?8:0;
+  const typeBonus=(hit.type==='golf_course'||hit.class==='leisure'||hit.type==='stadium')?4:0;
+  const region=regionBonusForHit(hit,centroids);
+  return nameScore+golfBonus+usBonus+countryClubBonus+countryClubQueryBonus+typeBonus+region;
+}
+window.grScoreCourseGeocodeHit=scoreCourseGeocodeHit;
 async function warmNearbyCourseGeocodes(exceptId){
   if(window.__grWarmingGeo)return;
   window.__grWarmingGeo=true;
@@ -1869,14 +1898,14 @@ async function warmNearbyCourseGeocodes(exceptId){
       .filter(x=>x&&String(x.id)!==String(exceptId))
       .slice(0,5);
     for(const o of others){
-      const k=`geo:v3:${o.id}`;
+      const k=`geo:v4:${o.id}`;
       if(coursePreviewCache.has(k))continue;
       try{await geocodeGolfCourse(o,{skipWarm:true})}catch{}
     }
   }finally{window.__grWarmingGeo=false}
 }
 async function geocodeGolfCourse(c,opts={}){
-  const key=`geo:v3:${c.id}`;
+  const key=`geo:v4:${c.id}`;
   if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
   if(!opts.skipWarm){try{await warmNearbyCourseGeocodes(c.id)}catch{}}
   const storedLat=Number(c.lat??c.mapLat??c.geoLat??c.latitude);
@@ -1888,9 +1917,11 @@ async function geocodeGolfCourse(c,opts={}){
   const base=cleanCourseForMap(c.baseName||c.name);
   if(!base)throw new Error('This course has no usable name for map lookup.');
   const tries=courseMapQueryVariants(base);
+  const centroids=knownPreviewCentroids();
+  const viewbox=nominatimViewboxParams(centroids);
   let candidates=[];
   for(const q of tries){
-    const url=`${OSM_NOMINATIM}?format=jsonv2&limit=8&q=${encodeURIComponent(q)}`;
+    const url=`${OSM_NOMINATIM}?format=jsonv2&limit=8&q=${encodeURIComponent(q)}${viewbox}`;
     const data=await osmFetchJson(url);
     if(Array.isArray(data)&&data.length){for(const hit of data)candidates.push({...hit,__q:q})}
   }
@@ -1899,29 +1930,18 @@ async function geocodeGolfCourse(c,opts={}){
     const id=String(hit?.place_id||`${hit?.lat},${hit?.lon}`);
     if(seen.has(id))continue;seen.add(id);uniq.push(hit);
   }
-  if(!uniq.length)throw new Error(`No OpenStreetMap location matched “${base}”. Hole details from your scorecard still show below when available.`);
-  const centroids=knownPreviewCentroids();
+  if(!uniq.length)throw new Error(`No OpenStreetMap location matched “${base}”. Scorecard hole # / par / yardage still show when available — the map stays blank rather than guessing another course.`);
   const strippedBase=cleanCourseForMap(base.replace(/^[A-Za-z][A-Za-z.]*(?:'s|’s)\s+/,''));
-  const score=x=>{
-    const d=String(x.display_name||'');
-    const nameScore=Math.max(
-      typeof courseNameScore==='function'?courseNameScore(base,d):0,
-      (strippedBase&&typeof courseNameScore==='function')?courseNameScore(strippedBase,d):0
-    );
-    const golfBonus=/golf|country club|links|highlands/i.test(d)?18:0;
-    const usBonus=/, United States|, USA\b/i.test(d)?6:0;
-    const region=regionBonusForHit(x,centroids);
-    return nameScore+golfBonus+usBonus+region;
-  };
+  const score=x=>scoreCourseGeocodeHit(x,base,centroids,strippedBase);
   uniq.sort((a,b)=>score(b)-score(a));
   const best=uniq[0], bestScore=score(best);
-  if(bestScore<70)throw new Error(`Could not confidently match “${base}” on the map. Hole Preview will not use a different course.`);
+  if(bestScore<70)throw new Error(`Could not confidently match “${base}” on the map. Scorecard hole # / par / yardage still show when available — Hole Preview will not use a different course.`);
   const result={lat:Number(best.lat),lon:Number(best.lon),displayName:best.display_name,matchScore:bestScore,query:best.__q||base,source:'nominatim'};
   coursePreviewCache.set(key,result);
   return result;
 }
 async function loadOsmCourse(c){
-  const key=`osm:v3:${c.id}`;
+  const key=`osm:v4:${c.id}`;
   if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
   const geo=await geocodeGolfCourse(c);
   const q=`[out:json][timeout:25];
@@ -2390,7 +2410,7 @@ async function ensureCoursePreviewLoaded(courseId,hole){
     const geom=selectedHoleGeometry(courseData,hole);
     coursePreviewCache.set(key,{courseData,geom,courseId:String(courseId)});
     if(!geom&&String(state.selectedCourseId)===String(courseId)){
-      state.coursePreviewError='The free course map does not have enough tee/green/hole data to locate this hole yet.';
+      state.coursePreviewError='Map geometry is unavailable for this hole on OpenStreetMap. Scorecard hole # / par / yardage still show above — nothing from another course is used.';
     }
   }catch(e){
     const msg=e.message||String(e);
@@ -2560,9 +2580,13 @@ function pregameHoleInsightsHtml(c,priority=[]){
   const mb=mapboxToken();
   const mapReady=Boolean(mb&&cached?.geom&&(!cached.courseId||String(cached.courseId)===String(c.id)));
   const waiting=!cached&&!state.coursePreviewError;
+  const emptyTitle=state.coursePreviewLoading||waiting
+    ? `Loading Hole ${hole}…`
+    : (!mb?'Mapbox token required'
+      :(cached&&!cached.geom?'Map unavailable — scorecard details still shown':'Hole geometry not available yet'));
   const mapBody=mapReady
     ? `<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`
-    : `<div class="preview-map-empty"><div><strong>${state.coursePreviewLoading||waiting?`Loading Hole ${hole}…`:(!mb?'Mapbox token required':'Hole geometry not available yet')}</strong><span>${safeText(!mb?'Set your Mapbox token to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
+    : `<div class="preview-map-empty"><div><strong>${emptyTitle}</strong><span>${safeText(!mb?'Set your Mapbox token to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
   const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
   const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
   const holePar=h?.par??c.pars?.[holeIdx]??'—';
@@ -4356,11 +4380,11 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=3"></script>
   <script src="platoon-mission-core.js?v=3"></script>
-  <script src="platoon-hq-records.js?v=161"></script>
-  <script src="platoons-v15-real.js?v=161"></script>
-  <script src="platoons-v15-patch-v5.js?v=161"></script>
+  <script src="platoon-hq-records.js?v=162"></script>
+  <script src="platoons-v15-real.js?v=162"></script>
+  <script src="platoons-v15-patch-v5.js?v=162"></script>
   <script src="dev-mobile-pregame-fix.js?v=157"></script>
-  <script src="dev-v15.5-results.js?v=161"></script>
+  <script src="dev-v15.5-results.js?v=162"></script>
 <script src="past-mission-import.js?v=5"></script>
 <script src="mission-delete.js?v=3"></script>
 </body>

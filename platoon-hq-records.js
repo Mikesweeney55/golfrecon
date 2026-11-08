@@ -304,12 +304,12 @@ function recordsModel(p){
 
 function canEditHq(p){
   try{
-    const role=String((p.members||[]).find(m=>m.linked||m.role==='chief')?.role||p.members?.find(m=>m.role==='chief')?.role||'');
-    // Chief / co-chief may edit; also allow if current browser user is chief by role on any linked member.
     const me=(p.members||[]).find(m=>m.linked);
-    const r=me?.role||role;
-    return r==='chief'||r==='co_chief'||r==='chief';
-  }catch{return true}
+    if(me)return me.role==='chief'||me.role==='co_chief';
+    // Local-only snapshots (no linked member yet): allow chief/co-chief roster roles only.
+    const admin=(p.members||[]).find(m=>m.role==='chief'||m.role==='co_chief');
+    return !!admin && (admin.role==='chief'||admin.role==='co_chief');
+  }catch{return false}
 }
 
 function editIconBtn(kind){
@@ -552,7 +552,7 @@ function openEaglesEditor(){
       savePlatoonLocal(p);
       d.close();
       setTimeout(()=>{if(typeof render==='function')render()},0);
-      alert('Club Eagle saved.');
+      alert('Club Eagle saved. They sync with your Platoon when online'+(window.__grHqMetaServer?'':' (server column pending migration approval)')+'.');
     }catch(err){
       const msg=d.querySelector('#grHqEgMsg');msg.hidden=false;msg.textContent=err.message||String(err);msg.className='gr-hq-msg err';
     }
@@ -637,6 +637,7 @@ window.grRenderClubEagleBubble=renderClubEagleBubble;
 window.grRenderRecordsBubble=renderRecordsBubble;
 window.grClubEagleModel=clubEagleModel;
 window.grRecordsModel=recordsModel;
+window.grCanEditHq=canEditHq;
 window.grOpenRecordsEditor=openRecordsEditor;
 window.grOpenEaglesEditor=openEaglesEditor;
 window.grHqRecordsReady=true;
