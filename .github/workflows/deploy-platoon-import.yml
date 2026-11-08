@@ -11,8 +11,57 @@ permissions:
   contents: read
 
 jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: vqpqyxamqiamblpcxqxg
+      SUPABASE_YES: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify deployment credential
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || (echo "SUPABASE_ACCESS_TOKEN secret is missing" && exit 1)
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Apply platoons-v4 hq_meta migration
+        run: |
+          set -euo pipefail
+          SQL_FILE=supabase/platoons-v4-hq-meta.sql
+          # Prefer Management API (PAT) so we do not need a stored postgres password.
+          # Fall back to CLI db query when SUPABASE_DB_PASSWORD is present.
+          BODY=$(python3 - <<'PY'
+          import json, pathlib
+          print(json.dumps({"query": pathlib.Path("supabase/platoons-v4-hq-meta.sql").read_text()}))
+          PY
+          )
+          HTTP=$(curl -sS -o /tmp/hqmeta-migrate.json -w '%{http_code}' \
+            -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" || true)
+          echo "Management API HTTP $HTTP"
+          cat /tmp/hqmeta-migrate.json || true
+          if [ "$HTTP" = "201" ] || [ "$HTTP" = "200" ]; then
+            echo "hq_meta migration applied via Management API"
+            exit 0
+          fi
+          if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
+            echo "Management API failed; retrying with supabase db query + DB password"
+            export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+            supabase db query --remote="$SUPABASE_PROJECT_ID" --yes -f "$SQL_FILE"
+            exit 0
+          fi
+          echo "::error::Could not apply hq_meta migration. Paste supabase/platoons-v4-hq-meta.sql in the Supabase SQL editor, or add SUPABASE_DB_PASSWORD repo secret."
+          exit 1
+
   deploy:
     runs-on: ubuntu-latest
+    # Function deploy must not wait on migration — frontend already live; edge code is additive.
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_ID: vqpqyxamqiamblpcxqxg
@@ -27,13 +76,6 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Show Supabase CLI version
-        run: supabase --version
-      - name: Apply platoons-v4 hq_meta migration
-        run: |
-          # Additive column only; IF NOT EXISTS makes this safe to re-run.
-          supabase db query --remote="$SUPABASE_PROJECT_ID" --yes -f supabase/platoons-v4-hq-meta.sql
       - name: Deploy platoon-import from main
         run: |
-          # Newer CLI requires --yes for non-interactive deploys.
           supabase functions deploy platoon-import --remote="$SUPABASE_PROJECT_ID" --use-api --yes
