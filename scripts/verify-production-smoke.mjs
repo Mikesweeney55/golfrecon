@@ -120,7 +120,7 @@ try{
     personalNav:report.navHasPregame&&report.navHasRounds&&report.navHasGame,
     platoonsNav:!!report.navHasGroups,
     authOrShell:!!(report.authVisible||report.shellPresent),
-    scriptsLoaded:report.scripts.includes('platoon-mission-core.js?v=3')&&report.scripts.includes('platoon-recap-shared.js?v=3')&&report.scripts.some(s=>/^platoons-v15-real\.js\?v=/.test(s))&&report.scripts.some(s=>/^platoon-hq-records\.js\?v=/.test(s)),
+    scriptsLoaded:report.scripts.some(s=>/^platoon-mission-core\.js\?v=/.test(s))&&report.scripts.some(s=>/^platoon-recap-shared\.js\?v=/.test(s))&&report.scripts.some(s=>/^platoons-v15-real\.js\?v=/.test(s))&&report.scripts.some(s=>/^platoon-hq-records\.js\?v=/.test(s))&&report.title.includes('V16.'),
     writesNotTestBlocked:!!g.saveNotTestBlocked,
     noHardExceptions:hardErrors.length===0
   };
