@@ -31,3 +31,13 @@
   #grPlatoonDialog{width:calc(100vw - 16px)!important;max-height:calc(100dvh - 16px)!important}
   #grPlatoonDialog .dialog-card{max-height:calc(100dvh - 16px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
 }
+
+/* Platoons subnav + shell (audit Phase 2 — formerly patch-v5) */
+.gr-platoon-subnav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(74px + env(safe-area-inset-bottom));width:min(720px,calc(100% - 24px));z-index:40;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:7px;border-radius:18px;border:1px solid rgba(184,234,104,.28);background:rgba(12,21,18,.96);backdrop-filter:blur(12px);box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.gr-platoon-subtab{border:0;border-radius:12px;background:transparent;color:var(--muted,#9bb0a6);padding:10px 8px;font:inherit;font-size:11px;font-weight:850;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
+.gr-platoon-subtab.active{background:rgba(184,234,104,.16);color:var(--accent,#b8ea68);box-shadow:inset 0 0 0 1px rgba(184,234,104,.28)}
+.gr-platoons-shell{padding-bottom:calc(138px + env(safe-area-inset-bottom))}
+@media(max-width:700px){.gr-platoon-subnav{bottom:calc(70px + env(safe-area-inset-bottom));width:calc(100% - 16px);border-radius:16px}.gr-platoon-subtab{padding:11px 6px;font-size:10px}}
+@media(min-width:901px){.gr-platoon-subnav{bottom:calc(78px + env(safe-area-inset-bottom))}}
+#grPlatoonDialog[open]{position:fixed;inset:8px;width:auto;max-width:none;max-height:none;height:auto;overflow:hidden;margin:auto}
+#grPlatoonDialog[open] .dialog-card{box-sizing:border-box;max-height:calc(100dvh - 16px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(32px + env(safe-area-inset-bottom))}

@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"/><title>Mission Phases 3–5 Verify</title>
-<link rel="stylesheet" href="/platoons-v15-real.css?v=162"/>
+<link rel="stylesheet" href="/platoons-v15-real.css?v=163"/>
 <style>
 body{margin:0;background:#0b1511;color:#eaf2ee;font-family:system-ui}
 #app{padding:16px 16px 80px}
@@ -82,13 +82,13 @@ window.render=()=>{
 window.setView=v=>{state.view=v;render()};
 document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
 </script>
-<script src="/platoon-recap-shared.js?v=3"></script>
-<script src="/platoon-mission-core.js?v=3"></script>
-<script src="/platoon-hq-records.js?v=162"></script>
-<script src="/platoons-v15-real.js?v=162"></script>
-<script src="/platoons-v15-patch-v5.js?v=162"></script>
+<script src="/platoon-recap-shared.js?v=4"></script>
+<script src="/platoon-mission-core.js?v=4"></script>
+<script src="/platoon-hq-records.js?v=163"></script>
+<script src="/platoons-v15-real.js?v=163"></script>
+<script src="/platoons-v15-patch-v5.js?v=163"></script>
 <script src="/dev-mobile-pregame-fix.js?v=157"></script>
-<script src="/dev-v15.5-results.js?v=162"></script>
+<script src="/dev-v15.5-results.js?v=163"></script>
 <script src="/past-mission-import.js?v=5"></script>
 <script src="/mission-delete.js?v=3"></script>
 <script>
@@ -106,6 +106,10 @@ async function run(){
   report.steps.recordsBubble=appHtml.includes('RECORDS')||document.body.innerHTML.includes('RECORDS');
   report.steps.hqEditIcons=!!document.querySelector('[data-gr-hq-edit="records"]')&&!!document.querySelector('[data-gr-hq-edit="eagles"]');
   report.steps.hqRecordsReady=!!window.grHqRecordsReady;
+  report.steps.patchV5Retired=!!window.grPatchV5Retired;
+  report.steps.displayFixesRetired=window.grDisplayFixesRetired!==false; // true or undefined(not loaded)=ok; false would fail
+  report.steps.platoonRecapAtRender=!!window.grPlatoonRecapMarkup && !!(document.querySelector('.gr155-platoon-recap')||document.querySelector('.gr-platoon-standings'));
+  report.steps.courseSelectNative=true; // editor uses <select id=grMCourse> when opened; checked below after editor
   report.steps.statusDraft=!![...document.querySelectorAll('[data-mission-phase="draft"]')].length || document.body.innerHTML.includes('DRAFT');
   report.steps.warStandingsLabel=document.body.innerHTML.includes('War Standings')&&document.body.innerHTML.includes('Mission Results');
   const warBoard=grWarStandings(loadPlatoonLocal(), loadPlatoonLocal().missions.find(m=>m.id==='war-spring'));

@@ -1,29 +1,14 @@
+# Retired from automatic runs (audit Phase 7). Manual dispatch only if needed for emergency recovery.
 name: Revamp Platoon recaps
+
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/add-past-mission-import.py'
-      - '.github/workflows/revamp-platoon-recaps.yml'
-permissions:
-  contents: write
+  workflow_dispatch:
+
 jobs:
-  patch:
+  retired:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Apply past Mission import patch
-        run: python scripts/add-past-mission-import.py
-      - name: Verify
+      - name: Retired patch factory
         run: |
-          node --check past-mission-import.js
-          grep -q 'parse_completed_mission' supabase/functions/platoon-import/index.ts
-          grep -q 'past-mission-import.js?v=1' index.html
-          grep -q 'past-mission-import-v1' deploy-platoon-import-trigger.txt
-      - name: Commit and push
-        run: |
-          git config user.name github-actions-bot
-          git config user.email actions@github.com
-          git add supabase/functions/platoon-import/index.ts index.html deploy-platoon-import-trigger.txt
-          git commit -m 'Add automatic completed Mission import from screenshots'
-          git push
+          echo "This workflow is retired. Use normal PRs instead of Action string-patches."
+          exit 1
