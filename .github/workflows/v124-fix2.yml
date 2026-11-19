@@ -1,36 +1,14 @@
+# Retired from automatic runs (audit Phase 7). Manual dispatch only if needed for emergency recovery.
 name: GolfRecon v12.7 Directional Review UI
+
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/v124-fix2.yml']
-permissions:
-  contents: write
+  workflow_dispatch:
+
 jobs:
-  patch:
+  retired:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Patch index
+      - name: Retired patch factory
         run: |
-          python <<'PY'
-          from pathlib import Path
-          import base64
-          p=Path('index.html')
-          s=p.read_text()
-          assert '<title>GolfRecon v12.6 Beta</title>' in s
-          assert '<span>v12.6 Beta</span>' in s
-          s=s.replace('<title>GolfRecon v12.6 Beta</title>','<title>GolfRecon v12.7 Beta</title>',1)
-          s=s.replace('<span>v12.6 Beta</span>','<span>v12.7 Beta</span>',1)
-          marker='function reviewHtml(x){'
-          helper=base64.b64decode('ZnVuY3Rpb24gZGlyZWN0aW9uYWxSZXZpZXdIdG1sKHIpewogIGNvbnN0IHBjdD12PT52PT09bnVsbHx8dj09PXVuZGVmaW5lZHx8dj09PScnPyfigJQnOmAke051bWJlcih2KS50b0ZpeGVkKE51bWJlcih2KSUxPzE6MCl9JWA7CiAgY29uc3QgZmQ9cj8uZmFpcndheV9kaXN0cmlidXRpb24sIGdkPXI/Lmdpcl9kaXN0cmlidXRpb247CiAgaWYoIWZkICYmICFnZClyZXR1cm4gJyc7CiAgY29uc3Qgcm93PShsYWJlbCx2KT0+YDxkaXYgY2xhc3M9ImltcG9ydC1rcGkiPjxkaXYgY2xhc3M9ImsiPiR7bGFiZWx9PC9kaXY+PGRpdiBjbGFzcz0idiI+JHtwY3Qodil9PC9kaXY+PC9kaXY+YDsKICByZXR1cm4gYDxkaXYgY2xhc3M9InNlY3Rpb24taGVhZCIgc3R5bGU9Im1hcmdpbi10b3A6MTZweCI+PGRpdj48ZGl2IGNsYXNzPSJleWVicm93Ij5ESVJFQ1RJT05BTCBEQVRBPC9kaXY+PGgzPk1pc3MgcGF0dGVybnMgZm91bmQ8L2gzPjwvZGl2PjwvZGl2PgogICAgJHtmZD9gPGRpdiBjbGFzcz0iYmFja2ZpbGwtbm90ZSIgc3R5bGU9Im1hcmdpbi1ib3R0b206OHB4Ij48c3Ryb25nPkZhaXJ3YXlzPC9zdHJvbmc+PC9kaXY+PGRpdiBjbGFzcz0iaW1wb3J0LXN1bW1hcnkiPiR7cm93KCdIaXQnLGZkLmhpdF9wY3QpfSR7cm93KCdMZWZ0JyxmZC5sZWZ0X3BjdCl9JHtyb3coJ1JpZ2h0JyxmZC5yaWdodF9wY3QpfSR7cm93KCdTaG9ydCcsZmQuc2hvcnRfcGN0KX0ke3JvdygnTG9uZycsZmQubG9uZ19wY3QpfTwvZGl2PmA6Jyd9CiAgICAke2dkP2A8ZGl2IGNsYXNzPSJiYWNrZmlsbC1ub3RlIiBzdHlsZT0ibWFyZ2luOjEycHggMCA4cHgiPjxzdHJvbmc+R0lSPC9zdHJvbmc+PC9kaXY+PGRpdiBjbGFzcz0iaW1wb3J0LXN1bW1hcnkiPiR7cm93KCdIaXQnLGdkLmhpdF9wY3QpfSR7cm93KCdTaG9ydCcsZ2Quc2hvcnRfcGN0KX0ke3JvdygnTGVmdCcsZ2QubGVmdF9wY3QpfSR7cm93KCdSaWdodCcsZ2QucmlnaHRfcGN0KX0ke3JvdygnTG9uZycsZ2QubG9uZ19wY3QpfSR7cm93KCdPdGhlcicsZ2Qub3RoZXJfcGN0KX08L2Rpdj5gOicnfWA7Cn0K').decode()
-          assert marker in s
-          s=s.replace(marker,helper+marker,1)
-          needle='    ${holes.length?`<div style="overflow-x:auto"><table class="import-hole-table">'
-          assert needle in s
-          s=s.replace(needle,'    ${directionalReviewHtml(r)}\n'+needle,1)
-          p.write_text(s)
-          PY
-      - name: Verify
-        run: grep -q 'GolfRecon v12.7 Beta' index.html && grep -q 'DIRECTIONAL DATA' index.html && grep -q 'directionalReviewHtml(r)' index.html
-      - name: Commit
-        run: git config user.name github-actions-bot && git config user.email actions@github.com && git add index.html && git commit -m 'Show directional data in backfill review for v12.7' && git push
+          echo "This workflow is retired. Use normal PRs instead of Action string-patches."
+          exit 1

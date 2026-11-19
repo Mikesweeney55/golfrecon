@@ -1,93 +1,10 @@
 (()=>{
 'use strict';
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
-let platoonMenuDialog=null,platoonSubpage='home',calendarCursor=null;
-const pData=()=>loadPlatoonLocal();
-function renderGroups(){try{if(typeof render==='function')render()}catch{}}
-function goSubpage(name){platoonSubpage=name;renderGroups();}
-function ensureMenu(){
-  if(platoonMenuDialog)return platoonMenuDialog;
-  const d=document.createElement('dialog');d.id='grPlatoonNavMenu';d.className='platoon-modal';
-  d.innerHTML='<div class="dialog-card"><div class="dialog-head"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:5px 0 0">Navigate</h2></div><button class="icon-button" data-close type="button">✕</button></div><div class="grid" style="margin-top:14px"><button class="card" data-gr-platoon-nav="calendar" type="button" style="text-align:left;color:inherit"><strong>📅 Calendar</strong><div class="muted" style="font-size:11px;margin-top:4px">Full mission calendar</div></button><button class="card" data-gr-platoon-nav="blog" type="button" style="text-align:left;color:inherit"><strong>📝 Blog</strong><div class="muted" style="font-size:11px;margin-top:4px">Platoon clubhouse and posts</div></button><button class="card" data-gr-platoon-nav="missions" type="button" style="text-align:left;color:inherit"><strong>🎯 Missions</strong><div class="muted" style="font-size:11px;margin-top:4px">Return to Platoon HQ missions view</div></button></div></div>';
-  document.body.appendChild(d);d.querySelector('[data-close]').onclick=()=>d.close();
-  d.addEventListener('click',e=>{const b=e.target.closest('[data-gr-platoon-nav]');if(!b)return;const action=b.dataset.grPlatoonNav;d.close();goSubpage(action==='missions'?'home':action)});
-  platoonMenuDialog=d;return d;
-}
-function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${esc(title)}</h2>${sub?`<div class="muted" style="font-size:12px;margin-top:4px">${esc(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
-function subNav(){
-  const tabs=[{id:'home',label:'Missions'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Blog'}];
-  return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${esc(t.label)}</button>`).join('')}</nav>`;
-}
-function withSubNav(html){return `<div class="gr-platoons-shell">${html||''}${subNav()}</div>`}
-function monthStart(){if(calendarCursor)return new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);const now=new Date(),rows=(pData().missions||[]).filter(m=>m.date&&m.type!=='war').map(m=>new Date(m.date+'T12:00:00')).filter(d=>!isNaN(d));const next=rows.filter(d=>d>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a,b)=>a-b)[0];calendarCursor=new Date((next||now).getFullYear(),(next||now).getMonth(),1);return calendarCursor;}
-function calendarView(){const p=pData(),cur=monthStart(),y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),missions=(p.missions||[]).filter(x=>x.type!=='war'&&x.date),map={};missions.forEach(x=>{const d=new Date(x.date+'T12:00:00');if(d.getFullYear()===y&&d.getMonth()===m)(map[d.getDate()]||=[]).push(x)});let cells='';for(let i=0;i<first;i++)cells+='<div style="min-height:88px;border:1px solid var(--border,#263244);border-radius:10px;opacity:.35"></div>';for(let d=1;d<=days;d++){const items=map[d]||[];cells+=`<div style="min-height:88px;border:1px solid ${items.length?'#4f8cff':'var(--border,#263244)'};border-radius:10px;padding:7px;background:${items.length?'rgba(79,140,255,.08)':'transparent'}"><div style="font-weight:800;font-size:12px;margin-bottom:5px">${d}</div>${items.map(x=>`<button type="button" data-mission="${esc(x.id)}" style="display:block;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:3px 0;font-size:10px;font-weight:700;line-height:1.15">⛳ ${esc(x.title||x.locationName||'Mission')}</button>`).join('')}</div>`}const label=cur.toLocaleString(undefined,{month:'long',year:'numeric'});return `${subHead('Calendar',p.name||'My Time')}<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><button class="icon-button" type="button" data-cal-prev>‹</button><strong style="font-size:18px">${esc(label)}</strong><button class="icon-button" type="button" data-cal-next>›</button></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div style="text-align:center;font-size:10px;font-weight:800;opacity:.65">${x}</div>`).join('')}</div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px">${cells}</div></div>`;}
-function blogView(){const p=pData();return `${subHead('Blog',(p.name||'My Time')+' Clubhouse')}<div class="card"><div class="empty" style="padding:34px 12px">No posts yet.</div></div>`}
-function installStyles(){if(document.getElementById('grV5Fix'))return;const s=document.createElement('style');s.id='grV5Fix';s.textContent=`#grPlatoonDialog[open]{position:fixed!important;inset:8px!important;width:auto!important;max-width:none!important;max-height:none!important;height:auto!important;overflow:hidden!important;margin:auto!important}#grPlatoonDialog[open] .dialog-card{box-sizing:border-box!important;max-height:calc(100dvh - 16px)!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;padding-bottom:calc(32px + env(safe-area-inset-bottom))!important}@media(max-width:700px){#grPlatoonDialog[open]{inset:10px!important}#grPlatoonDialog[open] .dialog-card{max-height:calc(100dvh - 20px)!important}}
-.gr-platoon-subnav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(74px + env(safe-area-inset-bottom));width:min(720px,calc(100% - 24px));z-index:40;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:7px;border-radius:18px;border:1px solid rgba(184,234,104,.28);background:rgba(12,21,18,.96);backdrop-filter:blur(12px);box-shadow:0 10px 24px rgba(0,0,0,.28)}
-.gr-platoon-subtab{border:0;border-radius:12px;background:transparent;color:var(--muted,#9bb0a6);padding:10px 8px;font:inherit;font-size:11px;font-weight:850;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
-.gr-platoon-subtab.active{background:rgba(184,234,104,.16);color:var(--accent,#b8ea68);box-shadow:inset 0 0 0 1px rgba(184,234,104,.28)}
-.gr-platoons-shell{padding-bottom:calc(138px + env(safe-area-inset-bottom))}
-@media(max-width:700px){.gr-platoon-subnav{bottom:calc(70px + env(safe-area-inset-bottom));width:calc(100% - 16px);border-radius:16px}.gr-platoon-subtab{padding:11px 6px;font-size:10px}}
-@media(min-width:901px){.gr-platoon-subnav{bottom:calc(78px + env(safe-area-inset-bottom))}}`;document.head.appendChild(s)}
-function missionIdFromEdit(btn){const s=btn.getAttribute('onclick')||'';const m=s.match(/grOpenMissionEditor\(['\"]([^'\"]+)/);return m?m[1]:''}
-function missionCourseNames(){
-  const names=[];
-  try{if(typeof db!=='undefined'&&Array.isArray(db.courses))db.courses.forEach(c=>{const n=String(c?.name||'').trim();if(n)names.push(n)})}catch{}
-  try{(pData().missions||[]).forEach(m=>{const n=String(m?.locationName||'').trim();if(n&&n!=='Course TBD'&&n!=='Multi-course')names.push(n)})}catch{}
-  return [...new Set(names)].sort((a,b)=>a.localeCompare(b));
-}
-function enhanceCoursePicker(dlg){
-  if(!dlg||!dlg.open)return;
-  const input=dlg.querySelector('input#grMCourse');if(!input||input.dataset.grCoursePickerDone)return;
-  const current=String(input.value||'').trim(),select=document.createElement('select');
-  select.id='grMCourse';select.dataset.grCoursePickerDone='1';select.style.width='100%';
-  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Select course…';select.appendChild(placeholder);
-  const names=missionCourseNames();if(current&&!names.includes(current))names.unshift(current);
-  names.forEach(name=>{const o=document.createElement('option');o.value=name;o.textContent=name;if(name===current)o.selected=true;select.appendChild(o)});
-  const add=document.createElement('option');add.value='__gr_add_course__';add.textContent='＋ Add new course…';select.appendChild(add);
-  input.replaceWith(select);
-  const sync=()=>{const b=dlg.querySelector('#grBannerCourse');if(b)b.textContent=select.value||'Course TBD'};
-  select.addEventListener('change',()=>{
-    if(select.value==='__gr_add_course__'){
-      const name=String(prompt('New course name')||'').trim();
-      if(!name){select.value=current||'';sync();return}
-      let o=[...select.options].find(x=>x.value===name);
-      if(!o){o=document.createElement('option');o.value=name;o.textContent=name;select.insertBefore(o,add)}
-      select.value=name;
-    }
-    sync();
-  });
-  sync();
-}
-function safeSupplementalImport(id){
-  const p=loadPlatoonLocal(),m=(p.missions||[]).find(x=>x.id===id);if(!m)return;
-  const locked=JSON.parse(JSON.stringify(Array.isArray(m.results)?m.results:[]));
-  if(typeof platoonDialog!=='function'||typeof callPlatoonFunction!=='function'||typeof platoonFilePayload!=='function'){alert('Scorecard detail import is unavailable.');return}
-  const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">SUPPLEMENTAL SCORECARDS</div><h2 style="margin:5px 0 0">${esc(m.title||m.locationName||'Mission')}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div><div class="platoon-notice"><strong>Original Mission scoring is locked.</strong><br>These screenshots will not replace gross, net, finish position, or points.</div><label class="upload-zone" style="cursor:pointer"><strong>Add hole-by-hole screenshots</strong><span>Supplemental detail only</span><input id="grSafeDetailFiles" type="file" accept="image/*" multiple></label><div id="grSafeDetailList" class="platoon-file-list"></div><div id="grSafeDetailOut"></div><div class="dialog-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="grSafeParse" type="button">Read Scorecards</button></div>`);
-  const input=d.querySelector('#grSafeDetailFiles'),list=d.querySelector('#grSafeDetailList'),out=d.querySelector('#grSafeDetailOut'),btn=d.querySelector('#grSafeParse');
-  input.onchange=()=>{list.textContent=[...input.files].map(f=>f.name).join(' · ')};
-  btn.onclick=async()=>{const files=[...input.files];if(!files.length){out.innerHTML='<div class="platoon-notice">Add at least one screenshot.</div>';return}btn.disabled=true;btn.textContent='Reading…';out.innerHTML='<div class="platoon-notice">Reading supplemental scorecards…</div>';try{const images=[];for(const f of files)images.push(await platoonFilePayload(f));const parsed=await callPlatoonFunction({action:'parse_results',mission:{date:m.date,locationName:m.locationName,title:m.title},images});const rows=parsed.results||[];out.innerHTML=`<div class="platoon-notice">Scorecards read. Original scoring remains locked.</div><div class="dialog-actions"><button class="button primary" id="grSafeSave" type="button">Save Supplemental Detail</button></div>`;out.querySelector('#grSafeSave').onclick=()=>{m.results=locked;m.supplementalScorecards={savedAt:new Date().toISOString(),rows,sourceCount:files.length};savePlatoonLocal(p);d.close();alert('Supplemental scorecards saved. Original Mission scoring was not changed.');};}catch(e){m.results=locked;out.innerHTML=`<div class="platoon-notice" style="border-color:rgba(255,77,79,.35);color:#ffadad">${esc(e.message||String(e))}</div>`}finally{btn.disabled=false;btn.textContent='Read Scorecards'}};
-}
-function enhanceDom(){
-  installStyles();
-  document.querySelectorAll('.gr-mission').forEach(card=>{
-    if(!card.querySelector('.gr-complete'))return;
-    const actions=card.querySelector('.gr-mini-actions');if(!actions||actions.querySelector('[data-gr-add-results]'))return;
-    const edit=[...actions.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Edit');const id=edit?missionIdFromEdit(edit):'';if(!id)return;
-    const b=document.createElement('button');b.type='button';b.className='button secondary';b.dataset.grAddResults=id;b.textContent='📸 Add Results';b.onclick=()=>safeSupplementalImport(id);actions.appendChild(b);
-  });
-  const dlg=document.getElementById('grPlatoonDialog');if(dlg&&dlg.open){dlg.style.overflow='hidden';const card=dlg.querySelector('.dialog-card');if(card){card.style.maxHeight='calc(100dvh - 20px)';card.style.overflowY='auto';card.style.webkitOverflowScrolling='touch';}enhanceCoursePicker(dlg)}
-}
-function applyPatch(){
-  installStyles();window.grUploadScores=safeSupplementalImport;const base=window.grGroupsView;if(typeof base==='function'){
-    const patched=()=>{let html;if(platoonSubpage==='calendar')html=calendarView();else if(platoonSubpage==='blog')html=blogView();else{const p=pData();html=base();html=html.replace('<div class="gr-standings-title">Platoon Standings</div>',`<div class="gr-standings-title">${esc(p.season||new Date().getFullYear())} Platoon Standings</div>`);html=html.replace(/<div class="chips"><span class="chip">[\s\S]*?<\/div><div class="gr-hq-actions">/,'<div class="gr-hq-actions">');html=html.replace(/<div class="gr-players">[\s\S]*?<\/div>/g,'');}return withSubNav(html);};
-    try{groupsView=patched}catch{window.groupsView=patched}window.grGroupsView=patched;
-  }
-  const nav=document.querySelector('.nav-item[data-view="groups"]');if(nav&&!nav.dataset.grSecondTap){nav.dataset.grSecondTap='1';nav.addEventListener('click',e=>{try{if(typeof state!=='undefined'&&state.view==='groups'){e.preventDefault();e.stopImmediatePropagation();ensureMenu().showModal()}}catch{}},true)}
-  if(!document.body.dataset.grPlatoonSubpages){document.body.dataset.grPlatoonSubpages='1';document.addEventListener('click',e=>{const tab=e.target.closest('[data-gr-subnav]');if(tab){e.preventDefault();goSubpage(tab.dataset.grSubnav||'home');return}if(e.target.closest('[data-platoon-home]')){platoonSubpage='home';renderGroups();return}if(e.target.closest('[data-cal-prev]')){const c=monthStart();calendarCursor=new Date(c.getFullYear(),c.getMonth()-1,1);renderGroups();return}if(e.target.closest('[data-cal-next]')){const c=monthStart();calendarCursor=new Date(c.getFullYear(),c.getMonth()+1,1);renderGroups();return}const b=e.target.closest('[data-mission]');if(b&&window.grViewMission)window.grViewMission(b.dataset.mission);});}
-  new MutationObserver(()=>enhanceDom()).observe(document.body,{childList:true,subtree:true});
-  setTimeout(enhanceDom,0);setTimeout(enhanceDom,300);setTimeout(enhanceDom,1000);
-  try{if(typeof state!=='undefined'&&state.view==='groups')renderGroups()}catch{}
-}
-applyPatch();
+/**
+ * Retired (audit Phase 2–3). Calendar / blog / subnav / course picker /
+ * Add Results live in platoons-v15-real.js. Official vs hole-by-hole chooser
+ * lives in dev-v15.5-results.js. This file stays loaded briefly as a no-op
+ * so cached HTML referencing it does not 404; safe to remove from index.html.
+ */
+window.grPatchV5Retired=true;
 })();

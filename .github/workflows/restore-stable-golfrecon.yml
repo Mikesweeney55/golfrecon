@@ -1,8 +1,6 @@
 name: Restore Stable Golf Recon
 on:
-  push:
-    paths:
-      - 'restore-stable-trigger.txt'
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:

@@ -49,6 +49,7 @@ function addModalDelete(id){
     if(actions)actions.appendChild(makeDelete(id,m.title));
   },0);
 }
+window.grRemoveMission=(id)=>removeMission(id,missionFor(id)?.title||'this Mission',null);
 function run(){document.querySelectorAll('.gr-mission').forEach(enhanceCard);document.querySelectorAll('.gr-archive-row').forEach(enhanceArchive)}
 const originalView=window.grViewMission;
 if(typeof originalView==='function'){
@@ -56,5 +57,4 @@ if(typeof originalView==='function'){
 }
 new MutationObserver(run).observe(document.body,{childList:true,subtree:true});
 setTimeout(run,0);setTimeout(run,400);setTimeout(run,1200);
-setTimeout(()=>window.grInstallDisplayFixes?.(),0);
 })();

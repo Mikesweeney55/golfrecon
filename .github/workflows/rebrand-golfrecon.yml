@@ -1,44 +1,14 @@
+# Retired from automatic runs (audit Phase 7). Manual dispatch only if needed for emergency recovery.
 name: Rebrand GolfRecon
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/rebrand-golfrecon.yml'
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  rebrand:
+  retired:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Replace GolfIQ branding
-        shell: bash
+      - name: Retired patch factory
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('index.html')
-          s = p.read_text()
-          s = s.replace('GolfIQ', 'GolfRecon')
-          s = s.replace('GOLFIQ', 'GOLFRECON')
-          s = s.replace("golfiqAuthSessionV1", "golfreconAuthSessionV1")
-          s = s.replace("golfiqSelectedCourseId", "golfreconSelectedCourseId")
-          s = s.replace('<div class="auth-logo"><span>G</span><span class="accent">I</span><span>Q</span></div>', '<div class="auth-logo"><span>G</span><span class="accent">R</span></div>')
-          s = s.replace('<div class="giq-logo" aria-label="GIQ">\n        <span class="giq-g">G</span><span class="giq-i">I</span><span class="giq-q">Q</span>\n      </div>', '<div class="giq-logo" aria-label="GR">\n        <span class="giq-g">G</span><span style="color:var(--accent)">R</span>\n      </div>')
-          p.write_text(s)
-          PY
-      - name: Commit rebrand
-        shell: bash
-        run: |
-          if git diff --quiet; then
-            echo "No branding changes needed"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git commit -m "Purge GolfIQ branding and switch to GolfRecon"
-          git push
+          echo "This workflow is retired. Use normal PRs instead of Action string-patches."
+          exit 1

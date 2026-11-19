@@ -629,6 +629,46 @@ function bindUi(){
   },true);
 }
 
+
+function detailStatsLocal(r){
+  const holes=cleanHoles(r?.holes).filter(h=>finite(h.score));
+  const birds=holes.filter(h=>finite(h.par)&&h.score===h.par-1);
+  const eagles=holes.filter(h=>finite(h.par)&&h.score<=h.par-2);
+  return {holes,birds,eagles};
+}
+function platoonRecapMarkup(p){
+  const complete=(p.missions||[]).filter(m=>m.type!=='war'&&m.status==='completed');
+  const map=new Map((p.members||[]).map(m=>[m.id,{member:m,points:0,birds:0,eagles:0,wins:0}]));
+  for(const m of complete)for(const r of (m.results||[])){
+    const mm=canon(p,r.player_name)||memberById(p,r.hole_detail_canonical_id);
+    if(!mm||!map.has(mm.id))continue;
+    const x=map.get(mm.id),st=detailStatsLocal(r);
+    x.points+=Number(r.raw_points||0);
+    if(Number(r.finish_position)===1)x.wins++;
+    if(st.holes.length){x.birds+=st.birds.length;x.eagles+=st.eagles.length}
+    else if(finite(r.eagle_count)&&Number(r.eagle_count)>0)x.eagles+=Number(r.eagle_count);
+  }
+  const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
+  const standing=rows.map((x,i)=>`<div class="gr155-recap-row"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span>${x.points} pts</span></div>`).join('')||'<div class="gr155-empty">No points yet.</div>';
+  const eagle=renderClubEagleBubble(p);
+  const records=renderRecordsBubble(p);
+  const intel=[];
+  const latest=[...complete].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
+  if(latest){
+    const ranked=(typeof window.grMissionStandingsRows==='function'?window.grMissionStandingsRows(latest):(latest.results||[])).slice();
+    const r=ranked[0];
+    if(r)intel.push(`${displayName(p,r.player_name)} finished the latest Mission on top${finite(r.net)?` at net ${Number(r.net)}`:''}.`);
+  }
+  if(rows.length){
+    const best=rows[0].points,leaders=rows.filter(x=>x.points===best);
+    intel.push(leaders.length>1?`${leaders.map(x=>x.member.name).join(' & ')} are tied atop the Platoon at ${best} point${best===1?'':'s'}.`:`${leaders[0].member.name} leads the Platoon with ${best} point${best===1?'':'s'}.`);
+    const birdVals=rows.map(x=>x.birds).filter(n=>n>0);
+    if(birdVals.length){const b=Math.max(...birdVals);const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
+  }
+  if(!intel.length)intel.push('No completed Missions yet. The season story is still waiting to be written.');
+  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section>${eagle}${records}<section class="gr155-recap-block gr155-recap-copy gr155-intel-wide"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
+}
+
 // Public API used by results renderer / sync merge
 window.grHqMetaNormalize=normalizeHqMeta;
 window.grHqMetaDefault=defaultHqMeta;
@@ -640,6 +680,7 @@ window.grRecordsModel=recordsModel;
 window.grCanEditHq=canEditHq;
 window.grOpenRecordsEditor=openRecordsEditor;
 window.grOpenEaglesEditor=openEaglesEditor;
+window.grPlatoonRecapMarkup=platoonRecapMarkup;
 window.grHqRecordsReady=true;
 
 installStyles();

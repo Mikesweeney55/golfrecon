@@ -261,5 +261,7 @@ window.grCleanCourseName=cleanCourseName;
 window.grMissionStandingsRows=missionStandingsRows;
 window.grMissionStandingsMarkup=(m,p)=>standingsTableMarkup(p,m);
 window.grMissionRecapMarkup=missionRecapMarkup;
+window.grNorm=typeof norm==='function'?norm:s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+window.grCleanHoles=cleanHoles;
 window.grSharedRecapReady=true;
 })();
