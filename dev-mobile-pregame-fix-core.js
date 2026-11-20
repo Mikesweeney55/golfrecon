@@ -49,10 +49,17 @@ if(!window.__grSupabaseFirstSaveInstalled){
   };
 }
 async function refreshPlatoonFromSupabase(){
+  if(window.grTestEnvActive)return;
   if(typeof callPlatoonFunction!=='function')return;
   try{
-    const out=await callPlatoonFunction({action:'bootstrap'});
-    if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
+    const localBefore=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
+    const out=await callPlatoonFunction({action:'bootstrap',snapshot:localBefore||undefined});
+    if(out?.platoon&&typeof writePlatoonLocal==='function'){
+      const merged=typeof window.grMergeHqMetaPreserve==='function'
+        ? window.grMergeHqMetaPreserve(out.platoon,localBefore)
+        : Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore?.hqMeta});
+      writePlatoonLocal(merged);
+    }
     try{if(typeof platoonSyncError!=='undefined')platoonSyncError=''}catch{}
     try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
   }catch(e){

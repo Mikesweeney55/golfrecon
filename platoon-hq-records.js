@@ -113,17 +113,22 @@ function writeHqMeta(p,meta){
   p.hqMeta=normalizeHqMeta(meta);
   return p;
 }
+function hqMetaWeight(meta){
+  const m=normalizeHqMeta(meta);
+  return (m.eagleBalances?.length||0)+(m.eagleDetails?.length||0)+(m.records?.length||0);
+}
 function mergeHqMetaPreserve(serverP,localP){
   if(!serverP)return localP||serverP;
-  const localMeta=localP?.hqMeta;
-  const serverMeta=serverP?.hqMeta;
-  // Prefer server when it actually carries hqMeta; otherwise keep local so sync cannot wipe manuals.
-  if(serverMeta&&typeof serverMeta==='object'&&(Object.keys(serverMeta).length||Array.isArray(serverMeta.records))){
-    serverP.hqMeta=normalizeHqMeta(serverMeta);
-  }else if(localMeta){
-    serverP.hqMeta=normalizeHqMeta(localMeta);
+  const localMeta=localP?.hqMeta?normalizeHqMeta(localP.hqMeta):null;
+  const serverRaw=serverP?.hqMeta;
+  const serverMeta=serverRaw&&typeof serverRaw==='object'?normalizeHqMeta(serverRaw):null;
+  const localW=localMeta?hqMetaWeight(localMeta):0;
+  const serverW=serverMeta?hqMetaWeight(serverMeta):0;
+  // Never let an empty/lagging server snapshot wipe richer local Club Eagle / Records edits.
+  if(!serverMeta||serverW===0&&localW>0||(!serverP.hqMetaSupported&&localW>=serverW&&localW>0)||localW>serverW){
+    serverP.hqMeta=localMeta||defaultHqMeta();
   }else{
-    serverP.hqMeta=defaultHqMeta();
+    serverP.hqMeta=serverMeta;
   }
   return serverP;
 }
@@ -385,7 +390,7 @@ function holeSelectHtml(current){
 }
 function dateFieldHtml(field,value,label){
   return `<label>${esc(label)}
-    <input data-f="${esc(field)}" class="gr-datetime" type="date" value="${esc(value||'')}">
+    <input data-f="${esc(field)}" class="gr-datetime gr-date-picker" type="date" value="${esc(value||'')}" readonly inputmode="none" autocomplete="off">
     <div class="gr-date-quick">
       <button type="button" class="gr-time-chip" data-date-preset="today">Today</button>
       <button type="button" class="gr-time-chip" data-date-preset="sat">Next Sat</button>
@@ -498,10 +503,13 @@ function openRecordsEditor(){
       });
       meta.records=next;
       writeHqMeta(p,meta);
-      savePlatoonLocal(p);
+      if(typeof writePlatoonLocal==='function')writePlatoonLocal(p);
+      if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,!window.grTestEnvActive);
       d.close();
       setTimeout(()=>{if(typeof render==='function')render()},0);
-      alert('Records saved. They sync with your Platoon when online'+(window.__grHqMetaServer?'':' (server column pending migration approval)')+'.');
+      alert(window.grTestEnvActive
+        ?'Records saved on this device (TEST build — server sync off).'
+        :('Records saved. They sync with your Platoon when online'+(window.__grHqMetaServer?'':' (server column pending migration approval)')+'.'));
     }catch(err){
       const msg=d.querySelector('#grHqRecMsg');msg.hidden=false;msg.textContent=err.message||String(err);msg.className='gr-hq-msg err';
     }
@@ -586,7 +594,9 @@ function openEaglesEditor(){
         const count=Number(row.querySelector('[data-f="count"]').value);
         const asOfDate=row.querySelector('[data-f="asOfDate"]').value;
         const notes=row.querySelector('[data-f="notes"]').value.trim();
-        if(!resolved.playerName&&!playerName)return;
+        const blank=!memberId&&!playerName&&(!Number.isFinite(count)||count===0)&&!asOfDate&&!notes;
+        if(blank)return;
+        if(!resolved.playerName&&!playerName)throw new Error('Choose a player for each starting balance.');
         if(!Number.isFinite(count)||count<0)throw new Error('Balance counts must be zero or greater.');
         bals.push(normalizeBalance({id:row.dataset.id,memberId:resolved.memberId,playerName:resolved.playerName||playerName,count,asOfDate,notes,updatedAt:new Date().toISOString()}));
       });
@@ -603,16 +613,26 @@ function openEaglesEditor(){
         const missionId=row.querySelector('[data-f="missionId"]').value;
         const mission=missionId?(p.missions||[]).find(m=>m.id===missionId):null;
         const notes=row.querySelector('[data-f="notes"]').value.trim();
-        if(!resolved.playerName&&!playerName)return;
+        const blank=!memberId&&!playerName&&!course&&hole==null&&!date&&!missionId&&!notes;
+        if(blank)return;
+        if(!resolved.playerName&&!playerName)throw new Error('Choose a player for each eagle detail.');
         dets.push(normalizeEagleDetail({id:row.dataset.id,memberId:resolved.memberId,playerName:resolved.playerName||playerName,course,hole,date,missionId,missionTitle:mission?.title||mission?.locationName||'',notes,updatedAt:new Date().toISOString()}));
       });
       meta.eagleBalances=bals;
       meta.eagleDetails=dets;
       writeHqMeta(p,meta);
-      savePlatoonLocal(p);
+      // Persist locally first; TEST/preview skips server; never allow a later bootstrap wipe.
+      if(typeof writePlatoonLocal==='function')writePlatoonLocal(p);
+      else if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,false);
+      if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,!window.grTestEnvActive);
       d.close();
       setTimeout(()=>{if(typeof render==='function')render()},0);
-      alert('Club Eagle saved. They sync with your Platoon when online'+(window.__grHqMetaServer?'':' (server column pending migration approval)')+'.');
+      const savedCheck=loadPlatoonLocal()?.hqMeta;
+      const ok=hqMetaWeight(savedCheck)>=hqMetaWeight(meta);
+      if(!ok)throw new Error('Eagle totals did not stick locally. Try again.');
+      alert(window.grTestEnvActive
+        ?'Club Eagle saved on this device (TEST build — server sync off).'
+        :('Club Eagle saved. They sync with your Platoon when online'+(window.__grHqMetaServer?'':' (server column pending migration approval)')+'.'));
     }catch(err){
       const msg=d.querySelector('#grHqEgMsg');msg.hidden=false;msg.textContent=err.message||String(err);msg.className='gr-hq-msg err';
     }

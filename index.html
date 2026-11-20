@@ -1598,7 +1598,7 @@ body::before,body::after{opacity:0!important}
 }
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=171">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=172">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1748,7 +1748,7 @@ body::before,body::after{opacity:0!important}
             <input id="editTee" placeholder="White, II, etc." />
           </label>
           <label>Date
-            <input id="editDate" type="date" />
+            <input id="editDate" class="gr-date-picker" type="date" readonly inputmode="none" autocomplete="off" />
           </label>
         </div>
         <div class="edit-grid">
@@ -3456,7 +3456,7 @@ function openMissionEditor(date='',missionId=''){
   const courseOpts=['<option value="">Choose course</option>',...courses.map(c=>`<option value="${safeText(c.id)}" ${(existing?.courseId===c.id)?'selected':''}>${safeText(courseMenuLabel(c))}</option>`)].join('');
   const memberChecks=(p.members||[]).map(m=>`<label class="platoon-roster-check"><input type="checkbox" data-mission-member="${safeText(m.id)}" ${selected.has(m.id)?'checked':''}><span>${safeText(m.name)}</span></label>`).join('');
   const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">MISSION CONTROL</div><h2 style="margin:5px 0 0">${existing?'Edit Mission':'Create Mission'}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
-    <div class="platoon-form-grid" style="margin-top:16px"><label>Date<input id="missionDate" type="date" value="${safeText(existing?.date||date||'')}"></label><label>Tee time<input id="missionTime" type="time" value="${safeText(existing?.teeTime||'')}"></label></div>
+    <div class="platoon-form-grid" style="margin-top:16px"><label>Date<input id="missionDate" class="gr-date-picker" type="date" value="${safeText(existing?.date||date||'')}" readonly inputmode="none" autocomplete="off"></label><label>Tee time<input id="missionTime" class="gr-time-picker" type="time" value="${safeText(existing?.teeTime||'')}" readonly inputmode="none" autocomplete="off"></label></div>
     <div class="platoon-form-grid"><label>Mission level<select id="missionType"><option value="skirmish" ${existing?.type==='skirmish'?'selected':''}>Skirmish</option><option value="battle" ${existing?.type==='battle'||!existing?'selected':''}>Battle</option><option value="war" ${existing?.type==='war'?'selected':''}>War</option></select></label><label>Course<select id="missionCourse">${courseOpts}</select></label></div>
     <label>Other location<input id="missionLocation" value="${safeText(existing?.locationName&&!existing?.courseId?existing.locationName:'')}" placeholder="Use if the course is not in Golf Recon"></label>
     <div class="platoon-form-grid"><label>Title<input id="missionTitle" value="${safeText(existing?.title||'')}" placeholder="Optional"></label><label>Format<input id="missionFormat" value="${safeText(existing?.format||'')}" placeholder="Skins, stroke play, teams..."></label></div>
@@ -4918,12 +4918,12 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=4"></script>
   <script src="platoon-mission-core.js?v=4"></script>
-  <script src="platoon-hq-records.js?v=170"></script>
-  <script src="platoons-v15-real.js?v=170"></script>
+  <script src="platoon-hq-records.js?v=171"></script>
+  <script src="platoons-v15-real.js?v=171"></script>
   <script src="platoons-v15-patch-v5.js?v=163"></script>
-  <script src="dev-mobile-pregame-fix.js?v=169"></script>
+  <script src="dev-mobile-pregame-fix.js?v=171"></script>
   <script src="dev-v15.5-results.js?v=163"></script>
-<script src="past-mission-import.js?v=170"></script>
+<script src="past-mission-import.js?v=171"></script>
 <script src="mission-delete.js?v=3"></script>
 </body>
 </html>
