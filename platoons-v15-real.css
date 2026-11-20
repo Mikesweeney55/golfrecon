@@ -41,3 +41,29 @@
 @media(min-width:901px){.gr-platoon-subnav{bottom:calc(78px + env(safe-area-inset-bottom))}}
 #grPlatoonDialog[open]{position:fixed;inset:8px;width:auto;max-width:none;max-height:none;height:auto;overflow:hidden;margin:auto}
 #grPlatoonDialog[open] .dialog-card{box-sizing:border-box;max-height:calc(100dvh - 16px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+
+/* Mission setup UX — chooser, calendar day create, formats, course wizard */
+.gr-choice-grid{display:grid;gap:10px;margin-top:14px}
+.gr-choice{text-align:left;color:inherit;cursor:pointer;padding:16px!important}
+.gr-choice strong{display:block;font-size:18px;margin-bottom:4px}
+.gr-choice .muted{font-size:12px;line-height:1.35}
+.gr-mission-select,.gr-datetime{width:100%}
+.gr-format-other{margin-top:8px;width:100%}
+.gr-date-quick,.gr-time-presets{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.gr-time-chip{border:1px solid rgba(212,175,106,.28);background:rgba(212,175,106,.08);color:var(--text,#f4ebe0);border-radius:999px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer}
+.gr-time-chip:active{background:rgba(212,175,106,.22)}
+.gr-course-meta{font-size:11px;margin-top:6px}
+.grid.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media(max-width:700px){.grid.three{grid-template-columns:1fr 1fr 1fr}}
+.gr-cal-card{padding:14px}
+.gr-cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.gr-cal-hint{font-size:11px;margin:0 0 10px}
+.gr-cal-dows{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px;text-align:center;font-size:10px;font-weight:800;opacity:.65}
+.gr-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.gr-cal-pad{min-height:88px;border:1px solid rgba(255,255,255,.06);border-radius:10px;opacity:.35}
+.gr-cal-day{min-height:88px;border:1px solid rgba(212,175,106,.18);border-radius:10px;padding:7px;background:rgba(14,12,10,.35);color:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit}
+.gr-cal-day.has-missions{border-color:rgba(212,175,106,.45);background:rgba(212,175,106,.08)}
+.gr-cal-day:hover,.gr-cal-day:focus-visible{outline:2px solid rgba(212,175,106,.45);outline-offset:1px}
+.gr-cal-daynum{font-weight:900;font-size:12px}
+.gr-cal-mission{display:block;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:2px 0;font-size:10px;font-weight:700;line-height:1.15;cursor:pointer}
+.gr-cal-add{margin-top:auto;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#d4af6a);opacity:.85}
