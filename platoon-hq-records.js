@@ -12,6 +12,8 @@ const CATEGORIES=[
   {id:'ace',label:'Hole in One',unit:'aces'},
   {id:'eagle',label:'Eagles',unit:'eagles'}
 ];
+/** Records board is birdies + aces only — eagles live in Club Eagle. */
+const RECORD_CATEGORIES=CATEGORIES.filter(c=>c.id==='birdies'||c.id==='ace');
 const MODES=['combined','automatic','manual'];
 
 function getP(){try{return loadPlatoonLocal()}catch{return null}}
@@ -250,13 +252,11 @@ function clubEagleModel(p){
 function recordsModel(p){
   const meta=hqMetaOf(p),auto=autoAchievements(p);
   const out={};
-  for(const cat of CATEGORIES){
-    if(cat.id==='eagle'){
-      // Eagles are shown primarily in Club Eagle; still allow Records entries for category eagle.
-    }
+  // Birdies + aces only — eagles belong to Club Eagle.
+  for(const cat of RECORD_CATEGORIES){
     const mode=meta.modes[cat.id]||'combined';
     const manual=(meta.records||[]).filter(r=>r.category===cat.id);
-    let autoList=cat.id==='birdies'?auto.birdieRounds:cat.id==='ace'?auto.aces:auto.eagles.filter(e=>!e.aggregate);
+    let autoList=cat.id==='birdies'?auto.birdieRounds:auto.aces;
     const suppressed=new Set((meta.suppressedAuto||[]).filter(s=>!s.category||s.category===cat.id).map(s=>s.fingerprint));
     autoList=autoList.filter(a=>!suppressed.has(a.fingerprint));
     const override=manual.find(r=>r.overrideAuto);
@@ -321,49 +321,55 @@ function editIconBtn(kind){
   return `<button type="button" class="gr-hq-edit" data-gr-hq-edit="${esc(kind)}" title="Edit ${esc(kind)}" aria-label="Edit ${esc(kind)}">✎</button>`;
 }
 
+function honorHead(kind,title,sub){
+  const mark=kind==='eagles'?'🦅':'🏆';
+  const add=kind==='eagles'
+    ?`<button type="button" class="button secondary gr-hq-add-eg" data-gr-hq-edit="eagles" data-gr-hq-add="1">+ Eagle</button>`
+    :'';
+  return `<div class="eagle-lockup gr-honor-lockup">
+    <div class="eagle-mark gr-honor-mark ${kind==='eagles'?'gr-honor-eagle':'gr-honor-records'}" aria-hidden="true">${mark}</div>
+    <div class="gr-honor-copy"><div class="eyebrow">${esc(title)}</div><div class="gr-honor-sub">${esc(sub)}</div></div>
+    <div class="gr-honor-actions">${add}${editIconBtn(kind)}</div>
+  </div>`;
+}
+
 function renderClubEagleBubble(p){
   const model=clubEagleModel(p);
-  const head=`<div class="gr155-recap-title gr-hq-title-row"><span>CLUB EAGLE</span>${editIconBtn('eagles')}</div>`;
+  const head=honorHead('eagles','CLUB EAGLE','Per-player running totals');
   if(!model.leaders.length){
-    return `<section class="gr155-recap-block" data-gr-hq="eagles">${head}<div class="gr155-empty">No individual eagles yet. Use ✎ to add a player’s balance or hole detail.</div><div class="gr-hq-mode-tag">${esc(model.mode)}</div></section>`;
+    return `<section class="gr155-recap-block gr-honor-card gr-honor-eagle-card" data-gr-hq="eagles">${head}<div class="gr155-empty">No eagles yet. Tap + Eagle to log one — each player keeps their own total.</div></section>`;
   }
-  // Individual leaderboard only — no platoon-wide tally.
-  const rows=model.leaders.slice(0,8).map(r=>`<div class="gr155-recap-row gr155-eagle-row"><span>${esc(r.playerName)}${r.flags.length?' <em class="gr-hq-flag" title="Possible duplicate — review in editor">⚑</em>':''}</span><span>${r.total} eagle${r.total===1?'':'s'}</span></div>`).join('');
-  return `<section class="gr155-recap-block" data-gr-hq="eagles">${head}${rows}<div class="gr-hq-mode-tag">${esc(model.mode)} · per player</div></section>`;
+  const lead=model.leaders[0];
+  const hero=`<div class="gr-eagle-spotlight"><div class="gr-eagle-spotlight-label">Pace setter</div><div class="gr-eagle-spotlight-name">${esc(lead.playerName)}</div><div class="gr-eagle-spotlight-count">${lead.total}<span> eagle${lead.total===1?'':'s'}</span></div></div>`;
+  const rows=model.leaders.slice(0,8).map((r,i)=>`<div class="gr155-recap-row gr155-eagle-row ${i===0?'is-lead':''}"><span><strong>${esc(r.playerName)}</strong>${r.flags.length?' <em class="gr-hq-flag" title="Possible duplicate">⚑</em>':''}</span><span class="gr-eagle-total">${r.total}</span></div>`).join('');
+  return `<section class="gr155-recap-block gr-honor-card gr-honor-eagle-card" data-gr-hq="eagles">${head}${hero}<div class="gr-eagle-board-label">Board</div>${rows}</section>`;
 }
 
 function renderRecordsBubble(p){
   const model=recordsModel(p);
-  const head=`<div class="gr155-recap-title gr-hq-title-row"><span>RECORDS</span>${editIconBtn('records')}</div>`;
+  const head=honorHead('records','RECORDS','Birdies & holes in one');
   const bits=[];
-  // Birdies
   const b=model.birdies;
   if(b.display.length){
     const t=b.display[0];
-    bits.push(`<div class="gr155-record"><span class="gr155-record-label">Most Birdies in a Round <i class="gr-hq-src">${esc(t.sourceLabel||b.mode)}</i></span><strong>${esc(t.player||t.playerName)} · ${t.value}</strong><small>${esc(t.missionTitle||t.mission||'')}${t.date?` · ${esc(fmtDate(t.date))}`:''}</small></div>`);
+    bits.push(`<div class="gr155-record gr-record-flash"><span class="gr155-record-label">Most Birdies in a Round</span><strong>${esc(t.player||t.playerName)} · ${t.value}</strong><small>${esc(t.missionTitle||t.mission||'')}${t.date?` · ${esc(fmtDate(t.date))}`:''}</small></div>`);
   }else{
     bits.push(`<div class="gr155-record"><span class="gr155-record-label">Most Birdies in a Round</span><div class="gr155-empty">No birdie record yet.</div></div>`);
   }
-  // Aces
   const a=model.ace;
   if(a.display.length){
-    bits.push(a.display.slice(0,4).map(x=>`<div class="gr155-record"><span class="gr155-record-label">Hole in One <i class="gr-hq-src">${esc(x.sourceLabel||a.mode)}</i></span><strong>${esc(x.player||x.playerName)}</strong><small>${esc(x.course||'')}${x.hole!=null?` · Hole ${x.hole}`:''}${x.date?` · ${esc(fmtDate(x.date))}`:''}</small></div>`).join(''));
+    bits.push(a.display.slice(0,4).map(x=>`<div class="gr155-record gr-record-flash"><span class="gr155-record-label">Hole in One</span><strong>${esc(x.player||x.playerName)}</strong><small>${esc(x.course||'')}${x.hole!=null?` · Hole ${x.hole}`:''}${x.date?` · ${esc(fmtDate(x.date))}`:''}</small></div>`).join(''));
   }else{
     bits.push(`<div class="gr155-record"><span class="gr155-record-label">Holes in One</span><div class="gr155-empty">No aces recorded yet.</div></div>`);
   }
-  // Eagle record line (compact pointer to Club Eagle / manual eagle records)
-  const e=model.eagle;
-  if(e.manual.length){
-    bits.push(`<div class="gr155-record"><span class="gr155-record-label">Eagles (manual entries)</span><strong>${e.manual.length}</strong><small>See Club Eagle for combined totals</small></div>`);
-  }
-  const flags=[...b.flagged,...a.flagged,...e.flagged];
+  const flags=[...b.flagged,...a.flagged];
   if(flags.length)bits.push(`<div class="gr155-record gr-hq-review"><span class="gr155-record-label">Needs review</span><small>${flags.length} possible duplicate${flags.length===1?'':'s'} flagged</small></div>`);
-  return `<section class="gr155-recap-block" data-gr-hq="records">${head}${bits.join('')}</section>`;
+  return `<section class="gr155-recap-block gr-honor-card gr-honor-records-card" data-gr-hq="records">${head}${bits.join('')}</section>`;
 }
 
-function playerOptions(p,selected){
+function playerOptions(p,selected,{placeholder='Choose player…'}={}){
   const opts=(p.members||[]).map(m=>`<option value="${esc(m.id)}" ${String(selected)===String(m.id)?'selected':''}>${esc(m.name)}</option>`).join('');
-  return `<option value="">Custom / new player…</option>${opts}`;
+  return `<option value="">${esc(placeholder)}</option>${opts}`;
 }
 function missionOptions(p,selected){
   const ms=(p.missions||[]).filter(m=>m.type!=='war').slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
@@ -436,13 +442,13 @@ function openRecordsEditor(){
   const model=recordsModel(p);
   const dlgFn=typeof platoonDialog==='function'?platoonDialog:null;
   if(!dlgFn){alert('Editor unavailable.');return}
-  const rows=(meta.records||[]).map((r,i)=>recordRowHtml(p,r,i)).join('')||'<div class="gr155-empty">No manual records yet.</div>';
-  const d=dlgFn(`<div class="dialog-head"><div><div class="eyebrow">RECORDS</div><h2 style="margin:5px 0 0">Edit Platoon Records</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
-    <div class="platoon-notice"><strong>Modes:</strong> Automatic uses verified hole data · Manual uses only your entries · Combined (default) merges both without double-counting. Overrides replace the automatic display for that category.</div>
-    <div class="gr-hq-modes grid three">
+  const editable=(meta.records||[]).filter(r=>r.category==='birdies'||r.category==='ace');
+  const rows=editable.map((r,i)=>recordRowHtml(p,r,i)).join('')||'<div class="gr155-empty">No manual records yet.</div>';
+  const d=dlgFn(`<div class="dialog-head"><div><div class="eyebrow">RECORDS</div><h2 style="margin:5px 0 0">Birdies &amp; holes in one</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
+    <div class="platoon-notice"><strong>Modes:</strong> Automatic uses verified hole data · Manual uses only your entries · Combined (default) merges both without double-counting. Eagles live in Club Eagle.</div>
+    <div class="gr-hq-modes grid two">
       <label>Birdies ${modeSelect('birdies',meta.modes.birdies)}</label>
       <label>Holes in One ${modeSelect('ace',meta.modes.ace)}</label>
-      <label>Eagles ${modeSelect('eagle',meta.modes.eagle)}</label>
     </div>
     <div class="gr-hq-editor-list" id="grHqRecList">${rows}</div>
     <div class="dialog-actions sticky-actions" style="margin-top:10px">
@@ -470,10 +476,10 @@ function openRecordsEditor(){
     try{
       meta.modes.birdies=d.querySelector('[data-mode="birdies"]').value;
       meta.modes.ace=d.querySelector('[data-mode="ace"]').value;
-      meta.modes.eagle=d.querySelector('[data-mode="eagle"]').value;
       const next=[];
       list.querySelectorAll('.gr-hq-edit-row').forEach(row=>{
-        const category=row.querySelector('[data-f="category"]').value;
+        let category=row.querySelector('[data-f="category"]').value;
+        if(category!=='birdies'&&category!=='ace')category='birdies';
         const memberId=row.querySelector('[data-f="memberId"]').value;
         let playerName=row.querySelector('[data-f="playerName"]').value.trim();
         const resolved=resolvePlayer(p,memberId,playerName);
@@ -502,7 +508,8 @@ function openRecordsEditor(){
         if(autoList.some(a=>a.fingerprint===rec.fingerprint))rec.reviewFlag=true;
         next.push(rec);
       });
-      meta.records=next;
+      // Drop legacy eagle category rows — eagles belong in Club Eagle only.
+      meta.records=next.filter(r=>r.category==='birdies'||r.category==='ace');
       writeHqMeta(p,meta);
       if(typeof writePlatoonLocal==='function')writePlatoonLocal(p);
       if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,!window.grTestEnvActive);
@@ -520,7 +527,7 @@ function openRecordsEditor(){
 function recordRowHtml(p,r){
   return `<div class="gr-hq-edit-row" data-id="${esc(r.id)}">
     <div class="grid two">
-      <label>Category<select data-f="category" class="gr-mission-select">${CATEGORIES.map(c=>`<option value="${c.id}" ${r.category===c.id?'selected':''}>${esc(c.label)}</option>`).join('')}</select></label>
+      <label>Category<select data-f="category" class="gr-mission-select">${RECORD_CATEGORIES.map(c=>`<option value="${c.id}" ${r.category===c.id?'selected':''}>${esc(c.label)}</option>`).join('')}</select></label>
       <label>Count / score<input data-f="value" type="number" min="1" step="1" value="${esc(r.value??1)}"></label>
     </div>
     <div class="grid two">
@@ -542,51 +549,177 @@ function recordRowHtml(p,r){
   </div>`;
 }
 
-function openEaglesEditor(){
+function eagleTotalsStripHtml(p){
+  const model=clubEagleModel(p);
+  if(!model.leaders.length)return `<div class="gr-eagle-live"><div class="gr155-empty">No running totals yet — log the first eagle below.</div></div>`;
+  return `<div class="gr-eagle-live">${model.leaders.map(r=>`<div class="gr-eagle-chip"><span>${esc(r.playerName)}</span><strong>${r.total}</strong></div>`).join('')}</div>`;
+}
+function eagleHistoryHtml(p,meta){
+  const dets=[...(meta.eagleDetails||[])].slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+  if(!dets.length)return `<div class="gr155-empty">No logged eagles yet.</div>`;
+  return dets.map(e=>{
+    const who=resolvePlayer(p,e.memberId,e.playerName).playerName||e.playerName||'Player';
+    const where=[e.course,e.hole!=null?`Hole ${e.hole}`:'',e.date?fmtDate(e.date):''].filter(Boolean).join(' · ');
+    return `<div class="gr-eagle-hist" data-eg-id="${esc(e.id)}">
+      <div><strong>${esc(who)}</strong><div class="muted" style="font-size:11px">${esc(where||'Details TBD')}</div></div>
+      <div class="gr-eagle-hist-actions">
+        <button type="button" class="button secondary" data-edit-eg="${esc(e.id)}" style="padding:6px 8px;font-size:10px">Edit</button>
+        <button type="button" class="button secondary" data-del-eg="${esc(e.id)}" style="padding:6px 8px;font-size:10px">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function blankEagleFormHtml(p,e={}){
+  return `<div class="gr-hq-edit-row gr-eagle-log-form" data-edit-id="${esc(e.id||'')}">
+    <div class="eyebrow" id="grEgFormTitle">${e.id?'EDIT EAGLE':'LOG AN EAGLE'}</div>
+    <div class="grid two">
+      <label>Player<select data-f="memberId" class="gr-mission-select">${playerOptions(p,e.memberId||'',{placeholder:'Choose player…'})}</select></label>
+      <label>Custom name<input data-f="playerName" value="${esc(e.playerName||'')}" placeholder="Only if not in roster"></label>
+    </div>
+    <div class="grid two">
+      <label>Course${courseSelectHtml(e.course||'')}</label>
+      <label>Hole${holeSelectHtml(e.hole)}</label>
+    </div>
+    <div class="grid two">
+      ${dateFieldHtml('date',e.date||'','Date')}
+      <label>Mission<select data-f="missionId" class="gr-mission-select">${missionOptions(p,e.missionId||'')}</select></label>
+    </div>
+    <label>Notes<input data-f="notes" value="${esc(e.notes||'')}" placeholder="Optional"></label>
+    <div class="dialog-actions" style="margin-top:10px">
+      <button type="button" class="button secondary" id="grEgClear" ${e.id?'':'hidden'}>Cancel edit</button>
+      <button type="button" class="button primary" id="grEgLog">${e.id?'Save changes':'+ Add to total'}</button>
+    </div>
+  </div>`;
+}
+function persistHq(p,meta){
+  writeHqMeta(p,meta);
+  if(typeof writePlatoonLocal==='function')writePlatoonLocal(p);
+  if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,!window.grTestEnvActive);
+}
+
+function openEaglesEditor(opts={}){
   const p=getP();if(!p)return;
   if(!canEditHq(p)){alert('Only the Platoon Chief or Co-Chief can edit Club Eagle.');return}
-  const meta=hqMetaOf(p);
+  let meta=hqMetaOf(p);
   const dlgFn=typeof platoonDialog==='function'?platoonDialog:null;
   if(!dlgFn){alert('Editor unavailable.');return}
-  const balRows=(meta.eagleBalances||[]).map(b=>balanceRowHtml(p,b)).join('')||'<div class="gr155-empty">No starting balances yet.</div>';
-  const detRows=(meta.eagleDetails||[]).map(e=>eagleDetailRowHtml(p,e)).join('')||'<div class="gr155-empty">No individual eagle details yet.</div>';
-  const d=dlgFn(`<div class="dialog-head"><div><div class="eyebrow">CLUB EAGLE</div><h2 style="margin:5px 0 0">Edit Player Eagles</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
-    <div class="platoon-notice"><strong>Per player only</strong> — no group tally. Starting balances cover historical eagles without scorecards. Set an <em>As-of date</em> so later automatic imports before that date are not double-counted. Hole details are optional.</div>
-    <label>Display mode ${modeSelect('eagle',meta.modes.eagle)}</label>
-    <div class="eyebrow" style="margin-top:14px">STARTING BALANCES</div>
-    <div id="grHqBalList" class="gr-hq-editor-list">${balRows}</div>
-    <button class="button secondary" type="button" id="grHqBalAdd">+ Add balance</button>
-    <div class="eyebrow" style="margin-top:16px">INDIVIDUAL EAGLES (MANUAL)</div>
-    <div id="grHqEgList" class="gr-hq-editor-list">${detRows}</div>
-    <button class="button secondary" type="button" id="grHqEgAdd">+ Add eagle detail</button>
+  const d=dlgFn(`<div class="dialog-head"><div><div class="eyebrow">CLUB EAGLE</div><h2 style="margin:5px 0 0">Player eagle totals</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">Each cadet keeps their own running total. Log a new eagle below — previous ones stay in History, not in the form.</p>
+    <div class="eyebrow" style="margin-top:14px">RUNNING TOTALS</div>
+    <div id="grEgTotals">${eagleTotalsStripHtml(p)}</div>
+    <div id="grEgFormWrap" style="margin-top:14px">${blankEagleFormHtml(p)}</div>
+    <div class="eyebrow" style="margin-top:16px">HISTORY</div>
+    <div id="grEgHistory" class="gr-eagle-history">${eagleHistoryHtml(p,meta)}</div>
+    <details class="gr-eagle-advanced" style="margin-top:16px">
+      <summary>Starting balances (optional)</summary>
+      <p class="muted" style="font-size:11px">Use this for historical eagles before Golf Recon — not for logging a new one.</p>
+      <div id="grHqBalList" class="gr-hq-editor-list">${(meta.eagleBalances||[]).map(b=>balanceRowHtml(p,b)).join('')||'<div class="gr155-empty">None yet.</div>'}</div>
+      <button class="button secondary" type="button" id="grHqBalAdd">+ Starting balance</button>
+      <button class="button secondary" type="button" id="grHqBalSave" style="margin-left:6px">Save balances</button>
+    </details>
     <div class="dialog-actions sticky-actions">
-      <button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button>
-      <button class="button primary" type="button" id="grHqEgSave">Save</button>
+      <button class="button secondary" type="button" onclick="closePlatoonDialog()">Done</button>
     </div>
     <div id="grHqEgMsg" class="gr-hq-msg" hidden></div>`);
-  const balList=d.querySelector('#grHqBalList'),egList=d.querySelector('#grHqEgList');
-  bindDateChips(d);bindCourseCustom(d);
+
+  const formWrap=d.querySelector('#grEgFormWrap');
+  const historyEl=d.querySelector('#grEgHistory');
+  const totalsEl=d.querySelector('#grEgTotals');
+  const balList=d.querySelector('#grHqBalList');
+  const msg=d.querySelector('#grHqEgMsg');
+  const showMsg=(text,ok=false)=>{msg.hidden=false;msg.textContent=text;msg.className='gr-hq-msg'+(ok?'':' err')};
+  const refreshUi=()=>{
+    meta=hqMetaOf(loadPlatoonLocal());
+    Object.assign(p,loadPlatoonLocal());
+    p.hqMeta=meta;
+    totalsEl.innerHTML=eagleTotalsStripHtml(p);
+    historyEl.innerHTML=eagleHistoryHtml(p,meta);
+  };
+  const resetForm=()=>{formWrap.innerHTML=blankEagleFormHtml(p);bindDateChips(formWrap);bindCourseCustom(formWrap);wireForm()};
+  const readForm=()=>{
+    const root=formWrap.querySelector('.gr-eagle-log-form');
+    const memberId=root.querySelector('[data-f="memberId"]').value;
+    let playerName=root.querySelector('[data-f="playerName"]').value.trim();
+    const resolved=resolvePlayer(p,memberId,playerName);
+    let course=root.querySelector('[data-f="course"]').value.trim();
+    if(course==='__custom__')course='';
+    const holeRaw=root.querySelector('[data-f="hole"]').value;
+    const hole=holeRaw===''?null:Number(holeRaw);
+    const date=root.querySelector('[data-f="date"]').value;
+    const missionId=root.querySelector('[data-f="missionId"]').value;
+    const mission=missionId?(p.missions||[]).find(m=>m.id===missionId):null;
+    const notes=root.querySelector('[data-f="notes"]').value.trim();
+    const editId=root.dataset.editId||'';
+    if(!resolved.playerName&&!playerName)throw new Error('Choose a player.');
+    return normalizeEagleDetail({
+      id:editId||uid('eg'),
+      memberId:resolved.memberId,
+      playerName:resolved.playerName||playerName,
+      course,hole,date,missionId,
+      missionTitle:mission?.title||mission?.locationName||'',
+      notes,
+      updatedAt:new Date().toISOString()
+    });
+  };
+  const wireForm=()=>{
+    formWrap.querySelector('#grEgLog').onclick=()=>{
+      try{
+        const row=readForm();
+        meta=hqMetaOf(loadPlatoonLocal());
+        const idx=meta.eagleDetails.findIndex(x=>String(x.id)===String(row.id));
+        if(idx>=0)meta.eagleDetails[idx]=row;
+        else meta.eagleDetails.push(row);
+        persistHq(p,meta);
+        refreshUi();
+        resetForm();
+        showMsg(`${row.playerName}: eagle logged. Running total updated.`,true);
+        setTimeout(()=>{if(typeof render==='function')render()},0);
+      }catch(err){showMsg(err.message||String(err))}
+    };
+    formWrap.querySelector('#grEgClear')?.addEventListener('click',()=>resetForm());
+  };
+
+  bindDateChips(d);bindCourseCustom(d);wireForm();
+
+  // Always land on a blank "add" form — never dump the last eagle into the editor.
+  if(opts.editId){
+    const existing=(meta.eagleDetails||[]).find(x=>String(x.id)===String(opts.editId));
+    if(existing){formWrap.innerHTML=blankEagleFormHtml(p,existing);bindDateChips(formWrap);bindCourseCustom(formWrap);wireForm()}
+  }else if(opts.add){
+    formWrap.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+
+  historyEl.onclick=e=>{
+    const del=e.target.closest('[data-del-eg]');
+    if(del){
+      if(!confirm('Delete this logged eagle? The player’s running total will drop by 1.'))return;
+      meta=hqMetaOf(loadPlatoonLocal());
+      meta.eagleDetails=meta.eagleDetails.filter(x=>String(x.id)!==String(del.getAttribute('data-del-eg')));
+      persistHq(p,meta);refreshUi();resetForm();
+      showMsg('Eagle removed from history.',true);
+      setTimeout(()=>{if(typeof render==='function')render()},0);
+      return;
+    }
+    const ed=e.target.closest('[data-edit-eg]');
+    if(ed){
+      meta=hqMetaOf(loadPlatoonLocal());
+      const existing=(meta.eagleDetails||[]).find(x=>String(x.id)===String(ed.getAttribute('data-edit-eg')));
+      if(!existing)return;
+      formWrap.innerHTML=blankEagleFormHtml(p,existing);
+      bindDateChips(formWrap);bindCourseCustom(formWrap);wireForm();
+      formWrap.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+  };
+
   d.querySelector('#grHqBalAdd').onclick=()=>{
     const b=normalizeBalance({playerName:'',count:1,asOfDate:new Date().toISOString().slice(0,10)});
-    meta.eagleBalances.push(b);
     if(balList.querySelector('.gr155-empty'))balList.innerHTML='';
     balList.insertAdjacentHTML('beforeend',balanceRowHtml(p,b));
+    bindDateChips(balList);bindCourseCustom(balList);
   };
-  d.querySelector('#grHqEgAdd').onclick=()=>{
-    const e=normalizeEagleDetail({playerName:'',date:''});
-    meta.eagleDetails.push(e);
-    if(egList.querySelector('.gr155-empty'))egList.innerHTML='';
-    egList.insertAdjacentHTML('beforeend',eagleDetailRowHtml(p,e));
-  };
-  d.onclick=e=>{
-    const db=e.target.closest('[data-del-bal]');
-    if(db){if(!confirm('Remove this starting balance?'))return;meta.eagleBalances=meta.eagleBalances.filter(x=>x.id!==db.getAttribute('data-del-bal'));db.closest('.gr-hq-edit-row')?.remove();return}
-    const de=e.target.closest('[data-del-eg]');
-    if(de){if(!confirm('Delete this manual eagle detail?'))return;meta.eagleDetails=meta.eagleDetails.filter(x=>x.id!==de.getAttribute('data-del-eg'));de.closest('.gr-hq-edit-row')?.remove()}
-  };
-  d.querySelector('#grHqEgSave').onclick=()=>{
+  d.querySelector('#grHqBalSave').onclick=()=>{
     try{
-      meta.modes.eagle=d.querySelector('[data-mode="eagle"]').value;
+      meta=hqMetaOf(loadPlatoonLocal());
       const bals=[];
       balList.querySelectorAll('.gr-hq-edit-row').forEach(row=>{
         const memberId=row.querySelector('[data-f="memberId"]').value;
@@ -601,91 +734,43 @@ function openEaglesEditor(){
         if(!Number.isFinite(count)||count<0)throw new Error('Balance counts must be zero or greater.');
         bals.push(normalizeBalance({id:row.dataset.id,memberId:resolved.memberId,playerName:resolved.playerName||playerName,count,asOfDate,notes,updatedAt:new Date().toISOString()}));
       });
-      const dets=[];
-      egList.querySelectorAll('.gr-hq-edit-row').forEach(row=>{
-        const memberId=row.querySelector('[data-f="memberId"]').value;
-        let playerName=row.querySelector('[data-f="playerName"]').value.trim();
-        const resolved=resolvePlayer(p,memberId,playerName);
-        let course=row.querySelector('[data-f="course"]').value.trim();
-        if(course==='__custom__')course='';
-        const holeRaw=row.querySelector('[data-f="hole"]').value;
-        const hole=holeRaw===''?null:Number(holeRaw);
-        const date=row.querySelector('[data-f="date"]').value;
-        const missionId=row.querySelector('[data-f="missionId"]').value;
-        const mission=missionId?(p.missions||[]).find(m=>m.id===missionId):null;
-        const notes=row.querySelector('[data-f="notes"]').value.trim();
-        const blank=!memberId&&!playerName&&!course&&hole==null&&!date&&!missionId&&!notes;
-        if(blank)return;
-        if(!resolved.playerName&&!playerName)throw new Error('Choose a player for each eagle detail.');
-        dets.push(normalizeEagleDetail({id:row.dataset.id,memberId:resolved.memberId,playerName:resolved.playerName||playerName,course,hole,date,missionId,missionTitle:mission?.title||mission?.locationName||'',notes,updatedAt:new Date().toISOString()}));
-      });
       meta.eagleBalances=bals;
-      meta.eagleDetails=dets;
-      writeHqMeta(p,meta);
-      // Persist locally first; TEST/preview skips server; never allow a later bootstrap wipe.
-      if(typeof writePlatoonLocal==='function')writePlatoonLocal(p);
-      else if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,false);
-      if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,!window.grTestEnvActive);
-      d.close();
+      persistHq(p,meta);refreshUi();
+      showMsg('Starting balances saved.',true);
       setTimeout(()=>{if(typeof render==='function')render()},0);
-      const savedCheck=loadPlatoonLocal()?.hqMeta;
-      const ok=hqMetaWeight(savedCheck)>=hqMetaWeight(meta);
-      if(!ok)throw new Error('Eagle totals did not stick locally. Try again.');
-      alert(window.grTestEnvActive
-        ?'Club Eagle saved on this device (TEST build — server sync off).'
-        :('Club Eagle saved. They sync with your Platoon when online'+(window.__grHqMetaServer?'':' (server column pending migration approval)')+'.'));
-    }catch(err){
-      const msg=d.querySelector('#grHqEgMsg');msg.hidden=false;msg.textContent=err.message||String(err);msg.className='gr-hq-msg err';
-    }
+    }catch(err){showMsg(err.message||String(err))}
   };
 }
 
 function balanceRowHtml(p,b){
   return `<div class="gr-hq-edit-row" data-id="${esc(b.id)}">
     <div class="grid two">
-      <label>Player<select data-f="memberId" class="gr-mission-select">${playerOptions(p,b.memberId)}</select></label>
-      <label>Name (if custom)<input data-f="playerName" value="${esc(b.playerName||'')}"></label>
+      <label>Player<select data-f="memberId" class="gr-mission-select">${playerOptions(p,b.memberId,{placeholder:'Choose player…'})}</select></label>
+      <label>Custom name<input data-f="playerName" value="${esc(b.playerName||'')}"></label>
     </div>
     <div class="grid two">
       <label>Starting eagles<input data-f="count" type="number" min="0" step="1" value="${esc(b.count??0)}"></label>
       ${dateFieldHtml('asOfDate',b.asOfDate,'As-of date')}
     </div>
     <label>Notes<input data-f="notes" value="${esc(b.notes||'')}"></label>
-    <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-bal="${esc(b.id)}">Remove</button><span class="muted" style="font-size:10px">Manual balance</span></div>
-  </div>`;
-}
-function eagleDetailRowHtml(p,e){
-  return `<div class="gr-hq-edit-row" data-id="${esc(e.id)}">
-    <div class="grid two">
-      <label>Player<select data-f="memberId" class="gr-mission-select">${playerOptions(p,e.memberId)}</select></label>
-      <label>Name (if custom)<input data-f="playerName" value="${esc(e.playerName||'')}"></label>
-    </div>
-    <div class="grid two">
-      <label>Course${courseSelectHtml(e.course)}</label>
-      <label>Hole${holeSelectHtml(e.hole)}</label>
-    </div>
-    <div class="grid two">
-      ${dateFieldHtml('date',e.date,'Date')}
-      <label>Mission<select data-f="missionId" class="gr-mission-select">${missionOptions(p,e.missionId)}</select></label>
-    </div>
-    <label>Notes<input data-f="notes" value="${esc(e.notes||'')}"></label>
-    <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-eg="${esc(e.id)}">Delete</button><span class="muted" style="font-size:10px">Manual detail</span></div>
+    <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-bal="${esc(b.id)}">Remove</button><span class="muted" style="font-size:10px">Starting balance</span></div>
   </div>`;
 }
 
 function installStyles(){
-  if(document.getElementById('grHqRecStyles'))return;
-  const s=document.createElement('style');s.id='grHqRecStyles';
+  let s=document.getElementById('grHqRecStyles');
+  if(!s){s=document.createElement('style');s.id='grHqRecStyles';document.head.appendChild(s)}
   s.textContent=`
   .gr-hq-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .gr-hq-edit{border:1px solid rgba(184,234,104,.35);background:rgba(184,234,104,.08);color:var(--accent,#b8ea68);border-radius:8px;width:28px;height:28px;padding:0;cursor:pointer;font-size:14px;line-height:1}
-  .gr-hq-edit:hover{background:rgba(184,234,104,.16)}
+  .gr-hq-edit{border:1px solid rgba(212,175,106,.4);background:rgba(212,175,106,.1);color:var(--accent,#d4af6a);border-radius:8px;width:28px;height:28px;padding:0;cursor:pointer;font-size:14px;line-height:1}
+  .gr-hq-edit:hover{background:rgba(212,175,106,.2)}
+  .gr-hq-add-eg{padding:6px 9px!important;font-size:9px!important;font-weight:850!important}
   .gr-hq-mode-tag{margin-top:8px;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800}
   .gr-hq-src{font-style:normal;font-weight:700;opacity:.75;margin-left:4px;text-transform:none;letter-spacing:0}
   .gr-hq-flag{color:#ffcf68;font-style:normal}
   .gr-hq-flag-line,.gr-hq-review small{color:#ffcf68}
   .gr-hq-editor-list{display:grid;gap:10px;margin-top:10px;overflow:visible;max-height:none}
-  .gr-hq-edit-row{border:1px solid var(--line,#24352d);border-radius:12px;padding:10px;background:#101914}
+  .gr-hq-edit-row{border:1px solid var(--line,#24352d);border-radius:12px;padding:10px;background:rgba(16,25,20,.55)}
   #platoonDynamicDialog .dialog-card{overflow-y:auto;-webkit-overflow-scrolling:touch}
   #platoonDynamicDialog .sticky-actions{position:sticky;bottom:0;z-index:6}
   .gr-hq-edit-row label{margin-top:6px}
@@ -695,8 +780,35 @@ function installStyles(){
   .gr-hq-msg{margin-top:10px;padding:8px 10px;border-radius:10px;font-size:11px}
   .gr-hq-msg.err{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.25);color:#ff9b96}
   .gr-hq-modes label{font-size:11px}
+  .gr-honor-card{position:relative;overflow:hidden;border-color:rgba(212,175,106,.28)!important;background:linear-gradient(160deg,rgba(48,40,24,.5),rgba(14,12,10,.55))!important;box-shadow:0 16px 36px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,248,235,.1)!important}
+  .gr-honor-eagle-card{background:radial-gradient(circle at 92% -10%,rgba(212,175,106,.22),transparent 42%),linear-gradient(160deg,rgba(52,40,20,.55),rgba(12,12,10,.58))!important}
+  .gr-honor-records-card{background:radial-gradient(circle at 92% -10%,rgba(111,143,90,.18),transparent 42%),linear-gradient(160deg,rgba(36,40,24,.52),rgba(12,12,10,.58))!important}
+  .gr-honor-lockup{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .gr-honor-mark{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:24px;border:1px solid rgba(212,175,106,.4);background:radial-gradient(circle at 35% 30%,rgba(255,248,235,.16),rgba(212,175,106,.08) 45%,rgba(14,12,10,.55));box-shadow:0 0 18px rgba(212,175,106,.18),inset 0 1px 0 rgba(255,248,235,.2);flex:0 0 auto}
+  .gr-honor-eagle .gr-honor-mark,.gr-honor-mark.gr-honor-eagle{animation:grHonorPulse 2.8s ease-in-out infinite}
+  .gr-honor-copy{flex:1 1 auto;min-width:0}
+  .gr-honor-sub{font-size:11px;font-weight:750;color:#e8dcc4;margin-top:2px}
+  .gr-honor-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}
+  .gr-eagle-spotlight{display:grid;gap:2px;padding:12px 12px 11px;margin:2px 0 10px;border-radius:14px;border:1px solid rgba(212,175,106,.35);background:linear-gradient(135deg,rgba(212,175,106,.18),rgba(20,16,10,.35));box-shadow:inset 0 1px 0 rgba(255,248,235,.12),0 10px 24px rgba(0,0,0,.2)}
+  .gr-eagle-spotlight-label{font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:900;color:var(--accent,#d4af6a)}
+  .gr-eagle-spotlight-name{font-size:18px;font-weight:950;line-height:1.1;color:#fff6e8;text-shadow:0 1px 10px rgba(0,0,0,.35)}
+  .gr-eagle-spotlight-count{font-size:28px;font-weight:950;color:var(--accent,#d4af6a);line-height:1;margin-top:4px;text-shadow:0 0 18px rgba(212,175,106,.25)}
+  .gr-eagle-spotlight-count span{font-size:11px;font-weight:800;margin-left:6px;color:#dce6e1;letter-spacing:.04em}
+  .gr-eagle-board-label{font-size:8px;letter-spacing:.12em;text-transform:uppercase;font-weight:900;color:var(--muted);margin:2px 0 4px}
+  .gr-eagle-total{font-size:16px!important;font-weight:950!important;color:var(--accent,#d4af6a)!important;text-shadow:0 0 12px rgba(212,175,106,.25)}
+  .gr155-eagle-row.is-lead{background:rgba(212,175,106,.08);border-radius:8px;padding-left:6px;padding-right:6px;margin:0 -6px}
+  .gr-eagle-live{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .gr-eagle-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid rgba(212,175,106,.3);background:rgba(212,175,106,.1)}
+  .gr-eagle-chip strong{color:var(--accent);font-size:16px}
+  .gr-eagle-history{display:grid;gap:8px;margin-top:8px}
+  .gr-eagle-hist{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(16,20,16,.45)}
+  .gr-eagle-hist-actions{display:flex;gap:6px}
+  .gr-eagle-advanced{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;background:rgba(10,12,10,.35)}
+  .gr-eagle-advanced summary{cursor:pointer;font-weight:850;font-size:12px;color:var(--accent)}
+  .gr-record-flash strong{font-size:14px!important;color:#fff6e8}
+  @keyframes grHonorPulse{0%,100%{box-shadow:0 0 14px rgba(212,175,106,.14),inset 0 1px 0 rgba(255,248,235,.18)}50%{box-shadow:0 0 22px rgba(212,175,106,.28),inset 0 1px 0 rgba(255,248,235,.28)}}
+  @media(prefers-reduced-motion:reduce){.gr-honor-mark.gr-honor-eagle{animation:none}}
   `;
-  document.head.appendChild(s);
 }
 
 function bindUi(){
@@ -708,7 +820,7 @@ function bindUi(){
     e.preventDefault();e.stopPropagation();
     const kind=b.getAttribute('data-gr-hq-edit');
     if(kind==='records')openRecordsEditor();
-    else if(kind==='eagles')openEaglesEditor();
+    else if(kind==='eagles')openEaglesEditor({add:!!b.getAttribute('data-gr-hq-add')});
   },true);
 }
 

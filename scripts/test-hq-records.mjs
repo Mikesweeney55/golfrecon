@@ -63,7 +63,11 @@ assert(merged.hqMeta&&merged.hqMeta.eagleBalances?.length===1,'sync preserves lo
 const htmlEagle=ctx.window.grRenderClubEagleBubble(p);
 const htmlRec=ctx.window.grRenderRecordsBubble(p);
 assert(htmlEagle.includes('data-gr-hq-edit="eagles"'),'eagle edit icon');
+assert(htmlEagle.includes('eagle-mark')||htmlEagle.includes('gr-honor-eagle'),'flashy eagle mark');
 assert(htmlRec.includes('data-gr-hq-edit="records"'),'records edit icon');
+assert(htmlRec.includes('Birdies')||htmlRec.includes('Hole in One')||htmlRec.includes('Holes in One'),'records shows birdies/aces');
+assert(!/Eagles \(manual|CLUB EAGLE for combined|category.?eagle/i.test(htmlRec),'records bubble has no eagle category');
+assert(!rec.eagle,'records model omits eagle category');
 
 // Authz: linked cadet cannot edit; linked chief can; fail-closed for empty platoon
 assert(ctx.window.grCanEditHq({members:[{id:'cadet',name:'Josh',role:'cadet',linked:true}]})===false,'linked cadet cannot edit HQ');
