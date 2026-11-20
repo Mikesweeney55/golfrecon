@@ -649,7 +649,14 @@ function platoonRecapMarkup(p){
     else if(finite(r.eagle_count)&&Number(r.eagle_count)>0)x.eagles+=Number(r.eagle_count);
   }
   const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
-  const standing=rows.map((x,i)=>`<div class="gr155-recap-row"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span>${x.points} pts</span></div>`).join('')||'<div class="gr155-empty">No points yet.</div>';
+  const maxPts=Math.max(1,...rows.map(x=>Number(x.points)||0));
+  const standing=rows.length
+    ? `<div class="dossier-rank-list">${rows.map((x,i)=>{
+        const pts=Number(x.points)||0;
+        const pct=Math.max(4,Math.round(100*pts/maxPts));
+        return `<div class="dossier-rank-row"><b class="dossier-rank-num">${i+1}</b><div class="dossier-rank-body"><strong>${esc(x.member.name)}</strong><div class="dossier-rank-track"><span style="width:${pct}%"></span></div></div><span class="dossier-rank-pts">${pts} pts</span></div>`;
+      }).join('')}</div>`
+    : '<div class="gr155-empty">No points yet.</div>';
   const eagle=renderClubEagleBubble(p);
   const records=renderRecordsBubble(p);
   const intel=[];

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Golf Recon V16.4</title>
+  <title>Golf Recon V16.5</title>
   <script src="gr-test-env.js?v=1"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
@@ -1550,8 +1550,140 @@ body::before,body::after{opacity:0!important}
   .gr-atmos-layer,.gr-atmos-scan,.gr-mark,.auth-gate,.topbar,.dossier-strip,.button.primary{animation:none!important;transition:none!important}
 }
 
+
+/* =========================================================
+   V16.5 — Field Dossier data views (Concept B)
+   Presentation only — same metrics / calcs.
+   ========================================================= */
+.dossier-shell{
+  display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;align-items:start;margin-top:8px;
+}
+.dossier-rail{
+  position:sticky;top:10px;display:grid;gap:6px;padding:8px 6px;
+  border:1px solid rgba(212,175,106,.22);border-radius:14px;
+  background:linear-gradient(180deg,rgba(28,26,18,.78),rgba(12,14,11,.86));
+  backdrop-filter:blur(12px);
+}
+.dossier-rail-tab{
+  border:0;border-radius:10px;padding:12px 6px;background:transparent;color:var(--muted);
+  font-family:var(--font-stencil),Oswald,sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.14em;cursor:pointer;text-align:center;
+}
+.dossier-rail-tab.active{
+  color:#fff6e8;background:linear-gradient(180deg,rgba(212,175,106,.22),rgba(111,143,90,.16));
+  box-shadow:inset 0 0 0 1px rgba(212,175,106,.3);
+}
+.dossier-pane{min-width:0}
+.dossier-hero{
+  padding:18px 16px;margin-bottom:12px;border-radius:14px;
+  border:1px solid rgba(212,175,106,.24);
+  background:linear-gradient(125deg,rgba(40,36,22,.72),rgba(12,14,11,.8));
+  backdrop-filter:blur(10px);
+}
+.dossier-hero-metric{
+  font-family:var(--font-display)!important;font-size:56px;line-height:1;font-weight:600;
+  letter-spacing:-.03em;color:#f4ebe0;margin:4px 0 6px;
+}
+.dossier-metric-strip{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 12px;
+}
+.dossier-metric{
+  padding:12px 10px;border-radius:12px;border:1px solid rgba(212,175,106,.16);
+  background:rgba(18,16,12,.55);text-align:left;
+}
+.dossier-metric .metric{font-family:var(--font-display)!important;font-size:28px;line-height:1;display:block;margin-top:4px}
+.dossier-metric .metric-sm{font-size:18px!important}
+.dossier-metric small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.dossier-panel{
+  padding:14px;border-radius:14px;border:1px solid rgba(212,175,106,.18);
+  background:linear-gradient(165deg,rgba(32,28,20,.72),rgba(14,14,12,.82));
+  backdrop-filter:blur(10px);
+}
+.dossier-panel h3{margin:4px 0 12px;font-size:18px}
+.dossier-bands{display:grid;gap:9px}
+.dossier-band{display:grid;grid-template-columns:78px minmax(0,1fr) 92px;gap:8px;align-items:center}
+.dossier-band-label{font-family:var(--font-stencil),Oswald,sans-serif;font-size:11px;letter-spacing:.06em;color:#e8dcc8}
+.dossier-band-track{
+  position:relative;height:12px;border-radius:999px;overflow:hidden;
+  background:rgba(0,0,0,.35);border:1px solid rgba(212,175,106,.14);
+}
+.dossier-band-fill{
+  position:absolute;left:0;top:0;bottom:0;
+  background:linear-gradient(90deg,#e0c07a,#c49a4a);border-radius:999px;
+  box-shadow:0 0 10px rgba(212,175,106,.2);
+}
+.dossier-band-bad{
+  position:absolute;right:0;top:0;bottom:0;
+  background:linear-gradient(90deg,rgba(199,90,74,.15),rgba(199,90,74,.75));
+  border-radius:999px;
+}
+.dossier-band.is-empty .dossier-band-track{opacity:.35}
+.dossier-band.good .dossier-band-label{color:#cfe6b8}
+.dossier-band.warn .dossier-band-label{color:#e8b4a8}
+.dossier-band-meta{font-size:11px;text-align:right;color:#d9cbb6}
+.dossier-band-meta strong{color:#f4ebe0}
+.dossier-band-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:10px;color:var(--muted)}
+.dossier-band-legend .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+.dossier-band-legend .sw.brass{background:#d4af6a}
+.dossier-band-legend .sw.warn{background:#c75a4a}
+.dossier-club-list{display:grid;gap:0}
+.dossier-club-row{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:11px 0;border-bottom:1px solid rgba(212,175,106,.1);font-size:14px;
+}
+.dossier-club-row:last-child{border-bottom:0}
+.dossier-club-row span{font-family:var(--font-display);font-size:22px;font-weight:600}
+.dossier-club-row small{font-family:var(--font-body);font-size:11px;color:var(--muted);font-weight:600}
+.dossier-rank-list{display:grid;gap:0}
+.dossier-rank-row{
+  display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;
+  padding:10px 0;border-bottom:1px solid rgba(212,175,106,.1);
+}
+.dossier-rank-row:last-child{border-bottom:0}
+.dossier-rank-num{
+  font-family:var(--font-display)!important;font-size:22px;font-weight:600;color:var(--accent);
+  text-align:center;line-height:1;
+}
+.dossier-rank-body strong{display:block;font-size:13px;margin-bottom:5px}
+.dossier-rank-track{
+  height:6px;border-radius:999px;overflow:hidden;background:rgba(0,0,0,.3);
+  border:1px solid rgba(212,175,106,.12);
+}
+.dossier-rank-track>span{
+  display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),var(--olive,#6f8f5a));
+}
+.dossier-rank-pts{font-size:12px;font-weight:800;color:#f0e6d8;white-space:nowrap}
+.gr155-recap-grid.gr155-platoon-recap,
+.gr155-recap-grid[data-gr-shared-recap="1"]{
+  grid-template-columns:1.15fr .95fr .95fr!important;
+}
+.gr155-recap-block{
+  background:linear-gradient(165deg,rgba(32,28,20,.78),rgba(14,14,12,.86))!important;
+  border-color:rgba(212,175,106,.18)!important;
+  backdrop-filter:blur(8px);
+}
+.gr155-recap-title{
+  font-family:var(--font-stencil),Oswald,sans-serif!important;
+  letter-spacing:.16em!important;
+}
+.grstd-name b,.gr155-recap-row b{color:var(--accent)!important;font-family:var(--font-display)!important;font-size:16px!important}
+@media(max-width:760px){
+  .dossier-shell{grid-template-columns:1fr;gap:10px}
+  .dossier-rail{
+    position:static;grid-template-columns:repeat(3,1fr);padding:6px;
+  }
+  .dossier-rail-tab{padding:10px 4px;font-size:10px;letter-spacing:.1em}
+  .dossier-hero-metric{font-size:44px}
+  .dossier-metric-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dossier-band{grid-template-columns:68px minmax(0,1fr) 78px;gap:6px}
+  .dossier-band-meta{font-size:10px}
+  .gr155-recap-grid.gr155-platoon-recap,
+  .gr155-recap-grid[data-gr-shared-recap="1"]{grid-template-columns:1fr!important}
+}
+
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=165">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=166">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1596,7 +1728,7 @@ body::before,body::after{opacity:0!important}
     <header class="topbar">
       <div class="topbar-left">
         <div class="gr-brand" aria-label="Golf Recon"><div class="gr-mark"><span class="gr-cross">GR</span><span class="gr-flag">⌖</span></div><div class="gr-word"><strong>GOLF RECON</strong><small>SCOUT · PLAN · PLAY · IMPROVE</small></div></div>
-        <div class="brand-meta"><span>V16.4</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
+        <div class="brand-meta"><span>V16.5</span><span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">Syncing</span></span></div>
       </div>
 
       <div class="giq-logo" aria-label="GR">
@@ -1616,7 +1748,7 @@ body::before,body::after{opacity:0!important}
       <span class="tag">MISSION BRIEF</span>
       <span class="tag live">STATUS LIVE</span>
       <div class="progress" title="Ops readiness"><span></span></div>
-      <span class="meta" id="dossierMeta">FIELD OPS CLUBHOUSE</span>
+      <span class="meta" id="dossierMeta">FIELD DOSSIER</span>
     </div>
 
     <div class="global-course-bar">
@@ -1776,7 +1908,7 @@ let pendingImport=null;
 
 const db = {player:{id:null,name:"Golfer",username:"",handicap:null},swingThoughts:{driver:[],irons:[],chipping:[],putting:[]},courses:[],rounds:[],puttingDetails:[],clubStats:[]};
 
-let state = {view:'pregame', selectedCourseId:'four-oaks-white-18-holes', roundStat:'score', roundFilter:'18', roundCourseId:'four-oaks-white-18-holes', selectedRoundId:null, gameCourseId:'four-oaks-white-18-holes', gameRoundLimit:'all', puttingCourse:'all', pregameChats:{}, chatBusy:false, coursePreviewHole:1, coursePreviewReturnView:'pregame', coursePreviewLoading:false, coursePreviewError:null, coursePreviewShowAll:false, coursePreviewCourseId:null};
+let state = {view:'pregame', selectedCourseId:'four-oaks-white-18-holes', roundStat:'score', roundFilter:'18', roundCourseId:'four-oaks-white-18-holes', selectedRoundId:null, gameCourseId:'four-oaks-white-18-holes', gameRoundLimit:'all', gameDossier:'trend', puttingCourse:'all', pregameChats:{}, chatBusy:false, coursePreviewHole:1, coursePreviewReturnView:'pregame', coursePreviewLoading:false, coursePreviewError:null, coursePreviewShowAll:false, coursePreviewCourseId:null};
 const app = document.getElementById('app');
 const coursePreviewCache=new Map();
 const course = id => db.courses.find(c=>c.id===id);
@@ -3750,19 +3882,17 @@ function cellTone(label,outcome){
 function puttingRowTone(z){return z.n?'':'empty'}
 function puttingOutcomeGrid(p){
   const stats=puttingBandStats(p);
-  const cols=stats.map(z=>{
-    if(!z.n)return `<div class="putt-stack-col"><div class="putt-stack-bar"></div><div class="putt-stack-label">${z.label}</div><div class="putt-stack-count">0</div></div>`;
-    const vals=[
-      {cls:'one',v:100*z.one/z.n,label:'1'},
-      {cls:'two',v:100*z.two/z.n,label:'2'},
-      {cls:'three',v:100*z.three/z.n,label:'3'},
-      {cls:'four',v:100*z.four/z.n,label:'4+'}
-    ];
-    const segs=vals.filter(x=>x.v>0).map(x=>`<div class="putt-seg ${x.cls}" style="height:${x.v}%">${x.v>=12?Math.round(x.v)+'%':''}</div>`).join('');
-    return `<div class="putt-stack-col"><div class="putt-stack-bar">${segs}</div><div class="putt-stack-label ${puttingRowTone(z)}">${z.label}</div><div class="putt-stack-count">${z.n}</div></div>`;
+  const bands=stats.map(z=>{
+    if(!z.n){
+      return `<div class="dossier-band is-empty"><div class="dossier-band-label">${z.label}</div><div class="dossier-band-track"></div><div class="dossier-band-meta muted">—</div></div>`;
+    }
+    const onePct=Math.round(100*z.one/z.n);
+    const badPct=Math.round(100*(z.three+z.four)/z.n);
+    const tone=onePct>=55?'good':badPct>=25?'warn':'';
+    return `<div class="dossier-band ${tone}"><div class="dossier-band-label">${z.label}</div><div class="dossier-band-track"><span class="dossier-band-fill" style="width:${onePct}%"></span>${badPct?`<span class="dossier-band-bad" style="width:${badPct}%"></span>`:''}</div><div class="dossier-band-meta"><strong>${onePct}%</strong> 1P · ${z.n}</div></div>`;
   }).join('');
-  return `<div class="putt-stack-wrap"><div class="putt-stack-chart">${cols}</div></div>
-  <div class="putt-stack-legend"><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#4f9df7"></span>1 putt</span><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#55c878"></span>2 putts</span><span class="putt-legend-item"><span class="putt-legend-swatch" style="background:#ef6461"></span>3+ putts</span></div>`;
+  return `<div class="dossier-bands">${bands}</div>
+  <div class="dossier-band-legend"><span><i class="sw brass"></i>1-putt %</span><span><i class="sw warn"></i>3+ putt %</span></div>`;
 }
 function heatMap(){
  const p=selectedPutting(),stats=puttingBandStats(p);
@@ -3780,9 +3910,14 @@ function heatMap(){
  }).sort((a,b)=>b.priority-a.priority);
  const practice=ranked.filter(z=>z.priority>0).slice(0,3);
  const practiceHtml=practice.length?practice.map((z,i)=>`<div class="practice-item"><div class="practice-rank">${i+1}</div><div><strong>${z.label}</strong><div class="why">${z.why}</div></div><div class="practice-score">${z.priority>20?'High':z.priority>9?'Med':'Low'} focus</div></div>`).join(''):`<div class="muted">No clear putting weakness in the available sample.</div>`;
- return `<div class="putting-summary"><div class="card"><div class="metric-label">Greens tracked</div><div class="metric">${total}</div></div><div class="card"><div class="metric-label">1-putts</div><div class="metric">${ones}</div><div class="muted">${total?Math.round(100*ones/total):0}%</div></div><div class="card"><div class="metric-label">3+ putts</div><div class="metric">${threes}</div></div><div class="card"><div class="metric-label">Best zone</div><div class="metric" style="font-size:20px">${best?.label||'—'}</div><div class="muted">${best?(best.sg>=0?'+':'')+best.sg.toFixed(2)+' SG':'—'}</div></div></div>
- <div class="card"><div class="eyebrow">PUTTING BY DISTANCE</div><h3 style="margin-top:4px">Results</h3>${puttingOutcomeGrid(p)}</div>
- <div class="card" style="margin-top:12px"><div class="eyebrow">PRACTICE PLAN</div><h3 style="margin-top:4px">Focus</h3><div class="practice-focus">${practiceHtml}</div></div>`;
+ return `<div class="dossier-metric-strip">
+   <div class="dossier-metric"><span class="metric-label">Greens</span><strong class="metric">${total}</strong></div>
+   <div class="dossier-metric"><span class="metric-label">1-putts</span><strong class="metric">${ones}</strong><small>${total?Math.round(100*ones/total):0}%</small></div>
+   <div class="dossier-metric"><span class="metric-label">3+ putts</span><strong class="metric">${threes}</strong></div>
+   <div class="dossier-metric"><span class="metric-label">Best zone</span><strong class="metric metric-sm">${best?.label||'—'}</strong><small>${best?(best.sg>=0?'+':'')+best.sg.toFixed(2)+' SG':'—'}</small></div>
+ </div>
+ <div class="dossier-panel"><div class="eyebrow">RANGE BANDS</div><h3>Putting by distance</h3>${puttingOutcomeGrid(p)}</div>
+ <div class="dossier-panel" style="margin-top:12px"><div class="eyebrow">PRACTICE PLAN</div><h3>Focus</h3><div class="practice-focus">${practiceHtml}</div></div>`;
 }
 
 
@@ -3809,9 +3944,9 @@ function myGame(){
  const selectedCourse=state.gameCourseId==='all'?null:course(state.gameCourseId);
  const scopeLabel=selectedCourse?`${selectedCourse.name}${selectedCourse.tees?` · ${selectedCourse.tees}`:''}`:'All data';
  const roundLabel=state.gameRoundLimit==='all'?'All rounds':`Last ${state.gameRoundLimit} rounds`;
- return `<div class="section-head"><div><div class="eyebrow">PLAYER MODEL</div><h2>My Game</h2></div></div>
-
- <div class="game-filter-block">
+ const pane=state.gameDossier||'trend';
+ const rail=[['trend','TREND'],['putting','PUTTING'],['keys','KEYS']].map(([id,label])=>`<button type="button" class="dossier-rail-tab ${pane===id?'active':''}" data-game-dossier="${id}">${label}</button>`).join('');
+ const filters=`<div class="game-filter-block dossier-filters">
    <div class="game-filter-label">Data</div>
    <div class="scope-toggle">
      <button class="filter-tab ${state.gameCourseId==='all'?'':'active'}" data-game-scope="selected">Selected course</button>
@@ -3822,32 +3957,28 @@ function myGame(){
      ${['all','5','10','20'].map(n=>`<button class="game-round-btn ${String(state.gameRoundLimit)===n?'active':''}" data-game-rounds="${n}">${n==='all'?'All':`Last ${n}`}</button>`).join('')}
    </div>
    <div class="game-scope-note">${scopeLabel} · ${roundLabel} · ${rs.length} round${rs.length===1?'':'s'} included</div>
+ </div>`;
+ const trendPane=`<div class="dossier-hero"><div class="eyebrow">FIELD DOSSIER</div><div class="dossier-hero-metric">${ps.avgScore==null?'—':ps.avgScore.toFixed(1)}</div><div class="muted">18-hole average · ${rs.length} round${rs.length===1?'':'s'}</div></div>
+ <div class="dossier-metric-strip">
+   <div class="dossier-metric"><span class="metric-label">Fairways</span><strong class="metric">${ps.fw==null?'—':ps.fw+'%'}</strong></div>
+   <div class="dossier-metric"><span class="metric-label">GIR</span><strong class="metric">${ps.gir==null?'—':ps.gir+'%'}</strong></div>
+   <div class="dossier-metric"><span class="metric-label">Putts / rd</span><strong class="metric">${ps.putts==null?'—':ps.putts.toFixed(1)}</strong></div>
  </div>
-
- <div class="grid two">
-   <div class="card"><div class="metric-label">18-hole average</div><div class="metric">${ps.avgScore==null?'—':ps.avgScore.toFixed(1)}</div></div>
-   <div class="card"><div class="metric-label">Fairways</div><div class="metric">${ps.fw==null?'—':ps.fw+'%'}</div></div>
-   <div class="card"><div class="metric-label">GIR</div><div class="metric">${ps.gir==null?'—':ps.gir+'%'}</div></div>
-   <div class="card"><div class="metric-label">Putts / round</div><div class="metric">${ps.putts==null?'—':ps.putts.toFixed(1)}</div></div>
- </div>
-
- <div class="section-head"><div><div class="eyebrow">SWING THOUGHTS</div><h2>My Game Keys</h2></div></div>
+ <div class="dossier-panel"><div class="eyebrow">CLUB MEMORY</div><h3>On-course distances</h3><div class="dossier-club-list">${db.clubStats.map(x=>`<div class="dossier-club-row"><strong>${x.club}</strong><span>${x.distance} <small>yds</small></span></div>`).join('')||'<div class="muted">No club distances yet.</div>'}</div></div>`;
+ const puttingPane=`<div class="dossier-hero"><div class="eyebrow">PUTTING INTEL</div><div class="dossier-hero-metric">${ps.putts==null?'—':ps.putts.toFixed(1)}</div><div class="muted">Putts per round</div></div>${heatMap()}`;
+ const keysPane=`<div class="dossier-panel"><div class="eyebrow">SWING THOUGHTS</div><h3>My Game Keys</h3>
  <div class="swing-grid">
    ${[['driver','Driver','Your top driver thoughts'],['irons','Irons','Your top iron thoughts'],['chipping','Chipping','Your short-game cues'],['putting','Putting','Your putting cues']].map(([k,label,hint])=>`<div class="card swing-card"><h3>${label}</h3><p>${hint} · one per line · top 3</p><textarea data-swing-input="${k}" placeholder="Add up to 3 thoughts...">${swingTextareaValue(k)}</textarea></div>`).join('')}
  </div>
- <div class="swing-save-row"><span id="swingSaveStatus" class="swing-save-status">These will appear in Pregame.</span><button id="saveSwingThoughts" class="button primary" type="button">Save Game Keys</button></div>
-
-
- <div class="mygame-accuracy">
-   <div class="section-head"><div><div class="eyebrow">SHOT PATTERNS</div><h2>Fairways & GIR</h2></div></div>
-   <div class="direction-grid">${directionGraphic('Fairways',fw,false)}${directionGraphic('Greens in regulation',gir,true)}</div>
- </div>
-
- <div class="section-head"><div><div class="eyebrow">PUTTING</div><h2>Putting by distance</h2></div></div>
- ${heatMap()}
-
- <div class="section-head"><div><div class="eyebrow">CLUB MEMORY</div><h2>On-course distances</h2></div></div>
- <div class="card">${db.clubStats.map(x=>`<div class="round-row"><div><strong>${x.club}</strong></div><div class="score-big">${x.distance}</div><div class="muted">yds</div></div>`).join('')}</div>`;
+ <div class="swing-save-row"><span id="swingSaveStatus" class="swing-save-status">These will appear in Pregame.</span><button id="saveSwingThoughts" class="button primary" type="button">Save Game Keys</button></div></div>
+ <div class="dossier-panel" style="margin-top:12px"><div class="eyebrow">SHOT PATTERNS</div><h3>Fairways & GIR</h3><div class="direction-grid">${directionGraphic('Fairways',fw,false)}${directionGraphic('Greens in regulation',gir,true)}</div></div>`;
+ const body=pane==='putting'?puttingPane:pane==='keys'?keysPane:trendPane;
+ return `<div class="section-head"><div><div class="eyebrow">PLAYER MODEL</div><h2>My Game</h2></div></div>
+ ${filters}
+ <div class="dossier-shell">
+   <aside class="dossier-rail" aria-label="My Game sections">${rail}</aside>
+   <div class="dossier-pane">${body}</div>
+ </div>`;
 }
 function selectRoundFromBar(id){
  state.selectedRoundId=id;
@@ -3886,6 +4017,7 @@ function render(){
  document.querySelectorAll('[data-round-filter]').forEach(b=>b.addEventListener('click',()=>{state.roundFilter=b.dataset.roundFilter;state.selectedRoundId=null;render()}));
  document.querySelectorAll('[data-round-bar]').forEach(b=>{b.addEventListener('click',()=>selectRoundFromBar(b.dataset.roundBar));b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectRoundFromBar(b.dataset.roundBar)}})});
  document.querySelectorAll('[data-game-rounds]').forEach(b=>b.addEventListener('click',()=>{state.gameRoundLimit=b.dataset.gameRounds;render()}));
+ document.querySelectorAll('[data-game-dossier]').forEach(b=>b.addEventListener('click',()=>{state.gameDossier=b.dataset.gameDossier||'trend';render()}));
  const saveKeys=document.getElementById('saveSwingThoughts');
  if(saveKeys)saveKeys.addEventListener('click',async()=>{
    const status=document.getElementById('swingSaveStatus');
@@ -4865,10 +4997,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=4"></script>
+  <script src="platoon-recap-shared.js?v=5"></script>
   <script src="platoon-mission-core.js?v=4"></script>
-  <script src="platoon-hq-records.js?v=163"></script>
-  <script src="platoons-v15-real.js?v=163"></script>
+  <script src="platoon-hq-records.js?v=164"></script>
+  <script src="platoons-v15-real.js?v=164"></script>
   <script src="platoons-v15-patch-v5.js?v=163"></script>
   <script src="dev-mobile-pregame-fix.js?v=158"></script>
   <script src="dev-v15.5-results.js?v=163"></script>

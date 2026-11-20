@@ -176,14 +176,16 @@ function afterActionLines(p,m,rows,detail,hi){
 
 function standingsTableMarkup(p,m){
   const rows=missionStandingsRows(m);
+  const maxPts=Math.max(1,...rows.map(r=>finite(r.raw_points)?Number(r.raw_points):0));
   const body=rows.map((r,i)=>{
     const pos=finite(r.finish_position)?Number(r.finish_position):i+1;
     const net=finite(r.net)?Number(r.net):'—';
     const gross=finite(r.gross)?Number(r.gross):'—';
     const pts=finite(r.raw_points)?Number(r.raw_points):0;
-    return `<div class="grstd-row"><div class="grstd-name"><b>${pos}</b><span>${esc(displayName(p,r.player_name))}</span></div><div>${net}</div><div>${gross}</div><div>${pts}</div></div>`;
+    const bar=Math.max(4,Math.round(100*pts/maxPts));
+    return `<div class="dossier-rank-row"><b class="dossier-rank-num">${pos}</b><div class="dossier-rank-body"><strong>${esc(displayName(p,r.player_name))}</strong><div class="dossier-rank-track"><span style="width:${bar}%"></span></div><div class="muted" style="font-size:10px;margin-top:3px">Net ${net} · Gross ${gross}</div></div><span class="dossier-rank-pts">${pts} pts</span></div>`;
   }).join('')||'<div class="grstd-empty">No results yet.</div>';
-  return `<div class="grstd-table"><div class="grstd-head"><div>NAME</div><div>NET</div><div>GROSS</div><div>POINTS</div></div>${body}</div>`;
+  return `<div class="dossier-rank-list" data-grstd="1">${body}</div>`;
 }
 
 function highlightsMarkup(p,hi){

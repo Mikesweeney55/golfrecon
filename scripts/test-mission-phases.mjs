@@ -77,7 +77,7 @@ assert(w.grCleanCourseName("Campbell's Scottish Highlands (dan itibaren...)")===
 /* Shared standings format */
 const markup = w.grMissionRecapMarkup(p, friday);
 assert(markup.includes('data-gr-shared-recap="1"'), 'shared recap marker');
-assert(/NAME/.test(markup)&&/NET/.test(markup)&&/GROSS/.test(markup)&&/POINTS/.test(markup), 'standings headers Name|Net|Gross|Points');
+assert(markup.includes('dossier-rank-list')&&/Net /.test(markup)&&/Gross /.test(markup)&&/pts/.test(markup), 'dossier standings show net/gross/pts');
 assert(markup.includes('Ryan Sweeney')&&markup.includes('Mike Sweeney'), 'friday alias resolution in standings');
 assert(markup.includes('AFTER ACTION REPORT'), 'AAR present');
 

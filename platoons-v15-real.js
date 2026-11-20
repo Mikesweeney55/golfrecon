@@ -114,7 +114,13 @@ function warCard(p,w){
   const mode=String(w.format||'Points');
   const avgHead=mode.toLowerCase().includes('gross')?'Avg G':'Avg N';
   const rows=board.rows||[];
-  const table=rows.length?`<div class="gr-war-standings-label">War Standings</div><table class="gr-leaderboard"><thead><tr><th>Player</th><th>Played</th><th>Pts</th><th>${avgHead}</th></tr></thead><tbody>${rows.map((r,i)=>{const avg=mode.toLowerCase().includes('gross')?(r.avgGross!=null?Math.round(r.avgGross*10)/10:'—'):(r.avgNet!=null?Math.round(r.avgNet*10)/10:'—');return `<tr><td>${i+1}. ${E(r.name)}</td><td>${r.played||0}</td><td>${r.points||0}</td><td>${avg}</td></tr>`}).join('')}</tbody></table>`:'';
+  const maxPts=Math.max(1,...rows.map(r=>Number(r.points)||0));
+  const table=rows.length?`<div class="gr-war-standings-label">War Standings</div><div class="dossier-rank-list">${rows.map((r,i)=>{
+    const avg=mode.toLowerCase().includes('gross')?(r.avgGross!=null?Math.round(r.avgGross*10)/10:'—'):(r.avgNet!=null?Math.round(r.avgNet*10)/10:'—');
+    const pts=Number(r.points)||0;
+    const bar=Math.max(4,Math.round(100*pts/maxPts));
+    return `<div class="dossier-rank-row"><b class="dossier-rank-num">${i+1}</b><div class="dossier-rank-body"><strong>${E(r.name)}</strong><div class="dossier-rank-track"><span style="width:${bar}%"></span></div><div class="muted" style="font-size:10px;margin-top:3px">${r.played||0} played · ${avgHead} ${avg}</div></div><span class="dossier-rank-pts">${pts} pts</span></div>`;
+  }).join('')}</div>`:'';
   return `<div class="card gr-war-card"><div class="gr-war-head"><div><div class="eyebrow">WAR</div><h3>${E(w.title||'War')}</h3><div class="muted" style="font-size:11px">${done} of ${kids.length} Missions complete${warEndOf(w)?` · through ${E(fmtDate(warEndOf(w)))}`:''} · ${E(mode)}</div></div><span class="gr-tag gr-war">${done===kids.length&&kids.length?'COMPLETE':'ACTIVE'}</span></div><div class="gr-progress"><span style="width:${pct}%"></span></div>${table}<div class="gr-mini-actions"><button class="button primary" onclick="grOpenMissionEditor('','${E(w.id)}')">+ Mission</button><button class="button secondary" onclick="grOpenWarEditor('${E(w.id)}')">Edit War</button></div><div class="gr-stack" style="margin-top:9px"><div class="gr-war-standings-label">Mission Results</div>${kids.map(m=>missionCard(p,m,false)).join('')||'<div class="muted" style="font-size:11px">No Missions yet.</div>'}</div></div>`;
 }
 
