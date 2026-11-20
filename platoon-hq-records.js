@@ -844,9 +844,9 @@ function installStyles(){
   .gr-hq-msg.err{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.25);color:#ff9b96}
   .gr-hq-modes label{font-size:11px}
   .gr-honor-card{position:relative;overflow:hidden;border-color:rgba(212,175,106,.28)!important;background:linear-gradient(160deg,rgba(48,40,24,.5),rgba(14,12,10,.55))!important;box-shadow:0 16px 36px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,248,235,.1)!important}
-  .gr-clubhouse-board{grid-template-columns:1.1fr 1fr!important;gap:12px!important;margin-top:14px}
+  .gr-clubhouse-board{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px!important;margin-top:12px;align-items:start}
   .gr-eagle-stack{display:flex;flex-direction:column;gap:10px;min-width:0}
-  .gr-honor-standings-card{grid-column:1/-1;background:radial-gradient(circle at 8% -20%,rgba(212,175,106,.28),transparent 40%),linear-gradient(160deg,rgba(56,44,22,.62),rgba(12,12,10,.6))!important}
+  .gr-honor-standings-card{grid-column:auto;background:radial-gradient(circle at 8% -20%,rgba(212,175,106,.28),transparent 40%),linear-gradient(160deg,rgba(56,44,22,.62),rgba(12,12,10,.6))!important}
   .gr-honor-eagle-card{background:radial-gradient(circle at 92% -10%,rgba(212,175,106,.22),transparent 42%),linear-gradient(160deg,rgba(52,40,20,.55),rgba(12,12,10,.58))!important}
   .gr-honor-birdies-card{background:radial-gradient(circle at 92% -10%,rgba(111,143,90,.22),transparent 42%),linear-gradient(160deg,rgba(28,40,24,.55),rgba(12,12,10,.58))!important}
   .gr-honor-ace-card{background:radial-gradient(circle at 90% -10%,rgba(212,175,106,.14),transparent 40%),linear-gradient(160deg,rgba(36,32,20,.5),rgba(12,12,10,.55))!important}
@@ -860,13 +860,13 @@ function installStyles(){
   .gr-honor-copy{flex:1 1 auto;min-width:0}
   .gr-honor-sub{font-size:11px;font-weight:750;color:#e8dcc4;margin-top:2px}
   .gr-honor-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}
-  .gr-eagle-spotlight{display:grid;gap:2px;padding:12px 12px 11px;margin:2px 0 10px;border-radius:14px;border:1px solid rgba(212,175,106,.35);background:linear-gradient(135deg,rgba(212,175,106,.18),rgba(20,16,10,.35));box-shadow:inset 0 1px 0 rgba(255,248,235,.12),0 10px 24px rgba(0,0,0,.2)}
+  .gr-eagle-spotlight{display:grid;gap:1px;padding:10px 10px 9px;margin:2px 0 8px;border-radius:12px;border:1px solid rgba(212,175,106,.35);background:linear-gradient(135deg,rgba(212,175,106,.18),rgba(20,16,10,.35));box-shadow:inset 0 1px 0 rgba(255,248,235,.12),0 10px 24px rgba(0,0,0,.2)}
   .gr-birdies-spotlight{border-color:rgba(111,143,90,.4);background:linear-gradient(135deg,rgba(111,143,90,.2),rgba(16,20,14,.35))}
   .gr-standings-spotlight{border-color:rgba(212,175,106,.45)}
   .gr-eagle-spotlight-label{font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:900;color:var(--accent,#d4af6a)}
-  .gr-eagle-spotlight-name{font-size:18px;font-weight:950;line-height:1.1;color:#fff6e8;text-shadow:0 1px 10px rgba(0,0,0,.35)}
-  .gr-eagle-spotlight-count{font-size:28px;font-weight:950;color:var(--accent,#d4af6a);line-height:1;margin-top:4px;text-shadow:0 0 18px rgba(212,175,106,.25)}
-  .gr-eagle-spotlight-count span{font-size:11px;font-weight:800;margin-left:6px;color:#dce6e1;letter-spacing:.04em}
+  .gr-eagle-spotlight-name{font-size:16px;font-weight:950;line-height:1.1;color:#fff6e8;text-shadow:0 1px 10px rgba(0,0,0,.35)}
+  .gr-eagle-spotlight-count{font-size:24px;font-weight:950;color:var(--accent,#d4af6a);line-height:1;margin-top:3px;text-shadow:0 0 18px rgba(212,175,106,.25)}
+  .gr-eagle-spotlight-count span{font-size:10px;font-weight:800;margin-left:5px;color:#dce6e1;letter-spacing:.04em}
   .gr-eagle-board-label{font-size:8px;letter-spacing:.12em;text-transform:uppercase;font-weight:900;color:var(--muted);margin:8px 0 4px}
   .gr-eagle-total,.gr-birdie-total,.gr-standings-pts{font-size:16px!important;font-weight:950!important;color:var(--accent,#d4af6a)!important;text-shadow:0 0 12px rgba(212,175,106,.25)}
   .gr-birdie-total{color:#c5e6a8!important;text-shadow:0 0 12px rgba(111,143,90,.3)}
@@ -884,8 +884,12 @@ function installStyles(){
   .gr-record-flash strong{font-size:14px!important;color:#fff6e8}
   .gr-ace-row{padding:6px 0!important}
   .gr-honor-intel{grid-column:1/-1}
+  .gr-clubhouse-board .gr-honor-lockup{margin-bottom:8px;gap:8px}
+  .gr-clubhouse-board .gr-honor-mark{width:40px;height:40px;font-size:20px}
+  .gr-clubhouse-board .gr-honor-sub{font-size:10px}
   @keyframes grHonorPulse{0%,100%{box-shadow:0 0 14px rgba(212,175,106,.14),inset 0 1px 0 rgba(255,248,235,.18)}50%{box-shadow:0 0 22px rgba(212,175,106,.28),inset 0 1px 0 rgba(255,248,235,.28)}}
-  @media(max-width:700px){.gr-clubhouse-board{grid-template-columns:1fr!important}.gr-honor-standings-card{grid-column:auto}}
+  @media(max-width:900px){.gr-clubhouse-board{grid-template-columns:1fr 1fr!important}}
+  @media(max-width:700px){.gr-clubhouse-board{grid-template-columns:1fr!important}}
   @media(prefers-reduced-motion:reduce){.gr-honor-mark.gr-honor-eagle,.gr-honor-mark.gr-honor-standings{animation:none}}
   `;
 }
