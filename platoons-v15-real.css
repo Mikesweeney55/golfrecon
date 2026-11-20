@@ -28,8 +28,8 @@
   .sticky-actions{position:sticky;bottom:0;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
   .gr-war-card .gr-leaderboard{font-size:11px}
   .gr-import-review{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  #grPlatoonDialog{width:calc(100vw - 16px)!important;max-height:calc(100dvh - 16px)!important}
-  #grPlatoonDialog .dialog-card{max-height:calc(100dvh - 16px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+  #grPlatoonDialog[open]{width:min(560px,calc(100vw - 20px))!important;max-height:min(90dvh,calc(100dvh - 20px))!important}
+  #grPlatoonDialog[open] .dialog-card{max-height:min(90dvh,calc(100dvh - 20px));overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
 }
 
 /* Platoons subnav + shell (audit Phase 2 — formerly patch-v5) */
@@ -39,8 +39,29 @@
 .gr-platoons-shell{padding-bottom:calc(138px + env(safe-area-inset-bottom))}
 @media(max-width:700px){.gr-platoon-subnav{bottom:calc(70px + env(safe-area-inset-bottom));width:calc(100% - 16px);border-radius:16px}.gr-platoon-subtab{padding:11px 6px;font-size:10px}}
 @media(min-width:901px){.gr-platoon-subnav{bottom:calc(78px + env(safe-area-inset-bottom))}}
-#grPlatoonDialog[open]{position:fixed;inset:8px;width:auto;max-width:none;max-height:none;height:auto;overflow:hidden;margin:auto}
-#grPlatoonDialog[open] .dialog-card{box-sizing:border-box;max-height:calc(100dvh - 16px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+/* Centered mid-screen mission/war popups (not full-bleed) */
+#grPlatoonDialog[open]{
+  position:fixed;
+  inset:0;
+  width:min(560px,calc(100vw - 28px));
+  max-width:560px;
+  max-height:min(86dvh,calc(100dvh - 28px));
+  height:fit-content;
+  margin:auto;
+  overflow:hidden;
+  border:0;
+  padding:0;
+  background:transparent;
+}
+#grPlatoonDialog[open] .dialog-card{
+  box-sizing:border-box;
+  width:100%;
+  max-height:min(86dvh,calc(100dvh - 28px));
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom));
+}
 
 /* Mission setup UX — chooser, calendar day create, formats, course wizard */
 .gr-choice-grid{display:grid;gap:10px;margin-top:14px}
