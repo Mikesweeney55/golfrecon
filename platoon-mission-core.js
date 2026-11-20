@@ -88,8 +88,15 @@ function prepareMissionDraft(input,opts={}){
   };
   if(existing?.recap_note!=null)mission.recap_note=existing.recap_note;
   if(input?.recap_note!=null)mission.recap_note=String(input.recap_note);
-  if(existing?.guests)mission.guests=clone(existing.guests);
-  if(Array.isArray(input?.guests))mission.guests=input.guests;
+  if(Array.isArray(existing?.guests))mission.guests=clone(existing.guests);
+  if(Array.isArray(input?.guests))mission.guests=input.guests.map(g=>String(g||'').trim()).filter(Boolean);
+  else if(!Array.isArray(mission.guests)){
+    // Recover guests embedded in notes when the array field was never set.
+    const hit=String(mission.notes||'').match(/\[\[GR_GUESTS:([\s\S]*?)\]\]/);
+    if(hit){
+      try{mission.guests=(JSON.parse(hit[1])||[]).map(g=>String(g||'').trim()).filter(Boolean)}catch{mission.guests=[]}
+    }else mission.guests=[];
+  }
   return {ok:true,mission};
 }
 
@@ -247,6 +254,44 @@ function resultsFingerprint(rows){
  * Build Mission Preview from existing completed Platoon Missions only.
  * Never invents stats that are not present in official results.
  */
+function guestsFromMission(m){
+  if(Array.isArray(m?.guests)&&m.guests.length)return m.guests.map(g=>String(g||'').trim()).filter(Boolean);
+  const hit=String(m?.notes||'').match(/\[\[GR_GUESTS:([\s\S]*?)\]\]/);
+  if(!hit)return [];
+  try{return (JSON.parse(hit[1])||[]).map(g=>String(g||'').trim()).filter(Boolean)}catch{return []}
+}
+
+function wittyPreviewBrief(p,m,{course,cadets,guests,prior,rivals,eagleNames}){
+  const field=[...cadets,...guests.map(g=>`${g} (guest)`)];
+  const n=field.length;
+  const courseBit=course||'wherever the GPS gives up';
+  const open=n
+    ? `Tee sheet at ${courseBit} features ${n} hopeful${n===1?'':'s'} who somehow all swear this is "just a friendly."`
+    : `Tee sheet at ${courseBit} is somehow empty, which is either a scheduling miracle or a mass no-show rehearsal.`;
+  let cast;
+  if(!n)cast='Nobody signed up, so the trash talk will have to trash-talk itself.';
+  else if(n===1)cast=`Solo act: ${field[0]} gets the rare privilege of losing an argument with their own scorecard.`;
+  else if(n===2)cast=`Head-to-head billing: ${field[0]} vs ${field[1]} — two people, one shared delusion about who owns the short stick.`;
+  else{
+    const head=field.slice(0,-1).join(', ');
+    const last=field[field.length-1];
+    cast=`The traveling circus is ${head}, and ${last} — a lineup that looks confident until the first tee shot finds a tree with a name.`;
+  }
+  let hist;
+  if(!prior.length)hist=`No Platoon receipts at this track yet, so everyone gets to invent a personal legend in real time.`;
+  else if(rivals[0]){
+    const top=rivals[0];
+    hist=`Historically, ${top.name} has milked ${top.points} My Time Point${top.points===1?'':'s'} here across ${top.starts} start${top.starts===1?'':'s'}${top.wins?` and ${top.wins} win${top.wins===1?'':'s'}`:''} — which they will mention by hole 2 whether asked or not.`;
+  }else hist=`This field has ${prior.length} prior Platoon round${prior.length===1?'':'s'} at ${courseBit}, and somehow learned almost nothing from any of them.`;
+  let jab;
+  if(guests.length&&cadets.length)jab=`Cadets brought ${guests.length===1?'a guest':'guests'} (${guests.slice(0,3).join(', ')}), presumably as fresh witnesses / scapegoats.`;
+  else if(guests.length)jab=`It's an all-guest special — no home cooking, just visiting chaos.`;
+  else if(eagleNames.length)jab=`Somewhere in the archives ${eagleNames[0]} actually made an eagle here, which will be weaponized as personality.`;
+  else jab=`Expect early bravado, mid-round silence, and a post-round debate about "conditions" that somehow never includes the swing.`;
+  const close=`Lock it, laugh first, and remember: My Time Points don't care about your warm-up.`;
+  return [open,cast,hist,jab,close].join(' ');
+}
+
 function buildMissionPreview(p,m){
   const course=cleanCourse(m?.locationName||'');
   const people=Array.isArray(m?.participants)?m.participants:[];
@@ -254,7 +299,9 @@ function buildMissionPreview(p,m){
     const hit=(p?.members||[]).find(x=>String(x.id)===String(id));
     return hit?.name||null;
   };
-  const fieldNames=people.map(memberName).filter(Boolean);
+  const cadets=people.map(memberName).filter(Boolean);
+  const guests=guestsFromMission(m);
+  const fieldNames=[...cadets,...guests];
   const prior=(p?.missions||[]).filter(x=>
     x&&x.id!==m?.id&&x.type!=='war'&&x.status==='completed'&&
     cleanCourse(x.locationName||'')===course
@@ -266,9 +313,9 @@ function buildMissionPreview(p,m){
     lines.push(`${prior.length} prior completed Platoon Mission${prior.length===1?'':'s'} at ${course}.`);
   }
 
-  // Head-to-head among this Mission's field using only official prior results.
+  // Head-to-head among this Mission's cadets using only official prior results.
   const rivalStats=new Map();
-  for(const name of fieldNames)rivalStats.set(name,{name,starts:0,wins:0,points:0,bestNet:null});
+  for(const name of cadets)rivalStats.set(name,{name,starts:0,wins:0,points:0,bestNet:null});
   for(const pm of prior){
     const rows=normalizeOfficialResults(pm.results||[]);
     for(const r of rows){
@@ -288,30 +335,40 @@ function buildMissionPreview(p,m){
     lines.push(`${top.name} leads this field historically at ${course} with ${top.points} pt${top.points===1?'':'s'} across ${top.starts} start${top.starts===1?'':'s'}${top.wins?` · ${top.wins} win${top.wins===1?'':'s'}`:''}.`);
     const withNet=rivals.filter(x=>x.bestNet!=null).sort((a,b)=>a.bestNet-b.bestNet);
     if(withNet.length)lines.push(`Best prior net among the field here: ${withNet[0].name} (${withNet[0].bestNet}).`);
-  }else if(fieldNames.length){
-    lines.push(`No prior completed results yet for ${fieldNames.slice(0,4).join(', ')} at this course.`);
+  }else if(cadets.length){
+    lines.push(`No prior completed results yet for ${cadets.slice(0,4).join(', ')} at this course.`);
   }
+  if(guests.length)lines.push(`Guests on the sheet: ${guests.join(', ')}.`);
 
   // Notable marks only when eagle_count exists on official rows.
   let eagleBits=[];
+  let eagleNames=[];
   for(const pm of prior){
     for(const r of normalizeOfficialResults(pm.results||[])){
       if(Number(r.eagle_count)>0){
         const name=canon(p,r.player_name)?.name||r.player_name;
-        if(fieldNames.includes(name))eagleBits.push(`${name} (${r.eagle_count})`);
+        if(cadets.includes(name)){
+          eagleBits.push(`${name} (${r.eagle_count})`);
+          eagleNames.push(name);
+        }
       }
     }
   }
   if(eagleBits.length)lines.push(`Eagles on record for this field here: ${[...new Set(eagleBits)].slice(0,4).join(', ')}.`);
 
+  const brief=wittyPreviewBrief(p,m,{course,cadets,guests,prior,rivals,eagleNames:[...new Set(eagleNames)]});
+
   return {
     builtAt:new Date().toISOString(),
     course,
     field:fieldNames,
+    guests,
     priorCount:prior.length,
     battlefield:lines[0]||`Mission at ${course||'Course TBD'}.`,
     watch:fieldNames.length?fieldNames.slice(0,6).join(' · '):'Field TBD',
-    intel:lines.slice(0,5)
+    intel:lines.slice(0,5),
+    brief,
+    narrative:brief
   };
 }
 

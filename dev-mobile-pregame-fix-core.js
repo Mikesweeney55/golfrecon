@@ -25,9 +25,14 @@ if(!window.__grSupabaseFirstSaveInstalled){
     try{if(typeof writePlatoonLocal==='function')writePlatoonLocal(p)}catch{}
     try{if(typeof render==='function')render()}catch{}
     if(push===false)return Promise.resolve(null);
+    // TEST / preview builds keep Platoon edits local only — never alert as a failure.
+    if(window.grTestEnvActive){
+      console.warn('[gr-test-env] Platoon saved locally (server save skipped)');
+      return Promise.resolve(null);
+    }
     if(typeof callPlatoonFunction!=='function'){
-      alert('Platoon save failed: Supabase connection is unavailable.');
-      return Promise.reject(new Error('Supabase connection unavailable'));
+      console.warn('Platoon saved locally; Supabase connection unavailable.');
+      return Promise.resolve(null);
     }
     return callPlatoonFunction({action:'save_state',snapshot:p}).then(out=>{
       if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
@@ -37,16 +42,24 @@ if(!window.__grSupabaseFirstSaveInstalled){
     }).catch(e=>{
       const msg=String(e?.message||e||'Supabase save failed');
       try{if(typeof platoonSyncError!=='undefined')platoonSyncError=msg}catch{}
-      alert(`Supabase save failed: ${msg}`);
-      throw e;
+      // Local write already succeeded — surface quietly instead of blocking the UX.
+      console.warn('Platoon saved locally; server sync deferred:', msg);
+      return null;
     });
   };
 }
 async function refreshPlatoonFromSupabase(){
+  if(window.grTestEnvActive)return;
   if(typeof callPlatoonFunction!=='function')return;
   try{
-    const out=await callPlatoonFunction({action:'bootstrap'});
-    if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
+    const localBefore=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
+    const out=await callPlatoonFunction({action:'bootstrap',snapshot:localBefore||undefined});
+    if(out?.platoon&&typeof writePlatoonLocal==='function'){
+      const merged=typeof window.grMergeHqMetaPreserve==='function'
+        ? window.grMergeHqMetaPreserve(out.platoon,localBefore)
+        : Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore?.hqMeta});
+      writePlatoonLocal(merged);
+    }
     try{if(typeof platoonSyncError!=='undefined')platoonSyncError=''}catch{}
     try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}
   }catch(e){

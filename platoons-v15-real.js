@@ -8,17 +8,131 @@ function subNav(){const tabs=[{id:'home',label:'Missions'},{id:'calendar',label:
 function withSubNav(html){return `<div class="gr-platoons-shell">${html||''}${subNav()}</div>`}
 function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${E(title)}</h2>${sub?`<div class="muted" style="font-size:12px;margin-top:4px">${E(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
 function monthStart(){if(calendarCursor)return new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);const now=new Date(),rows=(loadPlatoonLocal().missions||[]).filter(m=>m.date&&m.type!=='war').map(m=>new Date(m.date+'T12:00:00')).filter(d=>!isNaN(d));const next=rows.filter(d=>d>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a,b)=>a-b)[0];calendarCursor=new Date((next||now).getFullYear(),(next||now).getMonth(),1);return calendarCursor}
-function calendarView(){const p=loadPlatoonLocal(),cur=monthStart(),y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),missions=(p.missions||[]).filter(x=>x.type!=='war'&&x.date),map={};missions.forEach(x=>{const d=new Date(x.date+'T12:00:00');if(d.getFullYear()===y&&d.getMonth()===m)(map[d.getDate()]||=[]).push(x)});let cells='';for(let i=0;i<first;i++)cells+='<div style="min-height:88px;border:1px solid var(--border,#263244);border-radius:10px;opacity:.35"></div>';for(let d=1;d<=days;d++){const items=map[d]||[];cells+=`<div style="min-height:88px;border:1px solid ${items.length?'#4f8cff':'var(--border,#263244)'};border-radius:10px;padding:7px;background:${items.length?'rgba(79,140,255,.08)':'transparent'}"><div style="font-weight:800;font-size:12px;margin-bottom:5px">${d}</div>${items.map(x=>`<button type="button" data-mission="${E(x.id)}" style="display:block;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:3px 0;font-size:10px;font-weight:700;line-height:1.15">⛳ ${E(x.title||x.locationName||'Mission')}</button>`).join('')}</div>`}const label=cur.toLocaleString(undefined,{month:'long',year:'numeric'});return `${subHead('Calendar',p.name||'My Time')}<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><button class="icon-button" type="button" data-cal-prev>‹</button><strong style="font-size:18px">${E(label)}</strong><button class="icon-button" type="button" data-cal-next>›</button></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div style="text-align:center;font-size:10px;font-weight:800;opacity:.65">${x}</div>`).join('')}</div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px">${cells}</div></div>`}
+const MISSION_FORMATS=[
+  'Stroke play (gross)',
+  'Stroke play (net)',
+  'Stableford',
+  'Match play',
+  'Best Ball / Fourball',
+  'Scramble',
+  'Alternate Shot / Foursomes',
+  'Skins',
+  'Nassau',
+  'Points',
+  'Wolf',
+  'Other'
+];
+const TEE_TIME_PRESETS=['07:00','07:30','08:00','08:30','09:00','09:30','10:00','11:00','12:00','13:00','14:00'];
+function isoDate(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+function calendarView(){
+  const p=loadPlatoonLocal(),cur=monthStart(),y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate();
+  const missions=(p.missions||[]).filter(x=>x.type!=='war'&&x.date),map={};
+  missions.forEach(x=>{const d=new Date(x.date+'T12:00:00');if(d.getFullYear()===y&&d.getMonth()===m)(map[d.getDate()]||=[]).push(x)});
+  let cells='';
+  for(let i=0;i<first;i++)cells+='<div class="gr-cal-pad" aria-hidden="true"></div>';
+  for(let d=1;d<=days;d++){
+    const items=map[d]||[],iso=isoDate(y,m,d),busy=items.length>0;
+    cells+=`<button type="button" class="gr-cal-day ${busy?'has-missions':''}" data-cal-iso="${E(iso)}" aria-label="Schedule mission on ${E(iso)}"><div class="gr-cal-daynum">${d}</div>${items.map(x=>`<span class="gr-cal-mission" data-mission="${E(x.id)}">⛳ ${E(x.title||x.locationName||'Mission')}</span>`).join('')}${busy?'':`<span class="gr-cal-add">+ Mission</span>`}</button>`;
+  }
+  const label=cur.toLocaleString(undefined,{month:'long',year:'numeric'});
+  return `${subHead('Calendar',p.name||'My Time')}<div class="card gr-cal-card"><div class="gr-cal-nav"><button class="icon-button" type="button" data-cal-prev aria-label="Previous month">‹</button><strong>${E(label)}</strong><button class="icon-button" type="button" data-cal-next aria-label="Next month">›</button></div><p class="muted gr-cal-hint">Tap a day to schedule a Mission. Tap an existing Mission to open it.</p><div class="gr-cal-dows">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div>${x}</div>`).join('')}</div><div class="gr-cal-grid">${cells}</div></div>`;
+}
 function blogView(){const p=loadPlatoonLocal();return `${subHead('Blog',(p.name||'My Time')+' Clubhouse')}<div class="card"><div class="empty" style="padding:34px 12px">No posts yet.</div></div>`}
-function missionCourseNames(current){const names=[];try{if(typeof db!=='undefined'&&Array.isArray(db.courses))db.courses.forEach(c=>{const n=String(c?.name||'').trim();if(n)names.push(n)})}catch{}try{(loadPlatoonLocal().missions||[]).forEach(m=>{const n=String(m?.locationName||'').trim();if(n&&n!=='Course TBD'&&n!=='Multi-course')names.push(n)})}catch{}const cur=String(current||'').trim();if(cur&&!names.includes(cur))names.unshift(cur);return [...new Set(names)].sort((a,b)=>a.localeCompare(b))}
-function courseSelectMarkup(current){const cur=String(current||'').trim(),names=missionCourseNames(cur);return `<select id="grMCourse" style="width:100%"><option value="">Select course…</option>${names.map(n=>`<option value="${E(n)}" ${n===cur?'selected':''}>${E(n)}</option>`).join('')}<option value="__gr_add_course__">＋ Add new course…</option></select>`}
+function courseMenuName(c){
+  if(typeof courseMenuLabel==='function')return courseMenuLabel(c);
+  const n=c?.baseName||c?.name||'Course';
+  return c?.tees?`${n} · ${c.tees}`:n;
+}
+function courseSelectMarkup(currentName,currentId){
+  const curName=String(currentName||'').trim();
+  const curId=String(currentId||'').trim();
+  const opts=[];
+  try{
+    if(typeof db!=='undefined'&&Array.isArray(db.courses)){
+      const list=db.courses.slice().sort((a,b)=>courseMenuName(a).localeCompare(courseMenuName(b)));
+      for(const c of list){
+        const selected=curId?String(c.id)===curId:(curName&&(c.name===curName||c.baseName===curName||courseMenuName(c)===curName));
+        opts.push(`<option value="id:${E(c.id)}" ${selected?'selected':''}>${E(courseMenuName(c))}</option>`);
+      }
+    }
+  }catch{}
+  try{
+    (loadPlatoonLocal().missions||[]).forEach(m=>{
+      const n=String(m?.locationName||'').trim();
+      if(!n||n==='Course TBD'||n==='Multi-course')return;
+      if(opts.some(o=>o.includes(`>${E(n)}<`)||o.includes(`value="name:${E(n)}"`)))return;
+      if(typeof db!=='undefined'&&Array.isArray(db.courses)&&db.courses.some(c=>c.name===n||c.baseName===n||courseMenuName(c)===n))return;
+      opts.push(`<option value="name:${E(n)}" ${(!curId&&curName===n)?'selected':''}>${E(n)}</option>`);
+    });
+  }catch{}
+  return `<select id="grMCourse" class="gr-mission-select"><option value="">Select course…</option>${opts.join('')}<option value="__gr_add_course__">＋ Add new course…</option></select>`;
+}
+function formatSelectMarkup(current){
+  const cur=String(current||'Stroke play (net)').trim();
+  const known=MISSION_FORMATS.includes(cur);
+  const opts=MISSION_FORMATS.map(f=>`<option value="${E(f)}" ${(known?cur===f:(f==='Other'))?'selected':''}>${E(f)}</option>`).join('');
+  return `<select id="grMFormatPick" class="gr-mission-select">${opts}</select><input id="grMFormatOther" class="gr-format-other" style="${known?'display:none':''}" value="${E(known?'':cur)}" placeholder="Custom format">`;
+}
+function resolveCourseSelection(raw){
+  const v=String(raw||'').trim();
+  if(!v||v==='__gr_add_course__')return {courseId:'',locationName:''};
+  if(v.startsWith('id:')){
+    const id=v.slice(3);
+    try{
+      const c=(typeof db!=='undefined'?db.courses:[]).find(x=>String(x.id)===id);
+      if(c)return {courseId:c.id,locationName:courseMenuName(c)};
+    }catch{}
+    return {courseId:id,locationName:id};
+  }
+  if(v.startsWith('name:'))return {courseId:'',locationName:v.slice(5)};
+  return {courseId:'',locationName:v};
+}
+function readMissionFormat(root){
+  const pick=root.querySelector('#grMFormatPick')?.value||'';
+  if(pick==='Other')return String(root.querySelector('#grMFormatOther')?.value||'').trim()||'Other';
+  return pick;
+}
+function slugifyCourse(s){return String(s||'course').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48)||'course'}
+function ensureCourseInDb({name,tees,holes,par,rating,slope}){
+  if(typeof db==='undefined'||!Array.isArray(db.courses))return null;
+  const holesN=Number(holes)||18;
+  const segment=holesN===18?'18 holes':'9 holes';
+  let id=slugifyCourse(`${name}-${tees||'tees'}-${segment}`);
+  let n=2,base=id;
+  while(db.courses.some(c=>c.id===id))id=`${base}-${n++}`;
+  const pars=Array(holesN).fill(null);
+  const holeNumbers=Array.from({length:holesN},(_,i)=>i+1);
+  const c={
+    id,name,baseName:name,tees:tees||'Unknown',yardage:0,
+    slope:Number.isFinite(Number(slope))?Number(slope):null,
+    rating:Number.isFinite(Number(rating))?Number(rating):null,
+    par:Number.isFinite(Number(par))?Number(par):null,
+    pars,holeNumbers,handicaps:Array(holesN).fill(null),segment,imported:false,manual:true
+  };
+  db.courses.push(c);
+  // Keep in-session course memory; server course catalog sync is a later pass.
+  try{if(typeof state!=='undefined'&&!state.selectedCourseId)state.selectedCourseId=c.id}catch{}
+  return c;
+}
 const uid=p=>`${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const fmtTime=v=>{if(!v)return 'TBD';const [h,m]=String(v).slice(0,5).split(':').map(Number),d=new Date();d.setHours(h,m||0,0,0);return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})};
 const fmtDate=v=>v?new Date(v+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'Date TBD';
 function dateTile(v){if(!v)return '<div class="gr-date"><div class="d">—</div><div class="w">TBD</div></div>';const d=new Date(v+'T12:00:00');return `<div class="gr-date"><div class="m">${d.toLocaleString(undefined,{month:'short'}).toUpperCase()}</div><div class="d">${d.getDate()}</div><div class="w">${d.toLocaleString(undefined,{weekday:'short'}).toUpperCase()}</div></div>`}
 function cleanNotes(v){return String(v||'').replace(/\n?\[\[GR_GUESTS:[\s\S]*?\]\]/g,'').replace(/\n?\[\[GR_WAR:[^\]]+\]\]/g,'').replace(/\n?\[\[GR_WAR_END:[^\]]*\]\]/g,'').replace(/\n?\[\[GR_PREVIEW:[\s\S]*?\]\]/g,'').replace(/\n?\[\[GR_LIVE:[^\]]*\]\]/g,'').replace(/\n?\[\[GR_IMPORT_FP:[^\]]*\]\]/g,'').trim()}
-function guestsOf(m){if(Array.isArray(m.guests))return m.guests;const x=String(m.notes||'').match(/\[\[GR_GUESTS:([\s\S]*?)\]\]/);if(!x)return [];try{return JSON.parse(x[1])||[]}catch{return []}}
+function guestsFromNotes(notes){
+  const x=String(notes||'').match(/\[\[GR_GUESTS:([\s\S]*?)\]\]/);
+  if(!x)return [];
+  try{return (JSON.parse(x[1])||[]).map(g=>String(g||'').trim()).filter(Boolean)}catch{return []}
+}
+function guestsOf(m){
+  const fromArr=Array.isArray(m?.guests)?m.guests.map(g=>String(g||'').trim()).filter(Boolean):null;
+  const fromNotes=guestsFromNotes(m?.notes);
+  // Prefer a non-empty guests array; otherwise fall back to notes tag (legacy / sync).
+  if(fromArr&&fromArr.length)return fromArr;
+  if(fromNotes.length)return fromNotes;
+  return fromArr||[];
+}
 function warIdOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR:([^\]]+)\]\]/);return x?x[1]:''}
 function warEndOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR_END:([^\]]*)\]\]/);return x?x[1]:''}
 function composeNotes(base,guests=[],warId='',warEnd=''){let s=cleanNotes(base);if(guests.length)s+=`${s?'\n':''}[[GR_GUESTS:${JSON.stringify(guests)}]]`;if(warId)s+=`${s?'\n':''}[[GR_WAR:${warId}]]`;if(warEnd)s+=`${s?'\n':''}[[GR_WAR_END:${warEnd}]]`;return s}
@@ -35,15 +149,33 @@ function statusTag(m){
 }
 function previewFor(p,m){
   const stored=typeof window.grPreviewFromMission==='function'?window.grPreviewFromMission(m):null;
-  if(stored&&(stored.battlefield||(stored.intel&&stored.intel.length)))return stored;
+  // Prefer stored brief when present; otherwise rebuild so copy stays witty.
+  if(stored&&(stored.brief||stored.narrative))return stored;
   if(typeof window.grBuildMissionPreview==='function')return window.grBuildMissionPreview(p,m);
   const same=(p.missions||[]).filter(x=>x.id!==m.id&&x.type!=='war'&&courseLabel(x.locationName)===courseLabel(m.locationName)&&x.status==='completed');
   const names=peopleOf(p,m).map(x=>x.name);
-  return {battlefield:same.length?`${same.length} prior Platoon round${same.length===1?'':'s'} at ${courseLabel(m.locationName)}.`:`First Platoon Mission at ${courseLabel(m.locationName)}.`,watch:names.length?names.slice(0,4).join(' · '):'Field TBD',intel:[]};
+  const guests=guestsOf(m);
+  const open=names.length
+    ? `Tee sheet at ${courseLabel(m.locationName)} features ${names.length} hopeful${names.length===1?'':'s'} who somehow all swear this is "just a friendly."`
+    : `Tee sheet at ${courseLabel(m.locationName)} is somehow empty — bold strategy.`;
+  const cast=names.length?`On the card: ${names.join(', ')}.`:`Nobody checked in.`;
+  const hist=same.length?`${same.length} prior Platoon round${same.length===1?'':'s'} here, and the lessons remain optional.`:`First Platoon Mission at ${courseLabel(m.locationName)} — legends loading.`;
+  const jab=guests.length?`Guests (${guests.join(', ')}) are here as witnesses / scapegoats.`:`Expect early bravado and a late debate about conditions.`;
+  const narrative=`${open} ${cast} ${hist} ${jab} Lock it, laugh first, and remember My Time Points don't care about your warm-up.`;
+  return {
+    battlefield:same.length?`${same.length} prior Platoon round${same.length===1?'':'s'} at ${courseLabel(m.locationName)}.`:`First Platoon Mission at ${courseLabel(m.locationName)}.`,
+    watch:names.length?names.slice(0,4).join(' · '):'Field TBD',
+    intel:[],
+    brief:narrative,
+    narrative
+  };
 }
 function previewMarkup(pre){
   const intel=Array.isArray(pre?.intel)?pre.intel:[];
-  const body=intel.length?intel.map(x=>`<p>${E(x)}</p>`).join(''):`<p>${E(pre?.battlefield||'')}</p><p>${E(pre?.watch||'')}</p>`;
+  const graph=String(pre?.brief||pre?.narrative||'').trim();
+  const body=graph
+    ? `<p class="gr-preview-brief">${E(graph)}</p>`
+    : (intel.length?intel.map(x=>`<p>${E(x)}</p>`).join(''):`<p>${E(pre?.battlefield||'')}</p><p>${E(pre?.watch||'')}</p>`);
   return `<div class="gr-preview"><h4>Pre-Mission Intel</h4>${body}</div>`;
 }
 function resultRows(m){return Array.isArray(m.results)?m.results:[]}
@@ -56,7 +188,7 @@ function platoonStandingsMarkup(p){
   if(typeof window.grPlatoonRecapMarkup==='function')return window.grPlatoonRecapMarkup(p);
   const rows=platoonStandings(p);
   const season=p.season||new Date().getFullYear();
-  return `<div class="gr-platoon-standings"><div class="gr-standings-title">${E(season)} Platoon Standings</div>${rows.map((r,i)=>`<div class="gr-platoon-standing-row"><span><b>${i+1}</b> ${E(r.name)}</span><strong>${Number(r.points||0)}</strong></div>`).join('')}</div>`;
+  return `<div class="gr-platoon-standings"><div class="gr-standings-title">${E(season)} My Time Points</div>${rows.map((r,i)=>`<div class="gr-platoon-standing-row"><span><b>${i+1}</b> ${E(r.name)}</span><strong>${Number(r.points||0)}</strong></div>`).join('')}</div>`;
 }
 
 function missionActions(m,warId){
@@ -130,59 +262,306 @@ function groupsV15(){
   const complete=standalone.filter(m=>m.status==='completed').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.teeTime||'').localeCompare(String(a.teeTime||'')));
   const upcomingBody=upcoming.length
     ? `<div class="gr-stack">${upcoming.map((m,i)=>missionCard(p,m,i===0||phaseOf(m)==='in_progress')).join('')}</div>`
-    : `<div class="card gr-empty-upcoming"><strong>No upcoming Missions</strong><span class="muted">Schedule the next round with + Operation.</span></div>`;
+    : `<div class="card gr-empty-upcoming"><strong>No upcoming Missions</strong><span class="muted">Schedule the next round with + Mission, or tap a day on Calendar.</span></div>`;
   const completedBody=complete.length
     ? `<div class="gr-stack">${complete.map((m,i)=>completedMissionAccordion(p,m,i===0)).join('')}</div>`
     : `<div class="card gr-empty-upcoming"><strong>No completed Missions yet</strong><span class="muted">Finished rounds will stack here with standings and AAR.</span></div>`;
   const pastBtn=typeof window.grImportPastMission==='function'?`<button class="button secondary" data-gr-past-import="1" onclick="grImportPastMission()">📥 Import Past Mission</button>`:'';
-  const home=`<div class="gr-platoons-home"><section class="card gr-platoon-hq"><div><div class="eyebrow">PLATOON HQ</div><div class="gr-platoon-name">${E(p.name||'My Time')}</div><div class="gr-platoon-motto">${E(p.motto||'')}</div>${platoonStandingsMarkup(p)}<div class="gr-hq-actions"><button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button>${pastBtn}<button class="button primary" onclick="grOpenOperation()">+ Operation</button></div></div><div>${p.logoData?`<img class="gr-platoon-logo" src="${E(p.logoData)}" alt="Platoon logo">`:'<div class="gr-logo-placeholder">PLATOON<br>LOGO</div>'}</div></section>${wars.map(w=>warCard(p,w)).join('')}<section class="gr-section" id="grUpcomingMissions"><div class="gr-section-head"><h2>Upcoming Missions</h2></div>${upcomingBody}</section><section class="gr-section" id="grCompletedMissions"><div class="gr-section-head"><h2>Completed Missions</h2></div>${completedBody}</section></div>`;
+  const home=`<div class="gr-platoons-home gr-clubhouse-landing">
+    <section class="card gr-platoon-hq gr-clubhouse-hero">
+      <div class="gr-clubhouse-brand">
+        <div class="eyebrow">CLUBHOUSE</div>
+        <div class="gr-platoon-name">${E(p.name||'My Time')}</div>
+        <div class="gr-platoon-motto">${E(p.motto||'The flash board for the group.')}</div>
+        <div class="gr-hq-actions">
+          <button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button>
+          ${pastBtn}
+          <button class="button primary" onclick="grOpenOperation()">+ Mission</button>
+        </div>
+      </div>
+      <div class="gr-clubhouse-logo-wrap">${p.logoData?`<img class="gr-platoon-logo" src="${E(p.logoData)}" alt="Platoon logo">`:'<div class="gr-logo-placeholder">PLATOON<br>LOGO</div>'}</div>
+      <div class="gr-clubhouse-board-wrap">${platoonStandingsMarkup(p)}</div>
+    </section>
+    ${wars.map(w=>warCard(p,w)).join('')}
+    <section class="gr-section gr-upcoming-flash" id="grUpcomingMissions">
+      <div class="gr-section-head"><div><div class="eyebrow">NEXT UP</div><h2>Upcoming Missions</h2></div></div>
+      ${upcomingBody}
+    </section>
+    <section class="gr-section" id="grCompletedMissions">
+      <div class="gr-section-head"><div><div class="eyebrow">ARCHIVE</div><h2>Completed Missions</h2></div></div>
+      ${completedBody}
+    </section>
+  </div>`;
   return withSubNav(home);
 }
 
 function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=document.createElement('dialog');d.id='grPlatoonDialog';document.body.appendChild(d)}d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
 function closeModal(){document.getElementById('grPlatoonDialog')?.close()}
-window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW OPERATION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="grid two" style="margin-top:14px"><button class="card" style="text-align:left;color:inherit" onclick="grCloseModal();grOpenMissionEditor()"><strong style="font-size:18px">Mission</strong><div class="muted" style="font-size:11px">One competitive round</div></button><button class="card" style="text-align:left;color:inherit" onclick="grCloseModal();grOpenWarEditor()"><strong style="font-size:18px">War</strong><div class="muted" style="font-size:11px">Multiple Missions</div></button></div>`)};
+window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW MISSION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-choice-grid"><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenMissionEditor()"><strong>Single Mission</strong><span class="muted">One competitive round — league night, Saturday game, outing</span></button><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenWarEditor()"><strong>War</strong><span class="muted">Multiple Missions under one season / league series</span></button></div>`)};
 window.grCloseModal=closeModal;
-window.grOpenSetup=()=>{const p=loadPlatoonLocal(),d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><label>Name<input id="grPName" value="${E(p.name||'')}"></label><label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label><div class="grid two"><label>Season<input id="grPSeason" type="number" value="${E(p.season||new Date().getFullYear())}"></label><label>Visibility<select id="grPVis"><option ${p.visibility==='Private'?'selected':''}>Private</option><option ${p.visibility==='Invite only'?'selected':''}>Invite only</option></select></label></div><label class="gr-logo-upload">${p.logoData?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/*"></label><div class="dialog-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);d.querySelector('#grPLogo').onchange=e=>{const f=e.target.files?.[0];if(!f)return;const img=new Image(),r=new FileReader();r.onload=()=>{img.onload=()=>{const c=document.createElement('canvas'),max=256,scale=Math.min(1,max/Math.max(img.width,img.height));c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);d.dataset.logo=c.toDataURL('image/jpeg',.82)};img.src=r.result};r.readAsDataURL(f)};d.querySelector('#grPSave').onclick=()=>{p.name=d.querySelector('#grPName').value.trim()||'My Time';p.motto=d.querySelector('#grPMotto').value.trim();p.season=Number(d.querySelector('#grPSeason').value)||new Date().getFullYear();p.visibility=d.querySelector('#grPVis').value;if(d.dataset.logo)p.logoData=d.dataset.logo;savePlatoonLocal(p);closeModal()}};
+function compressImageFile(file,{max=1280,quality=.72}={}){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(),r=new FileReader();
+    r.onerror=()=>reject(r.error||new Error('Read failed'));
+    r.onload=()=>{
+      img.onload=()=>{
+        const c=document.createElement('canvas');
+        const scale=Math.min(1,max/Math.max(img.width,img.height));
+        c.width=Math.max(1,Math.round(img.width*scale));
+        c.height=Math.max(1,Math.round(img.height*scale));
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        resolve(c.toDataURL('image/jpeg',quality));
+      };
+      img.onerror=()=>reject(new Error('Image decode failed'));
+      img.src=r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function clubhousePhotosOf(p){
+  return Array.isArray(p?.clubhousePhotos)?p.clubhousePhotos.filter(x=>x&&x.dataUrl).slice(0,8):[];
+}
+function renderClubhousePhotoThumbs(photos){
+  if(!photos.length)return '<div class="muted" style="font-size:11px">No platoon photos yet — stock course shots still rotate.</div>';
+  return `<div class="gr-clubhouse-thumbs">${photos.map(ph=>`<div class="gr-clubhouse-thumb" data-photo-id="${E(ph.id)}"><img src="${E(ph.dataUrl)}" alt=""><button type="button" class="gr-clubhouse-thumb-del" data-del-photo="${E(ph.id)}" title="Remove">✕</button></div>`).join('')}</div>`;
+}
 
-window.grOpenMissionEditor=(id='',warId='')=>{
-  const p=loadPlatoonLocal(),m=id?(p.missions||[]).find(x=>x.id===id):null,war=warId?(p.missions||[]).find(x=>x.id===warId&&x.type==='war'):null,gs=m?guestsOf(m):[],memberIds=m?.participants||[],baseNotes=m?cleanNotes(m.notes):'';
-  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">MISSION</div><h2>${m?'Edit Mission':'New Mission'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-event-banner"><div class="gr-event-name" id="grBannerTitle">${E(m?.title||'Event name')}</div><div class="gr-event-course" id="grBannerCourse">${E(courseLabel(m?.locationName))}</div><div class="gr-event-facts"><span class="gr-event-fact" id="grBannerDate">📅 ${E(fmtDate(m?.date))}</span><span class="gr-event-fact" id="grBannerTime">⏱ ${E(fmtTime(m?.teeTime))}</span><span class="gr-event-fact" id="grBannerFormat">${E(m?.format||'Format TBD')}</span></div></div><label>Event Name<input id="grMTitle" value="${E(m?.title||'')}"></label><label>Course${courseSelectMarkup(m?.locationName)}</label><div class="grid two"><label>Date<input id="grMDate" type="date" value="${E(m?.date||'')}"></label><label>Tee Time<input id="grMTime" type="time" value="${E(String(m?.teeTime||'').slice(0,5))}"></label></div><label>Format<input id="grMFormat" value="${E(m?.format||'Net stroke play')}"></label><label>Cadets Playing<div class="gr-check-grid">${membersOf(p).map(x=>`<label class="gr-check"><input type="checkbox" data-member="${E(x.id)}" ${memberIds.includes(x.id)?'checked':''}>${E(x.name)}</label>`).join('')}</div></label><label>Guests<div class="gr-guest-add"><input id="grGuestName" placeholder="Guest name"><button class="button secondary" id="grAddGuest" type="button">Add</button></div><div class="gr-guest-list" id="grGuests"></div></label><label>Notes<input id="grMNotes" value="${E(baseNotes)}"></label>${war?`<div class="chip" style="margin-top:10px">WAR · ${E(war.title)}</div>`:''}<div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grMSave">Save Mission</button></div>`);
-  let guests=[...gs];
+window.grOpenSetup=()=>{
+  const p=loadPlatoonLocal();
+  let photos=clubhousePhotosOf(p).map(x=>({...x}));
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+    <label>Name<input id="grPName" value="${E(p.name||'')}"></label>
+    <label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label>
+    <div class="grid two">
+      <label>Season<input id="grPSeason" type="number" value="${E(p.season||new Date().getFullYear())}"></label>
+      <label>Visibility<select id="grPVis"><option ${p.visibility==='Private'?'selected':''}>Private</option><option ${p.visibility==='Invite only'?'selected':''}>Invite only</option></select></label>
+    </div>
+    <label class="gr-logo-upload">${p.logoData?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/*"></label>
+    <div class="gr-clubhouse-photos-setup">
+      <div class="eyebrow" style="margin-top:14px">CLUBHOUSE PHOTOS</div>
+      <p class="muted" style="font-size:11px;margin:6px 0 8px">Upload group shots to mix into the background rotation with the stock course/lodge pics. Up to 8 photos (compressed on this device).</p>
+      <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
+      <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin-top:8px;cursor:pointer"><strong>📷 Add clubhouse photos</strong><span class="muted" style="display:block;font-size:10px;margin-top:4px;font-weight:600">Tap to choose from camera roll · JPG/PNG</span><input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
+    </div>
+    <div class="dialog-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);
+  const thumbs=d.querySelector('#grClubhouseThumbs');
+  const refreshThumbs=()=>{thumbs.innerHTML=renderClubhousePhotoThumbs(photos)};
+  d.querySelector('#grPLogo').onchange=async e=>{
+    const f=e.target.files?.[0];if(!f)return;
+    try{d.dataset.logo=await compressImageFile(f,{max:256,quality:.82})}catch(err){alert(err.message||'Logo upload failed')}
+  };
+  d.querySelector('#grPClubPhotos').onchange=async e=>{
+    const files=[...(e.target.files||[])];
+    e.target.value='';
+    for(const f of files){
+      if(photos.length>=8){alert('Max 8 clubhouse photos for now.');break}
+      try{
+        const dataUrl=await compressImageFile(f,{max:1280,quality:.7});
+        photos.push({id:`ph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,dataUrl,createdAt:new Date().toISOString()});
+      }catch(err){alert(err.message||'Photo upload failed')}
+    }
+    refreshThumbs();
+  };
+  thumbs.onclick=e=>{
+    const del=e.target.closest('[data-del-photo]');
+    if(!del)return;
+    photos=photos.filter(x=>String(x.id)!==String(del.getAttribute('data-del-photo')));
+    refreshThumbs();
+  };
+  d.querySelector('#grPSave').onclick=()=>{
+    p.name=d.querySelector('#grPName').value.trim()||'My Time';
+    p.motto=d.querySelector('#grPMotto').value.trim();
+    p.season=Number(d.querySelector('#grPSeason').value)||new Date().getFullYear();
+    p.visibility=d.querySelector('#grPVis').value;
+    if(d.dataset.logo)p.logoData=d.dataset.logo;
+    p.clubhousePhotos=photos.slice(0,8);
+    savePlatoonLocal(p);
+    if(typeof window.grRefreshAtmos==='function')window.grRefreshAtmos();
+    closeModal();
+  };
+};
+
+window.grOpenMissionEditor=(id='',warId='',opts={})=>{
+  const p=loadPlatoonLocal();
+  const m=id?(p.missions||[]).find(x=>x.id===id):null;
+  const linkedWarId=warId||(m?warIdOf(m):'')||'';
+  const war=linkedWarId?(p.missions||[]).find(x=>x.id===linkedWarId&&x.type==='war'):null;
+  const wars=(p.missions||[]).filter(x=>x.type==='war');
+  const gs=Array.isArray(opts.guests)?opts.guests:(m?guestsOf(m):[]);
+  const memberIds=Array.isArray(opts.participants)?opts.participants:(m?.participants||[]);
+  const baseNotes=opts.notes!=null?String(opts.notes):(m?cleanNotes(m.notes):'');
+  const presetDate=opts.date||m?.date||today();
+  const presetTime=String(opts.teeTime||m?.teeTime||'').slice(0,5);
+  const presetFormat=opts.format||m?.format||'Stroke play (net)';
+  const presetTitle=opts.title!=null?String(opts.title):(m?.title||'');
+  const warOptions=`<option value="">None — standalone Mission</option>${wars.map(w=>`<option value="${E(w.id)}" ${String(w.id)===String(linkedWarId)?'selected':''}>${E(w.title||'War')}</option>`).join('')}`;
+  const timeChips=TEE_TIME_PRESETS.map(t=>`<button type="button" class="gr-time-chip" data-tee-preset="${t}">${fmtTime(t)}</button>`).join('');
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">MISSION</div><h2>${m?'Edit Mission':'New Mission'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+    <div class="gr-event-banner"><div class="gr-event-name" id="grBannerTitle">${E(presetTitle||'Event name')}</div><div class="gr-event-course" id="grBannerCourse">${E(courseLabel(m?.locationName))}</div><div class="gr-event-facts"><span class="gr-event-fact" id="grBannerDate">📅 ${E(fmtDate(presetDate))}</span><span class="gr-event-fact" id="grBannerTime">⏱ ${E(fmtTime(presetTime))}</span><span class="gr-event-fact" id="grBannerFormat">${E(presetFormat||'Format TBD')}</span></div></div>
+    <label>Event Name<input id="grMTitle" value="${E(presetTitle)}" placeholder="e.g. League Night 4"></label>
+    <label>Course${courseSelectMarkup(m?.locationName,m?.courseId)}<span class="muted" style="font-size:10px;font-weight:600">Add new course to save tees, rating, slope &amp; par.</span></label>
+    <div id="grCourseMeta" class="gr-course-meta muted" hidden></div>
+    <div class="grid two">
+      <label>Date<input id="grMDate" class="gr-datetime gr-date-picker" type="date" value="${E(presetDate)}" inputmode="none" autocomplete="off"></label>
+      <label>Tee Time<input id="grMTime" class="gr-datetime gr-time-picker" type="time" step="900" value="${E(presetTime)}" inputmode="none" autocomplete="off"></label>
+    </div>
+    <div class="gr-date-quick"><button type="button" class="gr-time-chip" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-date-preset="sun">Next Sun</button></div>
+    <div class="gr-time-presets">${timeChips}</div>
+    <label>Format${formatSelectMarkup(presetFormat)}</label>
+    <label>Attach to War<select id="grMWar" class="gr-mission-select">${warOptions}</select></label>
+    <label>Cadets Playing<div class="gr-check-grid">${membersOf(p).map(x=>`<label class="gr-check"><input type="checkbox" data-member="${E(x.id)}" ${memberIds.includes(x.id)?'checked':''}>${E(x.name)}</label>`).join('')}</div></label>
+    <label>Guests<div class="gr-guest-add"><input id="grGuestName" placeholder="Guest name"><button class="button secondary" id="grAddGuest" type="button">Add</button></div><div class="gr-guest-list" id="grGuests"></div></label>
+    <label>Notes<textarea id="grMNotes" rows="2" placeholder="Optional">${E(baseNotes)}</textarea></label>
+    <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grMSave">Save Mission</button></div>`);
+
+  let guests=[...gs].map(g=>String(g||'').trim()).filter(Boolean);
   const drawGuests=()=>d.querySelector('#grGuests').innerHTML=guests.map((g,i)=>`<span class="gr-guest-pill">${E(g)} <button type="button" data-rmguest="${i}">✕</button></span>`).join('');
   drawGuests();
-  d.querySelector('#grGuests').onclick=e=>{const i=e.target.dataset.rmguest;if(i!=null){guests.splice(Number(i),1);drawGuests()}};
-  d.querySelector('#grAddGuest').onclick=()=>{const v=d.querySelector('#grGuestName').value.trim();if(v&&!guests.includes(v)){guests.push(v);d.querySelector('#grGuestName').value='';drawGuests()}};
+  const addGuest=()=>{
+    const input=d.querySelector('#grGuestName');
+    const v=String(input?.value||'').trim();
+    if(!v)return;
+    if(guests.some(g=>g.toLowerCase()===v.toLowerCase())){input.value='';return}
+    guests.push(v);
+    input.value='';
+    drawGuests();
+  };
+  d.querySelector('#grGuests').onclick=e=>{const btn=e.target.closest('[data-rmguest]');if(!btn)return;guests.splice(Number(btn.getAttribute('data-rmguest')),1);drawGuests()};
+  d.querySelector('#grAddGuest').onclick=e=>{e.preventDefault();addGuest()};
+  d.querySelector('#grGuestName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addGuest()}});
+
   const courseEl=()=>d.querySelector('#grMCourse');
-  const syncBanner=()=>{d.querySelector('#grBannerTitle').textContent=d.querySelector('#grMTitle').value||'Event name';d.querySelector('#grBannerCourse').textContent=courseEl()?.value||'Course TBD';d.querySelector('#grBannerDate').textContent='📅 '+fmtDate(d.querySelector('#grMDate').value);d.querySelector('#grBannerTime').textContent='⏱ '+fmtTime(d.querySelector('#grMTime').value);d.querySelector('#grBannerFormat').textContent=d.querySelector('#grMFormat').value||'Format TBD'};
-  ['grMTitle','grMDate','grMTime','grMFormat'].forEach(x=>d.querySelector('#'+x).addEventListener('input',syncBanner));
+  const syncBanner=()=>{
+    const resolved=resolveCourseSelection(courseEl()?.value);
+    d.querySelector('#grBannerTitle').textContent=d.querySelector('#grMTitle').value||'Event name';
+    d.querySelector('#grBannerCourse').textContent=resolved.locationName||'Course TBD';
+    d.querySelector('#grBannerDate').textContent='📅 '+fmtDate(d.querySelector('#grMDate').value);
+    d.querySelector('#grBannerTime').textContent='⏱ '+fmtTime(d.querySelector('#grMTime').value);
+    d.querySelector('#grBannerFormat').textContent=readMissionFormat(d)||'Format TBD';
+  };
+  const syncCourseMeta=()=>{
+    const meta=d.querySelector('#grCourseMeta');
+    const resolved=resolveCourseSelection(courseEl()?.value);
+    let c=null;
+    try{if(resolved.courseId&&typeof db!=='undefined')c=db.courses.find(x=>String(x.id)===String(resolved.courseId))}catch{}
+    if(!c||!meta){if(meta)meta.hidden=true;return}
+    const bits=[c.tees?`Tees ${c.tees}`:'',c.par!=null?`Par ${c.par}`:'',c.rating!=null?`Rating ${c.rating}`:'',c.slope!=null?`Slope ${c.slope}`:'',c.segment||''].filter(Boolean);
+    meta.textContent=bits.join(' · ')||'Course on file';
+    meta.hidden=!bits.length;
+  };
+  const syncFormatOther=()=>{
+    const other=d.querySelector('#grMFormatOther');
+    const pick=d.querySelector('#grMFormatPick')?.value;
+    if(other)other.style.display=pick==='Other'?'block':'none';
+    syncBanner();
+  };
+
+  ['grMTitle','grMDate','grMTime','grMFormatOther'].forEach(x=>d.querySelector('#'+x)?.addEventListener('input',syncBanner));
+  d.querySelector('#grMFormatPick')?.addEventListener('change',syncFormatOther);
+  d.querySelectorAll('[data-tee-preset]').forEach(b=>b.addEventListener('click',()=>{d.querySelector('#grMTime').value=b.dataset.teePreset;syncBanner()}));
+  d.querySelectorAll('[data-date-preset]').forEach(b=>b.addEventListener('click',()=>{
+    const now=new Date();
+    let target=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    if(b.dataset.datePreset==='sat'){const day=target.getDay();const add=((6-day)+7)%7||7;target.setDate(target.getDate()+add)}
+    if(b.dataset.datePreset==='sun'){const day=target.getDay();const add=((0-day)+7)%7||7;target.setDate(target.getDate()+add)}
+    d.querySelector('#grMDate').value=isoDate(target.getFullYear(),target.getMonth(),target.getDate());
+    syncBanner();
+  }));
+
+  const openCourseWizard=()=>{
+    const snap={
+      date:d.querySelector('#grMDate')?.value||presetDate,
+      teeTime:d.querySelector('#grMTime')?.value||presetTime,
+      warId:String(d.querySelector('#grMWar')?.value||linkedWarId||''),
+      title:d.querySelector('#grMTitle')?.value||'',
+      format:readMissionFormat(d),
+      notes:d.querySelector('#grMNotes')?.value||'',
+      guests:[...guests],
+      participants:[...d.querySelectorAll('[data-member]:checked')].map(x=>x.dataset.member)
+    };
+    const wiz=modal(`<div class="dialog-head"><div><div class="eyebrow">COURSE</div><h2>Add course</h2></div><button class="icon-button" id="grCourseCancel" type="button">✕</button></div>
+      <p class="muted" style="font-size:12px">Saves into your Golf Recon course list with scorecard basics (par / rating / slope). Hole-by-hole maps can still come from Hole Preview later.</p>
+      <label>Course name<input id="grCName" placeholder="Four Oaks Country Club" required></label>
+      <div class="grid two"><label>Tees<input id="grCTees" placeholder="White / Blue" value="White"></label><label>Holes<select id="grCHoles"><option value="18">18</option><option value="9">9</option></select></label></div>
+      <div class="grid three"><label>Par<input id="grCPar" type="number" inputmode="numeric" placeholder="72"></label><label>Rating<input id="grCRating" type="number" inputmode="decimal" step="0.1" placeholder="71.2"></label><label>Slope<input id="grCSlope" type="number" inputmode="numeric" placeholder="128"></label></div>
+      <div class="dialog-actions sticky-actions"><button class="button secondary" id="grCourseCancel2" type="button">Cancel</button><button class="button primary" id="grCourseSave" type="button">Save course</button></div>`);
+    const reopen=(extra={})=>{closeModal();window.grOpenMissionEditor(id,snap.warId,{
+      date:snap.date,teeTime:snap.teeTime,title:snap.title,format:snap.format,notes:snap.notes,
+      guests:snap.guests,participants:snap.participants,...extra
+    })};
+    wiz.querySelector('#grCourseCancel').onclick=()=>reopen();
+    wiz.querySelector('#grCourseCancel2').onclick=()=>reopen();
+    wiz.querySelector('#grCourseSave').onclick=()=>{
+      const name=String(wiz.querySelector('#grCName').value||'').trim();
+      if(!name){alert('Enter a course name.');return}
+      const payload={
+        name,
+        tees:String(wiz.querySelector('#grCTees').value||'').trim()||'Unknown',
+        holes:Number(wiz.querySelector('#grCHoles').value)||18,
+        par:wiz.querySelector('#grCPar').value,
+        rating:wiz.querySelector('#grCRating').value,
+        slope:wiz.querySelector('#grCSlope').value
+      };
+      const created=ensureCourseInDb(payload);
+      reopen({
+        selectCourseId:created?.id||'',
+        selectCourseName:created?courseMenuName(created):name
+      });
+    };
+  };
+
   const sel=courseEl();
   if(sel){
-    sel.addEventListener('change',()=>{
-      if(sel.value==='__gr_add_course__'){
-        const name=String(prompt('New course name')||'').trim();
-        if(!name){sel.value=String(m?.locationName||'');syncBanner();return}
-        let o=[...sel.options].find(x=>x.value===name);
-        if(!o){o=document.createElement('option');o.value=name;o.textContent=name;const add=[...sel.options].find(x=>x.value==='__gr_add_course__');sel.insertBefore(o,add||null)}
-        sel.value=name;
+    if(opts.selectCourseId){
+      const val=`id:${opts.selectCourseId}`;
+      if(![...sel.options].some(o=>o.value===val)){
+        const o=document.createElement('option');o.value=val;o.textContent=opts.selectCourseName||opts.selectCourseId;sel.insertBefore(o,sel.querySelector('option[value="__gr_add_course__"]'));
       }
-      syncBanner();
+      sel.value=val;
+    }else if(opts.selectCourseName){
+      const val=`name:${opts.selectCourseName}`;
+      if(![...sel.options].some(o=>o.value===val)){
+        const o=document.createElement('option');o.value=val;o.textContent=opts.selectCourseName;sel.insertBefore(o,sel.querySelector('option[value="__gr_add_course__"]'));
+      }
+      sel.value=val;
+    }
+    sel.addEventListener('change',()=>{
+      if(sel.value==='__gr_add_course__'){openCourseWizard();return}
+      syncCourseMeta();syncBanner();
     });
   }
+  syncFormatOther();syncCourseMeta();syncBanner();
+
   d.querySelector('#grMSave').onclick=()=>{
-    const draftInput={title:d.querySelector('#grMTitle').value.trim()||'Mission',locationName:(d.querySelector('#grMCourse')?.value||'').trim()||'Course TBD',date:d.querySelector('#grMDate').value,teeTime:d.querySelector('#grMTime').value,format:d.querySelector('#grMFormat').value.trim(),participants:[...d.querySelectorAll('[data-member]:checked')].map(x=>x.dataset.member),notes:composeNotes(d.querySelector('#grMNotes').value,guests,warId||(m?warIdOf(m):'')),type:m?.type||'battle'};
+    const resolved=resolveCourseSelection(courseEl()?.value);
+    const chosenWar=String(d.querySelector('#grMWar')?.value||'');
+    const guestList=guests.map(g=>String(g||'').trim()).filter(Boolean);
+    const composed=composeNotes(d.querySelector('#grMNotes').value,guestList,chosenWar);
+    const draftInput={
+      title:d.querySelector('#grMTitle').value.trim()||'Mission',
+      locationName:resolved.locationName||'Course TBD',
+      courseId:resolved.courseId||'',
+      date:d.querySelector('#grMDate').value,
+      teeTime:d.querySelector('#grMTime').value,
+      format:readMissionFormat(d),
+      participants:[...d.querySelectorAll('[data-member]:checked')].map(x=>x.dataset.member),
+      guests:guestList,
+      notes:composed,
+      type:m?.type||'battle'
+    };
     const prepared=typeof window.grPrepareMissionDraft==='function'?window.grPrepareMissionDraft(draftInput,{existing:m}):{ok:true,mission:Object.assign(m||{id:uid('mission'),type:'battle',status:'planned',results:[]},draftInput)};
     if(!prepared.ok){alert(prepared.error||'Could not save Mission.');return}
     const obj=prepared.mission;
-    // Preserve preview/live/import tags from existing notes when editing.
+    obj.guests=guestList;
     if(m?.notes){
       const keep=[];
       for(const re of [/\[\[GR_PREVIEW:[\s\S]*?\]\]/,/\[\[GR_LIVE:[^\]]*\]\]/,/\[\[GR_IMPORT_FP:[^\]]*\]\]/]){
         const hit=String(m.notes).match(re);if(hit)keep.push(hit[0]);
       }
-      obj.notes=composeNotes(d.querySelector('#grMNotes').value,guests,warId||warIdOf(obj));
+      obj.notes=composed;
       if(keep.length)obj.notes+=`${obj.notes?'\n':''}${keep.join('\n')}`;
-    }else obj.notes=composeNotes(d.querySelector('#grMNotes').value,guests,warId||warIdOf(obj));
+    }else obj.notes=composed;
+    obj.courseId=resolved.courseId||obj.courseId||'';
     if(typeof window.grUpsertMission==='function')window.grUpsertMission(p,obj);else if(!m)p.missions.push(obj);else Object.assign(m,obj);
     savePlatoonLocal(p);closeModal();
   };
@@ -190,7 +569,21 @@ window.grOpenMissionEditor=(id='',warId='')=>{
 
 window.grOpenWarEditor=(id='')=>{
   const p=loadPlatoonLocal(),w=id?(p.missions||[]).find(x=>x.id===id&&x.type==='war'):null;
-  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">WAR</div><h2>${w?'Edit War':'New War'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><label>War Name<input id="grWTitle" value="${E(w?.title||'')}"></label><div class="grid two"><label>Start<input id="grWStart" type="date" value="${E(w?.date||'')}"></label><label>End<input id="grWEnd" type="date" value="${E(w?warEndOf(w):'')}"></label></div><label>Scoring<select id="grWScore"><option ${w?.format==='Points'?'selected':''}>Points</option><option ${w?.format==='Cumulative net'?'selected':''}>Cumulative net</option><option ${w?.format==='Cumulative gross'?'selected':''}>Cumulative gross</option><option ${w?.format==='Match-play points'?'selected':''}>Match-play points</option><option ${w?.format==='Team points'?'selected':''}>Team points</option></select></label><label>Notes<input id="grWNotes" value="${E(w?cleanNotes(w.notes):'')}"></label><div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grWSave">Save War</button></div>`);
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">WAR</div><h2>${w?'Edit War':'New War'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+    <label>War Name<input id="grWTitle" value="${E(w?.title||'')}"></label>
+    <div class="grid two">
+      <label>Start<input id="grWStart" class="gr-datetime gr-date-picker" type="date" value="${E(w?.date||'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="sun">Next Sun</button></div></label>
+      <label>End<input id="grWEnd" class="gr-datetime gr-date-picker" type="date" value="${E(w?warEndOf(w):'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="sun">Next Sun</button></div></label>
+    </div>
+    <label>Scoring<select id="grWScore" class="gr-mission-select"><option ${w?.format==='Points'?'selected':''}>Points</option><option ${w?.format==='Cumulative net'?'selected':''}>Cumulative net</option><option ${w?.format==='Cumulative gross'?'selected':''}>Cumulative gross</option><option ${w?.format==='Match-play points'?'selected':''}>Match-play points</option><option ${w?.format==='Team points'?'selected':''}>Team points</option></select></label>
+    <label>Notes<textarea id="grWNotes" rows="2">${E(w?cleanNotes(w.notes):'')}</textarea></label>
+    <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grWSave">Save War</button></div>`);
+  d.querySelectorAll('[data-war-date]').forEach(b=>b.addEventListener('click',()=>{
+    const now=new Date();let target=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    if(b.dataset.datePreset==='sat'){const day=target.getDay();const add=((6-day)+7)%7||7;target.setDate(target.getDate()+add)}
+    if(b.dataset.datePreset==='sun'){const day=target.getDay();const add=((0-day)+7)%7||7;target.setDate(target.getDate()+add)}
+    d.querySelector('#'+b.dataset.warDate).value=isoDate(target.getFullYear(),target.getMonth(),target.getDate());
+  }));
   d.querySelector('#grWSave').onclick=()=>{const obj=w||{id:uid('war'),type:'war',status:'planned',participants:[],results:[]};obj.title=d.querySelector('#grWTitle').value.trim()||'War';obj.date=d.querySelector('#grWStart').value;obj.teeTime='';obj.locationName='Multi-course';obj.format=d.querySelector('#grWScore').value;obj.notes=composeNotes(d.querySelector('#grWNotes').value,[],'',d.querySelector('#grWEnd').value);if(!w)p.missions.push(obj);savePlatoonLocal(p);closeModal()};
 };
 
@@ -250,10 +643,48 @@ if(!document.body.dataset.grPlatoonShellBound){
     if(e.target.closest('[data-platoon-home]')){platoonSubpage='home';renderGroups();return}
     if(e.target.closest('[data-cal-prev]')){const c=monthStart();calendarCursor=new Date(c.getFullYear(),c.getMonth()-1,1);renderGroups();return}
     if(e.target.closest('[data-cal-next]')){const c=monthStart();calendarCursor=new Date(c.getFullYear(),c.getMonth()+1,1);renderGroups();return}
-    const mb=e.target.closest('[data-mission]');
-    if(mb&&window.grViewMission){e.preventDefault();window.grViewMission(mb.dataset.mission)}
+    const missionChip=e.target.closest('[data-mission]');
+    if(missionChip&&window.grViewMission){e.preventDefault();e.stopPropagation();window.grViewMission(missionChip.dataset.mission);return}
+    const calDay=e.target.closest('[data-cal-iso]');
+    if(calDay&&window.grOpenMissionEditor){e.preventDefault();window.grOpenMissionEditor('','',{date:calDay.dataset.calIso});return}
   });
 }
+
+/* App-wide: date/time open native picker; block keyboard typing (no readonly — that breaks pickers) */
+(function installPickerOnlyDates(){
+  if(document.documentElement.dataset.grPickerOnly)return;
+  document.documentElement.dataset.grPickerOnly='1';
+  const isDT=el=>el&&el.matches?.('input[type="date"],input[type="time"]');
+  const harden=el=>{
+    if(!isDT(el)||el.dataset.grPickerBound)return;
+    el.dataset.grPickerBound='1';
+    el.removeAttribute('readonly');
+    el.setAttribute('inputmode','none');
+    el.setAttribute('autocomplete','off');
+    el.classList.add(el.type==='time'?'gr-time-picker':'gr-date-picker');
+  };
+  const openPicker=el=>{
+    harden(el);
+    try{if(typeof el.showPicker==='function')el.showPicker()}catch{}
+  };
+  document.addEventListener('click',e=>{if(isDT(e.target))openPicker(e.target)},true);
+  document.addEventListener('focusin',e=>{if(isDT(e.target)){harden(e.target);try{e.target.showPicker?.()}catch{}}},true);
+  document.addEventListener('keydown',e=>{
+    if(!isDT(e.target))return;
+    if(e.key==='Tab'||e.key==='Escape')return;
+    e.preventDefault();
+    if(e.key==='Enter'||e.key===' '||e.key==='ArrowDown')openPicker(e.target);
+  },true);
+  document.addEventListener('beforeinput',e=>{if(isDT(e.target))e.preventDefault()},true);
+  const scan=root=>{(root||document).querySelectorAll?.('input[type="date"],input[type="time"]').forEach(harden)};
+  scan(document);
+  new MutationObserver(muts=>{
+    for(const m of muts){
+      if(m.type==='childList')m.addedNodes.forEach(n=>{if(n.nodeType===1){harden(n);scan(n)}});
+      if(m.type==='attributes'&&isDT(m.target))harden(m.target);
+    }
+  }).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['type']});
+})();
 
 try{groupsView=groupsV15}catch{window.groupsView=groupsV15}
 window.grGroupsView=groupsV15;
