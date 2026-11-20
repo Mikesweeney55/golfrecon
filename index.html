@@ -1551,7 +1551,7 @@ body::before,body::after{opacity:0!important}
 }
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=169">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=170">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -4828,13 +4828,17 @@ document.getElementById('saveImport').onclick=async()=>{
     btn.disabled=false;btn.textContent='Save Round';
   }
 };
-/* V16.4 Field Ops — rotating lodge/ops atmosphere backgrounds */
+/* V16.4 Field Ops — rotating golf-course + lodge atmosphere backgrounds */
 (function grInitAtmos(){
   const views=[
-    'assets/atmos/atmos-forest-dawn.jpg',
-    'assets/atmos/atmos-ops-night.jpg',
+    'assets/atmos/atmos-augusta-dawn.jpg',
+    'assets/atmos/atmos-ne-highlands.jpg',
+    'assets/atmos/atmos-ne-autumn.jpg',
+    'assets/atmos/atmos-ne-woods.jpg',
+    'assets/atmos/atmos-calusa-dusk.jpg',
     'assets/atmos/atmos-lodge-dusk.jpg',
-    'assets/atmos/atmos-lodge-interior.jpg'
+    'assets/atmos/atmos-forest-dawn.jpg',
+    'assets/atmos/atmos-ops-night.jpg'
   ];
   const a=document.getElementById('grAtmosA');
   const b=document.getElementById('grAtmosB');
@@ -4867,12 +4871,12 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=4"></script>
   <script src="platoon-mission-core.js?v=4"></script>
-  <script src="platoon-hq-records.js?v=163"></script>
-  <script src="platoons-v15-real.js?v=168"></script>
+  <script src="platoon-hq-records.js?v=170"></script>
+  <script src="platoons-v15-real.js?v=170"></script>
   <script src="platoons-v15-patch-v5.js?v=163"></script>
   <script src="dev-mobile-pregame-fix.js?v=169"></script>
   <script src="dev-v15.5-results.js?v=163"></script>
-<script src="past-mission-import.js?v=5"></script>
+<script src="past-mission-import.js?v=170"></script>
 <script src="mission-delete.js?v=3"></script>
 </body>
 </html>

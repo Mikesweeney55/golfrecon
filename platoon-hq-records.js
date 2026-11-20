@@ -366,6 +366,62 @@ function missionOptions(p,selected){
 function modeSelect(name,value){
   return `<select data-mode="${esc(name)}">${MODES.map(m=>`<option value="${m}" ${value===m?'selected':''}>${m[0].toUpperCase()+m.slice(1)}</option>`).join('')}</select>`;
 }
+function courseNameList(current){
+  const names=[];
+  try{if(typeof db!=='undefined'&&Array.isArray(db.courses))db.courses.forEach(c=>{const n=String(c?.baseName||c?.name||'').trim();if(n)names.push(n)})}catch{}
+  try{(getP()?.missions||[]).forEach(m=>{const n=String(m?.locationName||'').trim();if(n&&n!=='Course TBD'&&n!=='Multi-course')names.push(n)})}catch{}
+  const cur=String(current||'').trim();if(cur)names.push(cur);
+  return [...new Set(names)].sort((a,b)=>a.localeCompare(b));
+}
+function courseSelectHtml(current){
+  const cur=String(current||'').trim();
+  const opts=courseNameList(cur).map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}</option>`).join('');
+  return `<select data-f="course" class="gr-mission-select"><option value="">Select course…</option>${opts}<option value="__custom__">＋ Custom course…</option></select>`;
+}
+function holeSelectHtml(current){
+  const cur=current==null||current===''?'':Number(current);
+  const opts=Array.from({length:18},(_,i)=>i+1).map(h=>`<option value="${h}" ${cur===h?'selected':''}>${h}</option>`).join('');
+  return `<select data-f="hole" class="gr-mission-select"><option value="">—</option>${opts}</select>`;
+}
+function dateFieldHtml(field,value,label){
+  return `<label>${esc(label)}
+    <input data-f="${esc(field)}" class="gr-datetime" type="date" value="${esc(value||'')}">
+    <div class="gr-date-quick">
+      <button type="button" class="gr-time-chip" data-date-preset="today">Today</button>
+      <button type="button" class="gr-time-chip" data-date-preset="sat">Next Sat</button>
+      <button type="button" class="gr-time-chip" data-date-preset="sun">Next Sun</button>
+    </div>
+  </label>`;
+}
+function isoFromPreset(kind){
+  const now=new Date();
+  let target=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  if(kind==='sat'){const day=target.getDay();const add=((6-day)+7)%7||7;target.setDate(target.getDate()+add)}
+  if(kind==='sun'){const day=target.getDay();const add=((0-day)+7)%7||7;target.setDate(target.getDate()+add)}
+  return `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
+}
+function bindDateChips(root){
+  root.addEventListener('click',e=>{
+    const chip=e.target.closest('[data-date-preset]');
+    if(!chip||!root.contains(chip))return;
+    e.preventDefault();
+    const input=chip.closest('label')?.querySelector('input[type="date"]');
+    if(!input)return;
+    input.value=isoFromPreset(chip.dataset.datePreset);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+}
+function bindCourseCustom(root){
+  root.addEventListener('change',e=>{
+    const sel=e.target.closest('select[data-f="course"]');
+    if(!sel||sel.value!=='__custom__')return;
+    const name=String(prompt('Course name')||'').trim();
+    if(!name){sel.value='';return}
+    let o=[...sel.options].find(x=>x.value===name);
+    if(!o){o=document.createElement('option');o.value=name;o.textContent=name;const add=[...sel.options].find(x=>x.value==='__custom__');sel.insertBefore(o,add||null)}
+    sel.value=name;
+  });
+}
 
 function openRecordsEditor(){
   const p=getP();if(!p)return;
@@ -383,13 +439,14 @@ function openRecordsEditor(){
       <label>Eagles ${modeSelect('eagle',meta.modes.eagle)}</label>
     </div>
     <div class="gr-hq-editor-list" id="grHqRecList">${rows}</div>
-    <div class="dialog-actions" style="margin-top:10px">
+    <div class="dialog-actions sticky-actions" style="margin-top:10px">
       <button class="button secondary" type="button" id="grHqRecAdd">+ Add record</button>
       <button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button>
       <button class="button primary" type="button" id="grHqRecSave">Save</button>
     </div>
     <div id="grHqRecMsg" class="gr-hq-msg" hidden></div>`);
   const list=d.querySelector('#grHqRecList');
+  bindDateChips(d);bindCourseCustom(d);
   d.querySelector('#grHqRecAdd').onclick=()=>{
     const blank=normalizeRecord({category:'birdies',playerName:'',value:1});
     meta.records.push(blank);
@@ -416,7 +473,8 @@ function openRecordsEditor(){
         const resolved=resolvePlayer(p,memberId,playerName);
         if(memberId)playerName=resolved.playerName||playerName;
         const value=Number(row.querySelector('[data-f="value"]').value);
-        const course=row.querySelector('[data-f="course"]').value.trim();
+        let course=row.querySelector('[data-f="course"]').value.trim();
+        if(course==='__custom__')course='';
         const holeRaw=row.querySelector('[data-f="hole"]').value;
         const hole=holeRaw===''?null:Number(holeRaw);
         const date=row.querySelector('[data-f="date"]').value;
@@ -453,20 +511,20 @@ function openRecordsEditor(){
 function recordRowHtml(p,r){
   return `<div class="gr-hq-edit-row" data-id="${esc(r.id)}">
     <div class="grid two">
-      <label>Category<select data-f="category">${CATEGORIES.map(c=>`<option value="${c.id}" ${r.category===c.id?'selected':''}>${esc(c.label)}</option>`).join('')}</select></label>
+      <label>Category<select data-f="category" class="gr-mission-select">${CATEGORIES.map(c=>`<option value="${c.id}" ${r.category===c.id?'selected':''}>${esc(c.label)}</option>`).join('')}</select></label>
       <label>Count / score<input data-f="value" type="number" min="1" step="1" value="${esc(r.value??1)}"></label>
     </div>
     <div class="grid two">
-      <label>Player<select data-f="memberId">${playerOptions(p,r.memberId)}</select></label>
+      <label>Player<select data-f="memberId" class="gr-mission-select">${playerOptions(p,r.memberId)}</select></label>
       <label>Name (if custom)<input data-f="playerName" value="${esc(r.playerName||'')}" placeholder="Player name"></label>
     </div>
     <div class="grid two">
-      <label>Course<input data-f="course" value="${esc(r.course||'')}"></label>
-      <label>Hole<input data-f="hole" type="number" min="1" max="18" value="${r.hole??''}"></label>
+      <label>Course${courseSelectHtml(r.course)}</label>
+      <label>Hole${holeSelectHtml(r.hole)}</label>
     </div>
     <div class="grid two">
-      <label>Date<input data-f="date" type="date" value="${esc(r.date||'')}"></label>
-      <label>Mission<select data-f="missionId">${missionOptions(p,r.missionId)}</select></label>
+      ${dateFieldHtml('date',r.date,'Date')}
+      <label>Mission<select data-f="missionId" class="gr-mission-select">${missionOptions(p,r.missionId)}</select></label>
     </div>
     <label>Notes<input data-f="notes" value="${esc(r.notes||'')}"></label>
     <label class="gr-hq-check"><input data-f="overrideAuto" type="checkbox" ${r.overrideAuto?'checked':''}> Override automatic display for this category</label>
@@ -498,6 +556,7 @@ function openEaglesEditor(){
     </div>
     <div id="grHqEgMsg" class="gr-hq-msg" hidden></div>`);
   const balList=d.querySelector('#grHqBalList'),egList=d.querySelector('#grHqEgList');
+  bindDateChips(d);bindCourseCustom(d);
   d.querySelector('#grHqBalAdd').onclick=()=>{
     const b=normalizeBalance({playerName:'',count:1,asOfDate:new Date().toISOString().slice(0,10)});
     meta.eagleBalances.push(b);
@@ -536,7 +595,8 @@ function openEaglesEditor(){
         const memberId=row.querySelector('[data-f="memberId"]').value;
         let playerName=row.querySelector('[data-f="playerName"]').value.trim();
         const resolved=resolvePlayer(p,memberId,playerName);
-        const course=row.querySelector('[data-f="course"]').value.trim();
+        let course=row.querySelector('[data-f="course"]').value.trim();
+        if(course==='__custom__')course='';
         const holeRaw=row.querySelector('[data-f="hole"]').value;
         const hole=holeRaw===''?null:Number(holeRaw);
         const date=row.querySelector('[data-f="date"]').value;
@@ -562,12 +622,12 @@ function openEaglesEditor(){
 function balanceRowHtml(p,b){
   return `<div class="gr-hq-edit-row" data-id="${esc(b.id)}">
     <div class="grid two">
-      <label>Player<select data-f="memberId">${playerOptions(p,b.memberId)}</select></label>
+      <label>Player<select data-f="memberId" class="gr-mission-select">${playerOptions(p,b.memberId)}</select></label>
       <label>Name (if custom)<input data-f="playerName" value="${esc(b.playerName||'')}"></label>
     </div>
     <div class="grid two">
       <label>Starting eagles<input data-f="count" type="number" min="0" step="1" value="${esc(b.count??0)}"></label>
-      <label>As-of date<input data-f="asOfDate" type="date" value="${esc(b.asOfDate||'')}" title="Automatic eagles on or before this date are not added again"></label>
+      ${dateFieldHtml('asOfDate',b.asOfDate,'As-of date')}
     </div>
     <label>Notes<input data-f="notes" value="${esc(b.notes||'')}"></label>
     <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-bal="${esc(b.id)}">Remove</button><span class="muted" style="font-size:10px">Manual balance</span></div>
@@ -576,16 +636,16 @@ function balanceRowHtml(p,b){
 function eagleDetailRowHtml(p,e){
   return `<div class="gr-hq-edit-row" data-id="${esc(e.id)}">
     <div class="grid two">
-      <label>Player<select data-f="memberId">${playerOptions(p,e.memberId)}</select></label>
+      <label>Player<select data-f="memberId" class="gr-mission-select">${playerOptions(p,e.memberId)}</select></label>
       <label>Name (if custom)<input data-f="playerName" value="${esc(e.playerName||'')}"></label>
     </div>
     <div class="grid two">
-      <label>Course<input data-f="course" value="${esc(e.course||'')}"></label>
-      <label>Hole<input data-f="hole" type="number" min="1" max="18" value="${e.hole??''}"></label>
+      <label>Course${courseSelectHtml(e.course)}</label>
+      <label>Hole${holeSelectHtml(e.hole)}</label>
     </div>
     <div class="grid two">
-      <label>Date<input data-f="date" type="date" value="${esc(e.date||'')}"></label>
-      <label>Mission<select data-f="missionId">${missionOptions(p,e.missionId)}</select></label>
+      ${dateFieldHtml('date',e.date,'Date')}
+      <label>Mission<select data-f="missionId" class="gr-mission-select">${missionOptions(p,e.missionId)}</select></label>
     </div>
     <label>Notes<input data-f="notes" value="${esc(e.notes||'')}"></label>
     <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-eg="${esc(e.id)}">Delete</button><span class="muted" style="font-size:10px">Manual detail</span></div>

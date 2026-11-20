@@ -39,8 +39,9 @@
 .gr-platoons-shell{padding-bottom:calc(138px + env(safe-area-inset-bottom))}
 @media(max-width:700px){.gr-platoon-subnav{bottom:calc(70px + env(safe-area-inset-bottom));width:calc(100% - 16px);border-radius:16px}.gr-platoon-subtab{padding:11px 6px;font-size:10px}}
 @media(min-width:901px){.gr-platoon-subnav{bottom:calc(78px + env(safe-area-inset-bottom))}}
-/* Centered mid-screen mission/war popups (not full-bleed) */
-#grPlatoonDialog[open]{
+/* Centered mid-screen popups (mission / war / HQ editors — not full-bleed) */
+#grPlatoonDialog[open],
+dialog.platoon-modal[open]{
   position:fixed;
   inset:0;
   width:min(560px,calc(100vw - 28px));
@@ -53,7 +54,8 @@
   padding:0;
   background:transparent;
 }
-#grPlatoonDialog[open] .dialog-card{
+#grPlatoonDialog[open] .dialog-card,
+dialog.platoon-modal[open] .dialog-card{
   box-sizing:border-box;
   width:100%;
   max-height:min(86dvh,calc(100dvh - 28px));
@@ -62,6 +64,9 @@
   overscroll-behavior:contain;
   padding-bottom:calc(28px + env(safe-area-inset-bottom));
 }
+.gr-hq-edit-row .gr-date-quick{margin-top:4px}
+.gr-hq-edit-row .gr-mission-select,
+.gr-hq-edit-row .gr-datetime{width:100%}
 
 /* Mission setup UX — chooser, calendar day create, formats, course wizard */
 .gr-choice-grid{display:grid;gap:10px;margin-top:14px}

@@ -410,7 +410,21 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
 
 window.grOpenWarEditor=(id='')=>{
   const p=loadPlatoonLocal(),w=id?(p.missions||[]).find(x=>x.id===id&&x.type==='war'):null;
-  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">WAR</div><h2>${w?'Edit War':'New War'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><label>War Name<input id="grWTitle" value="${E(w?.title||'')}"></label><div class="grid two"><label>Start<input id="grWStart" type="date" value="${E(w?.date||'')}"></label><label>End<input id="grWEnd" type="date" value="${E(w?warEndOf(w):'')}"></label></div><label>Scoring<select id="grWScore"><option ${w?.format==='Points'?'selected':''}>Points</option><option ${w?.format==='Cumulative net'?'selected':''}>Cumulative net</option><option ${w?.format==='Cumulative gross'?'selected':''}>Cumulative gross</option><option ${w?.format==='Match-play points'?'selected':''}>Match-play points</option><option ${w?.format==='Team points'?'selected':''}>Team points</option></select></label><label>Notes<input id="grWNotes" value="${E(w?cleanNotes(w.notes):'')}"></label><div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grWSave">Save War</button></div>`);
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">WAR</div><h2>${w?'Edit War':'New War'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+    <label>War Name<input id="grWTitle" value="${E(w?.title||'')}"></label>
+    <div class="grid two">
+      <label>Start<input id="grWStart" class="gr-datetime" type="date" value="${E(w?.date||'')}"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="sun">Next Sun</button></div></label>
+      <label>End<input id="grWEnd" class="gr-datetime" type="date" value="${E(w?warEndOf(w):'')}"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="sun">Next Sun</button></div></label>
+    </div>
+    <label>Scoring<select id="grWScore" class="gr-mission-select"><option ${w?.format==='Points'?'selected':''}>Points</option><option ${w?.format==='Cumulative net'?'selected':''}>Cumulative net</option><option ${w?.format==='Cumulative gross'?'selected':''}>Cumulative gross</option><option ${w?.format==='Match-play points'?'selected':''}>Match-play points</option><option ${w?.format==='Team points'?'selected':''}>Team points</option></select></label>
+    <label>Notes<textarea id="grWNotes" rows="2">${E(w?cleanNotes(w.notes):'')}</textarea></label>
+    <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grWSave">Save War</button></div>`);
+  d.querySelectorAll('[data-war-date]').forEach(b=>b.addEventListener('click',()=>{
+    const now=new Date();let target=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    if(b.dataset.datePreset==='sat'){const day=target.getDay();const add=((6-day)+7)%7||7;target.setDate(target.getDate()+add)}
+    if(b.dataset.datePreset==='sun'){const day=target.getDay();const add=((0-day)+7)%7||7;target.setDate(target.getDate()+add)}
+    d.querySelector('#'+b.dataset.warDate).value=isoDate(target.getFullYear(),target.getMonth(),target.getDate());
+  }));
   d.querySelector('#grWSave').onclick=()=>{const obj=w||{id:uid('war'),type:'war',status:'planned',participants:[],results:[]};obj.title=d.querySelector('#grWTitle').value.trim()||'War';obj.date=d.querySelector('#grWStart').value;obj.teeTime='';obj.locationName='Multi-course';obj.format=d.querySelector('#grWScore').value;obj.notes=composeNotes(d.querySelector('#grWNotes').value,[],'',d.querySelector('#grWEnd').value);if(!w)p.missions.push(obj);savePlatoonLocal(p);closeModal()};
 };
 
