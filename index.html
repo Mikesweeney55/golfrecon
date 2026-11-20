@@ -1555,34 +1555,50 @@ body::before,body::after{opacity:0!important}
    V16.5 — Field Dossier data views (Concept B)
    Presentation only — same metrics / calcs.
    ========================================================= */
+.dossier-banner{
+  margin:0 0 12px;padding:10px 12px;border-radius:12px;text-align:center;
+  font-family:var(--font-stencil),Oswald,sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:.22em;color:#1a140c;
+  background:linear-gradient(90deg,#e4c57e,#c49a4a 55%,#8f6b3a);
+  box-shadow:0 10px 28px rgba(0,0,0,.35),0 0 24px rgba(212,175,106,.2);
+}
 .dossier-shell{
-  display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;align-items:start;margin-top:8px;
+  display:grid;grid-template-columns:104px minmax(0,1fr);gap:14px;align-items:start;margin-top:10px;
 }
 .dossier-rail{
-  position:sticky;top:10px;display:grid;gap:6px;padding:8px 6px;
-  border:1px solid rgba(212,175,106,.22);border-radius:14px;
-  background:linear-gradient(180deg,rgba(28,26,18,.78),rgba(12,14,11,.86));
+  position:sticky;top:10px;display:grid;gap:8px;padding:10px 8px;
+  border:1px solid rgba(212,175,106,.4);border-radius:16px;
+  background:linear-gradient(180deg,rgba(48,40,24,.92),rgba(14,14,11,.94));
   backdrop-filter:blur(12px);
+  box-shadow:0 12px 28px rgba(0,0,0,.35),inset 0 0 0 1px rgba(212,175,106,.12);
 }
 .dossier-rail-tab{
-  border:0;border-radius:10px;padding:12px 6px;background:transparent;color:var(--muted);
-  font-family:var(--font-stencil),Oswald,sans-serif;font-size:11px;font-weight:600;
-  letter-spacing:.14em;cursor:pointer;text-align:center;
+  border:0;border-radius:12px;padding:16px 6px;background:rgba(0,0,0,.2);color:#b8a888;
+  font-family:var(--font-stencil),Oswald,sans-serif;font-size:12px;font-weight:700;
+  letter-spacing:.16em;cursor:pointer;text-align:center;
 }
 .dossier-rail-tab.active{
-  color:#fff6e8;background:linear-gradient(180deg,rgba(212,175,106,.22),rgba(111,143,90,.16));
-  box-shadow:inset 0 0 0 1px rgba(212,175,106,.3);
+  color:#17120a;background:linear-gradient(180deg,#e4c57e,#c49a4a);
+  box-shadow:0 0 18px rgba(212,175,106,.35);
 }
 .dossier-pane{min-width:0}
 .dossier-hero{
-  padding:18px 16px;margin-bottom:12px;border-radius:14px;
-  border:1px solid rgba(212,175,106,.24);
-  background:linear-gradient(125deg,rgba(40,36,22,.72),rgba(12,14,11,.8));
+  padding:20px 18px;margin-bottom:14px;border-radius:16px;
+  border:1px solid rgba(212,175,106,.34);
+  background:linear-gradient(125deg,rgba(48,40,22,.82),rgba(12,14,11,.88));
   backdrop-filter:blur(10px);
 }
+.dossier-hero-loud{
+  border-color:rgba(212,175,106,.55)!important;
+  box-shadow:0 18px 40px rgba(0,0,0,.4),0 0 30px rgba(212,175,106,.12);
+  background:
+    linear-gradient(120deg,rgba(70,55,28,.55),rgba(12,14,11,.82) 55%),
+    radial-gradient(circle at 90% 0,rgba(212,175,106,.18),transparent 40%)!important;
+}
 .dossier-hero-metric{
-  font-family:var(--font-display)!important;font-size:56px;line-height:1;font-weight:600;
-  letter-spacing:-.03em;color:#f4ebe0;margin:4px 0 6px;
+  font-family:var(--font-display)!important;font-size:64px;line-height:.92;font-weight:600;
+  letter-spacing:-.04em;color:#fff6e8;margin:6px 0 8px;
+  text-shadow:0 0 24px rgba(212,175,106,.25);
 }
 .dossier-metric-strip{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 12px;
@@ -1601,17 +1617,30 @@ body::before,body::after{opacity:0!important}
 }
 .dossier-panel h3{margin:4px 0 12px;font-size:18px}
 .dossier-bands{display:grid;gap:9px}
-.dossier-band{display:grid;grid-template-columns:78px minmax(0,1fr) 92px;gap:8px;align-items:center}
-.dossier-band-label{font-family:var(--font-stencil),Oswald,sans-serif;font-size:11px;letter-spacing:.06em;color:#e8dcc8}
+.dossier-band{display:grid;grid-template-columns:86px minmax(0,1fr) 96px;gap:10px;align-items:center;padding:6px 0}
+.dossier-band-label{font-family:var(--font-stencil),Oswald,sans-serif;font-size:12px;letter-spacing:.08em;color:#f0e6d8}
 .dossier-band-track{
-  position:relative;height:12px;border-radius:999px;overflow:hidden;
-  background:rgba(0,0,0,.35);border:1px solid rgba(212,175,106,.14);
+  position:relative;height:18px;border-radius:999px;overflow:hidden;
+  background:rgba(0,0,0,.45);border:1px solid rgba(212,175,106,.22);
 }
 .dossier-band-fill{
   position:absolute;left:0;top:0;bottom:0;
-  background:linear-gradient(90deg,#e0c07a,#c49a4a);border-radius:999px;
-  box-shadow:0 0 10px rgba(212,175,106,.2);
+  background:linear-gradient(90deg,#f0d78a,#d4af6a 55%,#a67c2d);border-radius:999px;
+  box-shadow:0 0 16px rgba(212,175,106,.35);
 }
+.dossier-chart-wrap .card,.dossier-chart-wrap .chart-card{
+  background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;
+}
+.dossier-chart-wrap .card::before,.dossier-chart-wrap .card::after,
+.dossier-chart-wrap .chart-card::before,.dossier-chart-wrap .chart-card::after{display:none!important}
+.dossier-round-list{display:grid;gap:0}
+.dossier-round-row{
+  display:grid;grid-template-columns:minmax(0,1.4fr) 64px 72px auto;gap:8px;align-items:center;
+  padding:12px 4px;border-bottom:1px solid rgba(212,175,106,.12);
+}
+.dossier-round-row.selected{background:rgba(212,175,106,.08);box-shadow:inset 3px 0 0 var(--accent);border-radius:8px}
+.dossier-round-score{font-family:var(--font-display);font-size:26px;font-weight:600;text-align:right}
+.dossier-round-diff{font-size:11px;color:var(--muted);text-align:right}
 .dossier-band-bad{
   position:absolute;right:0;top:0;bottom:0;
   background:linear-gradient(90deg,rgba(199,90,74,.15),rgba(199,90,74,.75));
@@ -1683,7 +1712,7 @@ body::before,body::after{opacity:0!important}
 }
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=166">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=167">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1769,7 +1798,7 @@ body::before,body::after{opacity:0!important}
       <button data-view="pregame" class="nav-item active"><span>⛳</span><small>Pregame</small></button>
       <button data-view="rounds" class="nav-item"><span>📊</span><small>Rounds</small></button>
       <button data-view="groups" class="nav-item"><span>👥</span><small>Platoons</small></button>
-      <button data-view="game" class="nav-item"><span>🏌️</span><small>My Game</small></button>
+      <button data-view="game" class="nav-item"><span>🏌️</span><small>Dossier</small></button>
     </nav>
   </div>
 
@@ -3809,9 +3838,24 @@ function roundsChart(rounds,key){
 }
 function roundsView(){
  const sorted=filteredRounds(),key=state.roundStat||'score',d=roundStatDefs[key];
- const courseChoices=db.courses.slice().sort((a,b)=>(a.baseName||a.name).localeCompare(b.baseName||b.name)||String(a.tees||'').localeCompare(String(b.tees||'')));
  const selectedCourse=state.roundCourseId==='all'?null:course(state.roundCourseId);
- return `<div class="section-head"><div><div class="eyebrow">ROUND DATABASE</div><h2>${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'All courses'} · ${sorted.length} round${sorted.length===1?'':'s'}</h2></div></div>
+ const chrono=sorted.slice().reverse();
+ const vals=chrono.map(r=>statValue(r,key)).filter(v=>v!=null);
+ const hero=vals.length?(d.better==='high'?Math.max(...vals):Math.min(...vals)):null;
+ const av=vals.length?avg(vals):null;
+ const latest=chrono.at(-1),lv=latest?statValue(latest,key):null;
+ const list=sorted.map(r=>{
+   const c=course(r.courseId),diff=scoreDifferential(r),sel=String(state.selectedRoundId)===String(r.id),g=missingRoundStats(r),basicMissing=g.fw+g.gir+g.putts;
+   const status=basicMissing?`<span class="round-status missing">Missing stats</span>`:g.firstPutts?`<span class="round-status warn">Putt detail missing</span>`:`<span class="round-status complete">Complete ✓</span>`;
+   return `<div class="dossier-round-row ${sel?'selected':''}" data-round-row="${r.id}"><div class="dossier-round-main"><strong>${c.name}</strong><div class="muted">${fmtDate(r.date)} · ${c.tees} tees · ${r.holes} holes</div><div class="round-status-row">${status}</div></div><div class="dossier-round-score">${r.gross}${sel&&Number.isFinite(c.par)?`<span class="score-over">${r.gross-c.par>=0?'+':''}${r.gross-c.par}</span>`:''}</div><div class="dossier-round-diff">Diff ${diff==null?'—':diff.toFixed(1)}</div><button class="edit-round-btn" data-round-action="${r.id}" type="button">Edit</button></div>`;
+ }).join('');
+ return `<div class="dossier-hero dossier-hero-loud"><div class="eyebrow">FIELD DOSSIER · ROUNDS</div><div class="dossier-hero-metric">${hero==null?'—':d.fmt(hero)}</div><div class="muted">${d.label} · best in view · ${sorted.length} round${sorted.length===1?'':'s'}</div></div>
+ <div class="dossier-metric-strip">
+   <div class="dossier-metric"><span class="metric-label">Average</span><strong class="metric">${av==null?'—':d.fmt(av)}</strong></div>
+   <div class="dossier-metric"><span class="metric-label">Latest</span><strong class="metric">${lv==null?'—':d.fmt(lv)}</strong></div>
+   <div class="dossier-metric"><span class="metric-label">Scope</span><strong class="metric metric-sm">${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'All courses'}</strong></div>
+   <div class="dossier-metric"><span class="metric-label">Filter</span><strong class="metric metric-sm">${state.roundFilter==='all'?'All holes':state.roundFilter+'-hole'}</strong></div>
+ </div>
  <div class="game-filter-label">Course scope</div>
  <div class="scope-toggle">
    <button class="filter-tab ${state.roundCourseId==='all'?'':'active'}" data-round-scope="selected">Selected course</button>
@@ -3819,8 +3863,8 @@ function roundsView(){
  </div>
  <div class="stat-tabs">${Object.entries(roundStatDefs).map(([k,x])=>`<button class="stat-tab ${k===key?'active':''}" data-round-stat="${k}">${x.short}</button>`).join('')}</div>
  <div class="filter-tabs"><button class="filter-tab ${state.roundFilter==='18'?'active':''}" data-round-filter="18">18 holes</button><button class="filter-tab ${state.roundFilter==='all'?'active':''}" data-round-filter="all">All</button><button class="filter-tab ${state.roundFilter==='9'?'active':''}" data-round-filter="9">9 holes</button></div>
- ${roundsChart(sorted,key)}
- <div class="section-head"><div><div class="eyebrow">ROUND LIST</div><h2>${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'Score by round'}</h2></div></div><div class="card">${sorted.map(r=>{const c=course(r.courseId),diff=scoreDifferential(r),sel=String(state.selectedRoundId)===String(r.id),g=missingRoundStats(r),basicMissing=g.fw+g.gir+g.putts,status=basicMissing?`<span class="round-status missing">Missing stats</span>`:g.firstPutts?`<span class="round-status warn">Putt detail missing</span>`:`<span class="round-status complete">Complete ✓</span>`;return `<div class="round-row round-summary has-edit ${sel?'selected':''}" data-round-row="${r.id}"><div><strong>${c.name}</strong><div class="muted">${fmtDate(r.date)} · ${c.tees} tees · Par ${c.par??'—'} · ${r.holes} holes</div><div class="round-status-row">${status}</div></div><div class="score-big">${r.gross}${sel&&Number.isFinite(c.par)?`<span class="score-over">${r.gross-c.par>=0?'+':''}${r.gross-c.par}</span>`:''}</div><div><span class="badge">Diff ${diff==null?'—':diff.toFixed(1)}</span></div><button class="edit-round-btn" data-round-action="${r.id}" type="button">Edit</button></div>`}).join('')}</div>
+ <div class="dossier-panel dossier-chart-wrap">${roundsChart(sorted,key)}</div>
+ <div class="dossier-panel" style="margin-top:12px"><div class="eyebrow">MISSION LOG</div><h3>Score by round</h3><div class="dossier-round-list">${list||'<div class="muted">No rounds in this filter.</div>'}</div></div>
  ${selectedCourse?courseMemorySection(selectedCourse.id):''}`;
 }
 
@@ -3958,14 +4002,14 @@ function myGame(){
    </div>
    <div class="game-scope-note">${scopeLabel} · ${roundLabel} · ${rs.length} round${rs.length===1?'':'s'} included</div>
  </div>`;
- const trendPane=`<div class="dossier-hero"><div class="eyebrow">FIELD DOSSIER</div><div class="dossier-hero-metric">${ps.avgScore==null?'—':ps.avgScore.toFixed(1)}</div><div class="muted">18-hole average · ${rs.length} round${rs.length===1?'':'s'}</div></div>
+ const trendPane=`<div class="dossier-hero dossier-hero-loud"><div class="eyebrow">FIELD DOSSIER · TREND</div><div class="dossier-hero-metric">${ps.avgScore==null?'—':ps.avgScore.toFixed(1)}</div><div class="muted">18-hole average · ${rs.length} round${rs.length===1?'':'s'}</div></div>
  <div class="dossier-metric-strip">
    <div class="dossier-metric"><span class="metric-label">Fairways</span><strong class="metric">${ps.fw==null?'—':ps.fw+'%'}</strong></div>
    <div class="dossier-metric"><span class="metric-label">GIR</span><strong class="metric">${ps.gir==null?'—':ps.gir+'%'}</strong></div>
    <div class="dossier-metric"><span class="metric-label">Putts / rd</span><strong class="metric">${ps.putts==null?'—':ps.putts.toFixed(1)}</strong></div>
  </div>
  <div class="dossier-panel"><div class="eyebrow">CLUB MEMORY</div><h3>On-course distances</h3><div class="dossier-club-list">${db.clubStats.map(x=>`<div class="dossier-club-row"><strong>${x.club}</strong><span>${x.distance} <small>yds</small></span></div>`).join('')||'<div class="muted">No club distances yet.</div>'}</div></div>`;
- const puttingPane=`<div class="dossier-hero"><div class="eyebrow">PUTTING INTEL</div><div class="dossier-hero-metric">${ps.putts==null?'—':ps.putts.toFixed(1)}</div><div class="muted">Putts per round</div></div>${heatMap()}`;
+ const puttingPane=`<div class="dossier-hero dossier-hero-loud"><div class="eyebrow">FIELD DOSSIER · PUTTING</div><div class="dossier-hero-metric">${ps.putts==null?'—':ps.putts.toFixed(1)}</div><div class="muted">Putts per round</div></div>${heatMap()}`;
  const keysPane=`<div class="dossier-panel"><div class="eyebrow">SWING THOUGHTS</div><h3>My Game Keys</h3>
  <div class="swing-grid">
    ${[['driver','Driver','Your top driver thoughts'],['irons','Irons','Your top iron thoughts'],['chipping','Chipping','Your short-game cues'],['putting','Putting','Your putting cues']].map(([k,label,hint])=>`<div class="card swing-card"><h3>${label}</h3><p>${hint} · one per line · top 3</p><textarea data-swing-input="${k}" placeholder="Add up to 3 thoughts...">${swingTextareaValue(k)}</textarea></div>`).join('')}
@@ -3973,7 +4017,8 @@ function myGame(){
  <div class="swing-save-row"><span id="swingSaveStatus" class="swing-save-status">These will appear in Pregame.</span><button id="saveSwingThoughts" class="button primary" type="button">Save Game Keys</button></div></div>
  <div class="dossier-panel" style="margin-top:12px"><div class="eyebrow">SHOT PATTERNS</div><h3>Fairways & GIR</h3><div class="direction-grid">${directionGraphic('Fairways',fw,false)}${directionGraphic('Greens in regulation',gir,true)}</div></div>`;
  const body=pane==='putting'?puttingPane:pane==='keys'?keysPane:trendPane;
- return `<div class="section-head"><div><div class="eyebrow">PLAYER MODEL</div><h2>My Game</h2></div></div>
+ return `<div class="dossier-banner">FIELD DOSSIER · MY GAME</div>
+ <div class="section-head"><div><div class="eyebrow">PLAYER MODEL</div><h2>My Game</h2></div></div>
  ${filters}
  <div class="dossier-shell">
    <aside class="dossier-rail" aria-label="My Game sections">${rail}</aside>
@@ -4999,8 +5044,8 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=5"></script>
   <script src="platoon-mission-core.js?v=4"></script>
-  <script src="platoon-hq-records.js?v=164"></script>
-  <script src="platoons-v15-real.js?v=164"></script>
+  <script src="platoon-hq-records.js?v=165"></script>
+  <script src="platoons-v15-real.js?v=165"></script>
   <script src="platoons-v15-patch-v5.js?v=163"></script>
   <script src="dev-mobile-pregame-fix.js?v=158"></script>
   <script src="dev-v15.5-results.js?v=163"></script>
