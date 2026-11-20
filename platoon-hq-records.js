@@ -325,10 +325,11 @@ function renderClubEagleBubble(p){
   const model=clubEagleModel(p);
   const head=`<div class="gr155-recap-title gr-hq-title-row"><span>CLUB EAGLE</span>${editIconBtn('eagles')}</div>`;
   if(!model.leaders.length){
-    return `<section class="gr155-recap-block" data-gr-hq="eagles">${head}<div class="gr155-empty">No eagles recorded yet. Use ✎ to add a historical starting balance.</div><div class="gr-hq-mode-tag">${esc(model.mode)}</div></section>`;
+    return `<section class="gr155-recap-block" data-gr-hq="eagles">${head}<div class="gr155-empty">No individual eagles yet. Use ✎ to add a player’s balance or hole detail.</div><div class="gr-hq-mode-tag">${esc(model.mode)}</div></section>`;
   }
-  const rows=model.leaders.slice(0,6).map(r=>`<div class="gr155-recap-row gr155-eagle-row"><span>${esc(r.playerName)}${r.flags.length?' <em class="gr-hq-flag" title="Possible duplicate — review in editor">⚑</em>':''}</span><span>${r.total} eagle${r.total===1?'':'s'}</span></div>`).join('');
-  return `<section class="gr155-recap-block" data-gr-hq="eagles">${head}<div class="gr155-eagle-hero"><span>🦅</span><div><strong>${model.platoonTotal}</strong><small>PLATOON EAGLES</small></div></div>${rows}<div class="gr-hq-mode-tag">${esc(model.mode)}</div></section>`;
+  // Individual leaderboard only — no platoon-wide tally.
+  const rows=model.leaders.slice(0,8).map(r=>`<div class="gr155-recap-row gr155-eagle-row"><span>${esc(r.playerName)}${r.flags.length?' <em class="gr-hq-flag" title="Possible duplicate — review in editor">⚑</em>':''}</span><span>${r.total} eagle${r.total===1?'':'s'}</span></div>`).join('');
+  return `<section class="gr155-recap-block" data-gr-hq="eagles">${head}${rows}<div class="gr-hq-mode-tag">${esc(model.mode)} · per player</div></section>`;
 }
 
 function renderRecordsBubble(p){
@@ -390,7 +391,7 @@ function holeSelectHtml(current){
 }
 function dateFieldHtml(field,value,label){
   return `<label>${esc(label)}
-    <input data-f="${esc(field)}" class="gr-datetime gr-date-picker" type="date" value="${esc(value||'')}" readonly inputmode="none" autocomplete="off">
+    <input data-f="${esc(field)}" class="gr-datetime gr-date-picker" type="date" value="${esc(value||'')}" inputmode="none" autocomplete="off">
     <div class="gr-date-quick">
       <button type="button" class="gr-time-chip" data-date-preset="today">Today</button>
       <button type="button" class="gr-time-chip" data-date-preset="sat">Next Sat</button>
@@ -549,8 +550,8 @@ function openEaglesEditor(){
   if(!dlgFn){alert('Editor unavailable.');return}
   const balRows=(meta.eagleBalances||[]).map(b=>balanceRowHtml(p,b)).join('')||'<div class="gr155-empty">No starting balances yet.</div>';
   const detRows=(meta.eagleDetails||[]).map(e=>eagleDetailRowHtml(p,e)).join('')||'<div class="gr155-empty">No individual eagle details yet.</div>';
-  const d=dlgFn(`<div class="dialog-head"><div><div class="eyebrow">CLUB EAGLE</div><h2 style="margin:5px 0 0">Edit Eagle Totals</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
-    <div class="platoon-notice"><strong>Starting balances</strong> cover historical eagles without scorecards. Set an <em>As-of date</em> so later automatic imports before that date are not double-counted. Individual details are optional.</div>
+  const d=dlgFn(`<div class="dialog-head"><div><div class="eyebrow">CLUB EAGLE</div><h2 style="margin:5px 0 0">Edit Player Eagles</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
+    <div class="platoon-notice"><strong>Per player only</strong> — no group tally. Starting balances cover historical eagles without scorecards. Set an <em>As-of date</em> so later automatic imports before that date are not double-counted. Hole details are optional.</div>
     <label>Display mode ${modeSelect('eagle',meta.modes.eagle)}</label>
     <div class="eyebrow" style="margin-top:14px">STARTING BALANCES</div>
     <div id="grHqBalList" class="gr-hq-editor-list">${balRows}</div>
@@ -683,8 +684,10 @@ function installStyles(){
   .gr-hq-src{font-style:normal;font-weight:700;opacity:.75;margin-left:4px;text-transform:none;letter-spacing:0}
   .gr-hq-flag{color:#ffcf68;font-style:normal}
   .gr-hq-flag-line,.gr-hq-review small{color:#ffcf68}
-  .gr-hq-editor-list{display:grid;gap:10px;margin-top:10px;max-height:45vh;overflow:auto}
+  .gr-hq-editor-list{display:grid;gap:10px;margin-top:10px;overflow:visible;max-height:none}
   .gr-hq-edit-row{border:1px solid var(--line,#24352d);border-radius:12px;padding:10px;background:#101914}
+  #platoonDynamicDialog .dialog-card{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #platoonDynamicDialog .sticky-actions{position:sticky;bottom:0;z-index:6}
   .gr-hq-edit-row label{margin-top:6px}
   .gr-hq-check{display:flex!important;align-items:center;gap:8px;flex-direction:row!important;font-size:11px}
   .gr-hq-check input{width:auto}

@@ -265,8 +265,8 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     <label>Course${courseSelectMarkup(m?.locationName,m?.courseId)}<span class="muted" style="font-size:10px;font-weight:600">Add new course to save tees, rating, slope &amp; par.</span></label>
     <div id="grCourseMeta" class="gr-course-meta muted" hidden></div>
     <div class="grid two">
-      <label>Date<input id="grMDate" class="gr-datetime gr-date-picker" type="date" value="${E(presetDate)}" readonly inputmode="none" autocomplete="off"></label>
-      <label>Tee Time<input id="grMTime" class="gr-datetime gr-time-picker" type="time" step="900" value="${E(presetTime)}" readonly inputmode="none" autocomplete="off"></label>
+      <label>Date<input id="grMDate" class="gr-datetime gr-date-picker" type="date" value="${E(presetDate)}" inputmode="none" autocomplete="off"></label>
+      <label>Tee Time<input id="grMTime" class="gr-datetime gr-time-picker" type="time" step="900" value="${E(presetTime)}" inputmode="none" autocomplete="off"></label>
     </div>
     <div class="gr-date-quick"><button type="button" class="gr-time-chip" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-date-preset="sun">Next Sun</button></div>
     <div class="gr-time-presets">${timeChips}</div>
@@ -413,8 +413,8 @@ window.grOpenWarEditor=(id='')=>{
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">WAR</div><h2>${w?'Edit War':'New War'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <label>War Name<input id="grWTitle" value="${E(w?.title||'')}"></label>
     <div class="grid two">
-      <label>Start<input id="grWStart" class="gr-datetime gr-date-picker" type="date" value="${E(w?.date||'')}" readonly inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="sun">Next Sun</button></div></label>
-      <label>End<input id="grWEnd" class="gr-datetime gr-date-picker" type="date" value="${E(w?warEndOf(w):'')}" readonly inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="sun">Next Sun</button></div></label>
+      <label>Start<input id="grWStart" class="gr-datetime gr-date-picker" type="date" value="${E(w?.date||'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-war-date="grWStart" data-date-preset="sun">Next Sun</button></div></label>
+      <label>End<input id="grWEnd" class="gr-datetime gr-date-picker" type="date" value="${E(w?warEndOf(w):'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-war-date="grWEnd" data-date-preset="sun">Next Sun</button></div></label>
     </div>
     <label>Scoring<select id="grWScore" class="gr-mission-select"><option ${w?.format==='Points'?'selected':''}>Points</option><option ${w?.format==='Cumulative net'?'selected':''}>Cumulative net</option><option ${w?.format==='Cumulative gross'?'selected':''}>Cumulative gross</option><option ${w?.format==='Match-play points'?'selected':''}>Match-play points</option><option ${w?.format==='Team points'?'selected':''}>Team points</option></select></label>
     <label>Notes<textarea id="grWNotes" rows="2">${E(w?cleanNotes(w.notes):'')}</textarea></label>
@@ -491,15 +491,15 @@ if(!document.body.dataset.grPlatoonShellBound){
   });
 }
 
-/* App-wide: date/time fields open the native picker only — no typing */
+/* App-wide: date/time open native picker; block keyboard typing (no readonly — that breaks pickers) */
 (function installPickerOnlyDates(){
   if(document.documentElement.dataset.grPickerOnly)return;
   document.documentElement.dataset.grPickerOnly='1';
-  const isDT=el=>el&&(el.matches?.('input[type="date"],input[type="time"]')||el.classList?.contains('gr-date-picker')||el.classList?.contains('gr-time-picker'));
+  const isDT=el=>el&&el.matches?.('input[type="date"],input[type="time"]');
   const harden=el=>{
     if(!isDT(el)||el.dataset.grPickerBound)return;
     el.dataset.grPickerBound='1';
-    el.setAttribute('readonly','readonly');
+    el.removeAttribute('readonly');
     el.setAttribute('inputmode','none');
     el.setAttribute('autocomplete','off');
     el.classList.add(el.type==='time'?'gr-time-picker':'gr-date-picker');
@@ -508,19 +508,16 @@ if(!document.body.dataset.grPlatoonShellBound){
     harden(el);
     try{if(typeof el.showPicker==='function')el.showPicker()}catch{}
   };
-  document.addEventListener('pointerdown',e=>{if(isDT(e.target))openPicker(e.target)},true);
-  document.addEventListener('focusin',e=>{if(isDT(e.target))openPicker(e.target)},true);
+  document.addEventListener('click',e=>{if(isDT(e.target))openPicker(e.target)},true);
+  document.addEventListener('focusin',e=>{if(isDT(e.target)){harden(e.target);try{e.target.showPicker?.()}catch{}}},true);
   document.addEventListener('keydown',e=>{
     if(!isDT(e.target))return;
-    // Block typing; allow Escape / Tab navigation only.
     if(e.key==='Tab'||e.key==='Escape')return;
     e.preventDefault();
     if(e.key==='Enter'||e.key===' '||e.key==='ArrowDown')openPicker(e.target);
   },true);
   document.addEventListener('beforeinput',e=>{if(isDT(e.target))e.preventDefault()},true);
-  const scan=root=>{
-    (root||document).querySelectorAll?.('input[type="date"],input[type="time"]').forEach(harden);
-  };
+  const scan=root=>{(root||document).querySelectorAll?.('input[type="date"],input[type="time"]').forEach(harden)};
   scan(document);
   new MutationObserver(muts=>{
     for(const m of muts){

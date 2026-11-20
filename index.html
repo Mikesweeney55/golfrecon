@@ -1461,33 +1461,6 @@ body::before,body::after{opacity:0!important}
   font-size:20px!important;
   letter-spacing:.12em!important;
 }
-.dossier-strip{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
-  margin:0 0 14px;padding:10px 12px;
-  border:1px solid rgba(212,175,106,.22);
-  border-radius:12px;
-  background:linear-gradient(90deg,rgba(28,30,20,.72),rgba(14,12,10,.7));
-  backdrop-filter:blur(10px);
-  box-shadow:inset 0 1px 0 rgba(244,235,224,.04);
-  animation:grRiseIn .65s ease both;
-}
-.dossier-strip .tag{
-  font-family:var(--font-stencil);font-size:10px;font-weight:600;letter-spacing:.16em;
-  text-transform:uppercase;color:var(--accent);
-  border:1px solid rgba(212,175,106,.28);border-radius:999px;padding:5px 9px;
-  background:rgba(212,175,106,.08);
-}
-.dossier-strip .tag.live{color:#cfe6b8;border-color:rgba(111,143,90,.45);background:rgba(111,143,90,.12)}
-.dossier-strip .meta{font-size:11px;color:var(--muted);letter-spacing:.04em}
-.dossier-strip .progress{
-  flex:1 1 120px;height:6px;min-width:100px;border-radius:999px;overflow:hidden;
-  background:rgba(0,0,0,.35);border:1px solid rgba(212,175,106,.15);
-}
-.dossier-strip .progress>span{
-  display:block;height:100%;width:var(--dossier-progress,62%);
-  background:linear-gradient(90deg,var(--accent),var(--olive));
-  box-shadow:0 0 12px rgba(212,175,106,.25);
-}
 /* Liquid glass data panels — more atmos bleed-through, readable type */
 .card,.hero,.chart-card,.direction-card,.tendency-card,.hole-card,.course-stat-lines,.chat-msg.assistant,.global-course-bar,.gr-mission,.gr-platoon-hq,.gr155-recap-block{
   background:
@@ -1589,7 +1562,7 @@ body::before,body::after{opacity:0!important}
   -webkit-backdrop-filter:blur(22px) saturate(1.3)!important;
 }
 @media(prefers-reduced-motion:reduce){
-  .gr-atmos-layer,.gr-atmos-scan,.gr-mark,.auth-gate,.topbar,.dossier-strip,.button.primary{animation:none!important;transition:none!important}
+  .gr-atmos-layer,.gr-atmos-scan,.gr-mark,.auth-gate,.topbar,.button.primary{animation:none!important;transition:none!important}
 }
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .card,.hero,.chart-card,.direction-card,.tendency-card,.hole-card,.gr-mission,.gr-platoon-hq,.gr155-recap-block{
@@ -1598,7 +1571,7 @@ body::before,body::after{opacity:0!important}
 }
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=172">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=173">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1658,13 +1631,6 @@ body::before,body::after{opacity:0!important}
         <button id="importBtn" class="button secondary">Import Round</button>
       </div>
     </header>
-
-    <div class="dossier-strip" id="dossierStrip" aria-label="Mission status">
-      <span class="tag">MISSION BRIEF</span>
-      <span class="tag live">STATUS LIVE</span>
-      <div class="progress" title="Ops readiness"><span></span></div>
-      <span class="meta" id="dossierMeta">FIELD OPS CLUBHOUSE</span>
-    </div>
 
     <div class="global-course-bar">
       <div class="global-course-label">
@@ -1748,7 +1714,7 @@ body::before,body::after{opacity:0!important}
             <input id="editTee" placeholder="White, II, etc." />
           </label>
           <label>Date
-            <input id="editDate" class="gr-date-picker" type="date" readonly inputmode="none" autocomplete="off" />
+            <input id="editDate" class="gr-date-picker" type="date" inputmode="none" autocomplete="off" />
           </label>
         </div>
         <div class="edit-grid">
@@ -3456,7 +3422,7 @@ function openMissionEditor(date='',missionId=''){
   const courseOpts=['<option value="">Choose course</option>',...courses.map(c=>`<option value="${safeText(c.id)}" ${(existing?.courseId===c.id)?'selected':''}>${safeText(courseMenuLabel(c))}</option>`)].join('');
   const memberChecks=(p.members||[]).map(m=>`<label class="platoon-roster-check"><input type="checkbox" data-mission-member="${safeText(m.id)}" ${selected.has(m.id)?'checked':''}><span>${safeText(m.name)}</span></label>`).join('');
   const d=platoonDialog(`<div class="dialog-head"><div><div class="eyebrow">MISSION CONTROL</div><h2 style="margin:5px 0 0">${existing?'Edit Mission':'Create Mission'}</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
-    <div class="platoon-form-grid" style="margin-top:16px"><label>Date<input id="missionDate" class="gr-date-picker" type="date" value="${safeText(existing?.date||date||'')}" readonly inputmode="none" autocomplete="off"></label><label>Tee time<input id="missionTime" class="gr-time-picker" type="time" value="${safeText(existing?.teeTime||'')}" readonly inputmode="none" autocomplete="off"></label></div>
+    <div class="platoon-form-grid" style="margin-top:16px"><label>Date<input id="missionDate" class="gr-date-picker" type="date" value="${safeText(existing?.date||date||'')}" inputmode="none" autocomplete="off"></label><label>Tee time<input id="missionTime" class="gr-time-picker" type="time" value="${safeText(existing?.teeTime||'')}" inputmode="none" autocomplete="off"></label></div>
     <div class="platoon-form-grid"><label>Mission level<select id="missionType"><option value="skirmish" ${existing?.type==='skirmish'?'selected':''}>Skirmish</option><option value="battle" ${existing?.type==='battle'||!existing?'selected':''}>Battle</option><option value="war" ${existing?.type==='war'?'selected':''}>War</option></select></label><label>Course<select id="missionCourse">${courseOpts}</select></label></div>
     <label>Other location<input id="missionLocation" value="${safeText(existing?.locationName&&!existing?.courseId?existing.locationName:'')}" placeholder="Use if the course is not in Golf Recon"></label>
     <div class="platoon-form-grid"><label>Title<input id="missionTitle" value="${safeText(existing?.title||'')}" placeholder="Optional"></label><label>Format<input id="missionFormat" value="${safeText(existing?.format||'')}" placeholder="Skins, stroke play, teams..."></label></div>
@@ -4918,12 +4884,12 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=4"></script>
   <script src="platoon-mission-core.js?v=4"></script>
-  <script src="platoon-hq-records.js?v=171"></script>
-  <script src="platoons-v15-real.js?v=171"></script>
+  <script src="platoon-hq-records.js?v=172"></script>
+  <script src="platoons-v15-real.js?v=172"></script>
   <script src="platoons-v15-patch-v5.js?v=163"></script>
   <script src="dev-mobile-pregame-fix.js?v=171"></script>
   <script src="dev-v15.5-results.js?v=163"></script>
-<script src="past-mission-import.js?v=171"></script>
+<script src="past-mission-import.js?v=172"></script>
 <script src="mission-delete.js?v=3"></script>
 </body>
 </html>
