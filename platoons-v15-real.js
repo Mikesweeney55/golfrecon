@@ -339,9 +339,9 @@ window.grOpenSetup=()=>{
     <label class="gr-logo-upload">${p.logoData?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/*"></label>
     <div class="gr-clubhouse-photos-setup">
       <div class="eyebrow" style="margin-top:14px">CLUBHOUSE PHOTOS</div>
-      <p class="muted" style="font-size:11px;margin:6px 0 8px">Mix your group shots into the background rotation with the stock course/lodge pics. Up to 8 photos (compressed on device).</p>
+      <p class="muted" style="font-size:11px;margin:6px 0 8px">Upload group shots to mix into the background rotation with the stock course/lodge pics. Up to 8 photos (compressed on this device).</p>
       <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
-      <label class="gr-logo-upload" style="margin-top:8px">Add clubhouse photos<input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
+      <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin-top:8px;cursor:pointer"><strong>📷 Add clubhouse photos</strong><span class="muted" style="display:block;font-size:10px;margin-top:4px;font-weight:600">Tap to choose from camera roll · JPG/PNG</span><input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
     </div>
     <div class="dialog-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);
   const thumbs=d.querySelector('#grClubhouseThumbs');

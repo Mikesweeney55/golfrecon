@@ -141,3 +141,21 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
 }
 
 .gr-preview-brief{font-size:12px;line-height:1.45;color:#dce6e1;margin:0}
+
+/* Pre-Mission Intel — larger type + breathing room on the sides */
+.gr-preview{
+  padding:14px 18px 15px 20px!important;
+  margin-top:12px;
+}
+.gr-preview h4{
+  font-size:14px!important;
+  margin:0 0 9px!important;
+  letter-spacing:.02em;
+}
+.gr-preview p,
+.gr-preview-brief{
+  font-size:14px!important;
+  line-height:1.55!important;
+  color:#e8f0ea!important;
+  margin:0!important;
+}
