@@ -158,7 +158,7 @@ function platoonStandingsMarkup(p){
   if(typeof window.grPlatoonRecapMarkup==='function')return window.grPlatoonRecapMarkup(p);
   const rows=platoonStandings(p);
   const season=p.season||new Date().getFullYear();
-  return `<div class="gr-platoon-standings"><div class="gr-standings-title">${E(season)} Platoon Standings</div>${rows.map((r,i)=>`<div class="gr-platoon-standing-row"><span><b>${i+1}</b> ${E(r.name)}</span><strong>${Number(r.points||0)}</strong></div>`).join('')}</div>`;
+  return `<div class="gr-platoon-standings"><div class="gr-standings-title">${E(season)} My Time Points</div>${rows.map((r,i)=>`<div class="gr-platoon-standing-row"><span><b>${i+1}</b> ${E(r.name)}</span><strong>${Number(r.points||0)}</strong></div>`).join('')}</div>`;
 }
 
 function missionActions(m,warId){

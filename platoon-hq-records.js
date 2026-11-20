@@ -321,7 +321,7 @@ function editIconBtn(kind){
   return `<button type="button" class="gr-hq-edit" data-gr-hq-edit="${esc(kind)}" title="Edit ${esc(kind)}" aria-label="Edit ${esc(kind)}">✎</button>`;
 }
 
-const HONOR_MARKS={eagles:'🦅',birdies:'🐦',ace:'⛳',records:'🏆',standings:'★'};
+const HONOR_MARKS={eagles:'🦅',birdies:'🐦',ace:'⛳',records:'★',standings:'🏆'};
 
 function honorHead(kind,title,sub,{addHtml=''}={}){
   const mark=HONOR_MARKS[kind]||'★';
@@ -363,15 +363,16 @@ function birdieBoardModel(p){
 }
 
 function renderStandingsBubble(p,standingRows){
+  const season=p?.season||new Date().getFullYear();
   const lockup=`<div class="eagle-lockup gr-honor-lockup">
-    <div class="eagle-mark gr-honor-mark gr-honor-standings" aria-hidden="true">★</div>
-    <div class="gr-honor-copy"><div class="eyebrow">STANDINGS</div><div class="gr-honor-sub">Season points race</div></div>
+    <div class="eagle-mark gr-honor-mark gr-honor-standings" aria-hidden="true">🏆</div>
+    <div class="gr-honor-copy"><div class="eyebrow">MY TIME POINTS</div><div class="gr-honor-sub">${esc(String(season))} season cup</div></div>
   </div>`;
   const lead=standingRows[0];
-  const hero=lead?`<div class="gr-eagle-spotlight gr-standings-spotlight"><div class="gr-eagle-spotlight-label">On top</div><div class="gr-eagle-spotlight-name">${esc(lead.member.name)}</div><div class="gr-eagle-spotlight-count">${lead.points}<span> pt${lead.points===1?'':'s'}</span></div></div>`:'';
+  const hero=lead?`<div class="gr-eagle-spotlight gr-standings-spotlight"><div class="gr-eagle-spotlight-label">Cup lead</div><div class="gr-eagle-spotlight-name">${esc(lead.member.name)}</div><div class="gr-eagle-spotlight-count">${lead.points}<span> pt${lead.points===1?'':'s'}</span></div></div>`:'';
   const rows=standingRows.length
     ? standingRows.map((x,i)=>`<div class="gr155-recap-row gr-standings-row ${i===0?'is-lead':''}"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span class="gr-standings-pts">${x.points}</span></div>`).join('')
-    : '<div class="gr155-empty">No points yet — finish a Mission to open the board.</div>';
+    : '<div class="gr155-empty">No My Time Points yet — finish a Mission to open the cup.</div>';
   return `<section class="gr155-recap-block gr-honor-card gr-honor-standings-card" data-gr-hq="standings">${lockup}${hero}${rows}</section>`;
 }
 
@@ -940,7 +941,7 @@ function platoonRecapMarkup(p){
   }
   if(rows.length){
     const best=rows[0].points,leaders=rows.filter(x=>x.points===best);
-    intel.push(leaders.length>1?`${leaders.map(x=>x.member.name).join(' & ')} are tied atop the Platoon at ${best} point${best===1?'':'s'}.`:`${leaders[0].member.name} leads the Platoon with ${best} point${best===1?'':'s'}.`);
+    intel.push(leaders.length>1?`${leaders.map(x=>x.member.name).join(' & ')} are tied atop My Time Points at ${best}.`:`${leaders[0].member.name} leads My Time Points with ${best}.`);
     const birdVals=rows.map(x=>x.birds).filter(n=>n>0);
     if(birdVals.length){const b=Math.max(...birdVals);const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
   }
