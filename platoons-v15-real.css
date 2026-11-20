@@ -139,3 +139,5 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
       "board board";
   }
 }
+
+.gr-preview-brief{font-size:12px;line-height:1.45;color:#dce6e1;margin:0}

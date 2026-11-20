@@ -120,7 +120,19 @@ const fmtTime=v=>{if(!v)return 'TBD';const [h,m]=String(v).slice(0,5).split(':')
 const fmtDate=v=>v?new Date(v+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'Date TBD';
 function dateTile(v){if(!v)return '<div class="gr-date"><div class="d">—</div><div class="w">TBD</div></div>';const d=new Date(v+'T12:00:00');return `<div class="gr-date"><div class="m">${d.toLocaleString(undefined,{month:'short'}).toUpperCase()}</div><div class="d">${d.getDate()}</div><div class="w">${d.toLocaleString(undefined,{weekday:'short'}).toUpperCase()}</div></div>`}
 function cleanNotes(v){return String(v||'').replace(/\n?\[\[GR_GUESTS:[\s\S]*?\]\]/g,'').replace(/\n?\[\[GR_WAR:[^\]]+\]\]/g,'').replace(/\n?\[\[GR_WAR_END:[^\]]*\]\]/g,'').replace(/\n?\[\[GR_PREVIEW:[\s\S]*?\]\]/g,'').replace(/\n?\[\[GR_LIVE:[^\]]*\]\]/g,'').replace(/\n?\[\[GR_IMPORT_FP:[^\]]*\]\]/g,'').trim()}
-function guestsOf(m){if(Array.isArray(m.guests))return m.guests;const x=String(m.notes||'').match(/\[\[GR_GUESTS:([\s\S]*?)\]\]/);if(!x)return [];try{return JSON.parse(x[1])||[]}catch{return []}}
+function guestsFromNotes(notes){
+  const x=String(notes||'').match(/\[\[GR_GUESTS:([\s\S]*?)\]\]/);
+  if(!x)return [];
+  try{return (JSON.parse(x[1])||[]).map(g=>String(g||'').trim()).filter(Boolean)}catch{return []}
+}
+function guestsOf(m){
+  const fromArr=Array.isArray(m?.guests)?m.guests.map(g=>String(g||'').trim()).filter(Boolean):null;
+  const fromNotes=guestsFromNotes(m?.notes);
+  // Prefer a non-empty guests array; otherwise fall back to notes tag (legacy / sync).
+  if(fromArr&&fromArr.length)return fromArr;
+  if(fromNotes.length)return fromNotes;
+  return fromArr||[];
+}
 function warIdOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR:([^\]]+)\]\]/);return x?x[1]:''}
 function warEndOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR_END:([^\]]*)\]\]/);return x?x[1]:''}
 function composeNotes(base,guests=[],warId='',warEnd=''){let s=cleanNotes(base);if(guests.length)s+=`${s?'\n':''}[[GR_GUESTS:${JSON.stringify(guests)}]]`;if(warId)s+=`${s?'\n':''}[[GR_WAR:${warId}]]`;if(warEnd)s+=`${s?'\n':''}[[GR_WAR_END:${warEnd}]]`;return s}
@@ -137,15 +149,33 @@ function statusTag(m){
 }
 function previewFor(p,m){
   const stored=typeof window.grPreviewFromMission==='function'?window.grPreviewFromMission(m):null;
-  if(stored&&(stored.battlefield||(stored.intel&&stored.intel.length)))return stored;
+  // Prefer stored brief when present; otherwise rebuild so copy stays witty.
+  if(stored&&(stored.brief||stored.narrative))return stored;
   if(typeof window.grBuildMissionPreview==='function')return window.grBuildMissionPreview(p,m);
   const same=(p.missions||[]).filter(x=>x.id!==m.id&&x.type!=='war'&&courseLabel(x.locationName)===courseLabel(m.locationName)&&x.status==='completed');
   const names=peopleOf(p,m).map(x=>x.name);
-  return {battlefield:same.length?`${same.length} prior Platoon round${same.length===1?'':'s'} at ${courseLabel(m.locationName)}.`:`First Platoon Mission at ${courseLabel(m.locationName)}.`,watch:names.length?names.slice(0,4).join(' · '):'Field TBD',intel:[]};
+  const guests=guestsOf(m);
+  const open=names.length
+    ? `Tee sheet at ${courseLabel(m.locationName)} features ${names.length} hopeful${names.length===1?'':'s'} who somehow all swear this is "just a friendly."`
+    : `Tee sheet at ${courseLabel(m.locationName)} is somehow empty — bold strategy.`;
+  const cast=names.length?`On the card: ${names.join(', ')}.`:`Nobody checked in.`;
+  const hist=same.length?`${same.length} prior Platoon round${same.length===1?'':'s'} here, and the lessons remain optional.`:`First Platoon Mission at ${courseLabel(m.locationName)} — legends loading.`;
+  const jab=guests.length?`Guests (${guests.join(', ')}) are here as witnesses / scapegoats.`:`Expect early bravado and a late debate about conditions.`;
+  const narrative=`${open} ${cast} ${hist} ${jab} Lock it, laugh first, and remember My Time Points don't care about your warm-up.`;
+  return {
+    battlefield:same.length?`${same.length} prior Platoon round${same.length===1?'':'s'} at ${courseLabel(m.locationName)}.`:`First Platoon Mission at ${courseLabel(m.locationName)}.`,
+    watch:names.length?names.slice(0,4).join(' · '):'Field TBD',
+    intel:[],
+    brief:narrative,
+    narrative
+  };
 }
 function previewMarkup(pre){
   const intel=Array.isArray(pre?.intel)?pre.intel:[];
-  const body=intel.length?intel.map(x=>`<p>${E(x)}</p>`).join(''):`<p>${E(pre?.battlefield||'')}</p><p>${E(pre?.watch||'')}</p>`;
+  const graph=String(pre?.brief||pre?.narrative||'').trim();
+  const body=graph
+    ? `<p class="gr-preview-brief">${E(graph)}</p>`
+    : (intel.length?intel.map(x=>`<p>${E(x)}</p>`).join(''):`<p>${E(pre?.battlefield||'')}</p><p>${E(pre?.watch||'')}</p>`);
   return `<div class="gr-preview"><h4>Pre-Mission Intel</h4>${body}</div>`;
 }
 function resultRows(m){return Array.isArray(m.results)?m.results:[]}
@@ -357,15 +387,18 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
   const linkedWarId=warId||(m?warIdOf(m):'')||'';
   const war=linkedWarId?(p.missions||[]).find(x=>x.id===linkedWarId&&x.type==='war'):null;
   const wars=(p.missions||[]).filter(x=>x.type==='war');
-  const gs=m?guestsOf(m):[],memberIds=m?.participants||[],baseNotes=m?cleanNotes(m.notes):'';
+  const gs=Array.isArray(opts.guests)?opts.guests:(m?guestsOf(m):[]);
+  const memberIds=Array.isArray(opts.participants)?opts.participants:(m?.participants||[]);
+  const baseNotes=opts.notes!=null?String(opts.notes):(m?cleanNotes(m.notes):'');
   const presetDate=opts.date||m?.date||today();
   const presetTime=String(opts.teeTime||m?.teeTime||'').slice(0,5);
-  const presetFormat=m?.format||'Stroke play (net)';
+  const presetFormat=opts.format||m?.format||'Stroke play (net)';
+  const presetTitle=opts.title!=null?String(opts.title):(m?.title||'');
   const warOptions=`<option value="">None — standalone Mission</option>${wars.map(w=>`<option value="${E(w.id)}" ${String(w.id)===String(linkedWarId)?'selected':''}>${E(w.title||'War')}</option>`).join('')}`;
   const timeChips=TEE_TIME_PRESETS.map(t=>`<button type="button" class="gr-time-chip" data-tee-preset="${t}">${fmtTime(t)}</button>`).join('');
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">MISSION</div><h2>${m?'Edit Mission':'New Mission'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
-    <div class="gr-event-banner"><div class="gr-event-name" id="grBannerTitle">${E(m?.title||'Event name')}</div><div class="gr-event-course" id="grBannerCourse">${E(courseLabel(m?.locationName))}</div><div class="gr-event-facts"><span class="gr-event-fact" id="grBannerDate">📅 ${E(fmtDate(presetDate))}</span><span class="gr-event-fact" id="grBannerTime">⏱ ${E(fmtTime(presetTime))}</span><span class="gr-event-fact" id="grBannerFormat">${E(presetFormat||'Format TBD')}</span></div></div>
-    <label>Event Name<input id="grMTitle" value="${E(m?.title||'')}" placeholder="e.g. League Night 4"></label>
+    <div class="gr-event-banner"><div class="gr-event-name" id="grBannerTitle">${E(presetTitle||'Event name')}</div><div class="gr-event-course" id="grBannerCourse">${E(courseLabel(m?.locationName))}</div><div class="gr-event-facts"><span class="gr-event-fact" id="grBannerDate">📅 ${E(fmtDate(presetDate))}</span><span class="gr-event-fact" id="grBannerTime">⏱ ${E(fmtTime(presetTime))}</span><span class="gr-event-fact" id="grBannerFormat">${E(presetFormat||'Format TBD')}</span></div></div>
+    <label>Event Name<input id="grMTitle" value="${E(presetTitle)}" placeholder="e.g. League Night 4"></label>
     <label>Course${courseSelectMarkup(m?.locationName,m?.courseId)}<span class="muted" style="font-size:10px;font-weight:600">Add new course to save tees, rating, slope &amp; par.</span></label>
     <div id="grCourseMeta" class="gr-course-meta muted" hidden></div>
     <div class="grid two">
@@ -381,11 +414,21 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     <label>Notes<textarea id="grMNotes" rows="2" placeholder="Optional">${E(baseNotes)}</textarea></label>
     <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grMSave">Save Mission</button></div>`);
 
-  let guests=[...gs];
+  let guests=[...gs].map(g=>String(g||'').trim()).filter(Boolean);
   const drawGuests=()=>d.querySelector('#grGuests').innerHTML=guests.map((g,i)=>`<span class="gr-guest-pill">${E(g)} <button type="button" data-rmguest="${i}">✕</button></span>`).join('');
   drawGuests();
-  d.querySelector('#grGuests').onclick=e=>{const i=e.target.dataset.rmguest;if(i!=null){guests.splice(Number(i),1);drawGuests()}};
-  d.querySelector('#grAddGuest').onclick=()=>{const v=d.querySelector('#grGuestName').value.trim();if(v&&!guests.includes(v)){guests.push(v);d.querySelector('#grGuestName').value='';drawGuests()}};
+  const addGuest=()=>{
+    const input=d.querySelector('#grGuestName');
+    const v=String(input?.value||'').trim();
+    if(!v)return;
+    if(guests.some(g=>g.toLowerCase()===v.toLowerCase())){input.value='';return}
+    guests.push(v);
+    input.value='';
+    drawGuests();
+  };
+  d.querySelector('#grGuests').onclick=e=>{const btn=e.target.closest('[data-rmguest]');if(!btn)return;guests.splice(Number(btn.getAttribute('data-rmguest')),1);drawGuests()};
+  d.querySelector('#grAddGuest').onclick=e=>{e.preventDefault();addGuest()};
+  d.querySelector('#grGuestName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addGuest()}});
 
   const courseEl=()=>d.querySelector('#grMCourse');
   const syncBanner=()=>{
@@ -429,7 +472,12 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     const snap={
       date:d.querySelector('#grMDate')?.value||presetDate,
       teeTime:d.querySelector('#grMTime')?.value||presetTime,
-      warId:String(d.querySelector('#grMWar')?.value||linkedWarId||'')
+      warId:String(d.querySelector('#grMWar')?.value||linkedWarId||''),
+      title:d.querySelector('#grMTitle')?.value||'',
+      format:readMissionFormat(d),
+      notes:d.querySelector('#grMNotes')?.value||'',
+      guests:[...guests],
+      participants:[...d.querySelectorAll('[data-member]:checked')].map(x=>x.dataset.member)
     };
     const wiz=modal(`<div class="dialog-head"><div><div class="eyebrow">COURSE</div><h2>Add course</h2></div><button class="icon-button" id="grCourseCancel" type="button">✕</button></div>
       <p class="muted" style="font-size:12px">Saves into your Golf Recon course list with scorecard basics (par / rating / slope). Hole-by-hole maps can still come from Hole Preview later.</p>
@@ -437,7 +485,10 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
       <div class="grid two"><label>Tees<input id="grCTees" placeholder="White / Blue" value="White"></label><label>Holes<select id="grCHoles"><option value="18">18</option><option value="9">9</option></select></label></div>
       <div class="grid three"><label>Par<input id="grCPar" type="number" inputmode="numeric" placeholder="72"></label><label>Rating<input id="grCRating" type="number" inputmode="decimal" step="0.1" placeholder="71.2"></label><label>Slope<input id="grCSlope" type="number" inputmode="numeric" placeholder="128"></label></div>
       <div class="dialog-actions sticky-actions"><button class="button secondary" id="grCourseCancel2" type="button">Cancel</button><button class="button primary" id="grCourseSave" type="button">Save course</button></div>`);
-    const reopen=(extra={})=>{closeModal();window.grOpenMissionEditor(id,snap.warId,{date:snap.date,teeTime:snap.teeTime,...extra})};
+    const reopen=(extra={})=>{closeModal();window.grOpenMissionEditor(id,snap.warId,{
+      date:snap.date,teeTime:snap.teeTime,title:snap.title,format:snap.format,notes:snap.notes,
+      guests:snap.guests,participants:snap.participants,...extra
+    })};
     wiz.querySelector('#grCourseCancel').onclick=()=>reopen();
     wiz.querySelector('#grCourseCancel2').onclick=()=>reopen();
     wiz.querySelector('#grCourseSave').onclick=()=>{
@@ -484,6 +535,8 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
   d.querySelector('#grMSave').onclick=()=>{
     const resolved=resolveCourseSelection(courseEl()?.value);
     const chosenWar=String(d.querySelector('#grMWar')?.value||'');
+    const guestList=guests.map(g=>String(g||'').trim()).filter(Boolean);
+    const composed=composeNotes(d.querySelector('#grMNotes').value,guestList,chosenWar);
     const draftInput={
       title:d.querySelector('#grMTitle').value.trim()||'Mission',
       locationName:resolved.locationName||'Course TBD',
@@ -492,20 +545,22 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
       teeTime:d.querySelector('#grMTime').value,
       format:readMissionFormat(d),
       participants:[...d.querySelectorAll('[data-member]:checked')].map(x=>x.dataset.member),
-      notes:composeNotes(d.querySelector('#grMNotes').value,guests,chosenWar),
+      guests:guestList,
+      notes:composed,
       type:m?.type||'battle'
     };
     const prepared=typeof window.grPrepareMissionDraft==='function'?window.grPrepareMissionDraft(draftInput,{existing:m}):{ok:true,mission:Object.assign(m||{id:uid('mission'),type:'battle',status:'planned',results:[]},draftInput)};
     if(!prepared.ok){alert(prepared.error||'Could not save Mission.');return}
     const obj=prepared.mission;
+    obj.guests=guestList;
     if(m?.notes){
       const keep=[];
       for(const re of [/\[\[GR_PREVIEW:[\s\S]*?\]\]/,/\[\[GR_LIVE:[^\]]*\]\]/,/\[\[GR_IMPORT_FP:[^\]]*\]\]/]){
         const hit=String(m.notes).match(re);if(hit)keep.push(hit[0]);
       }
-      obj.notes=composeNotes(d.querySelector('#grMNotes').value,guests,chosenWar);
+      obj.notes=composed;
       if(keep.length)obj.notes+=`${obj.notes?'\n':''}${keep.join('\n')}`;
-    }else obj.notes=composeNotes(d.querySelector('#grMNotes').value,guests,chosenWar);
+    }else obj.notes=composed;
     obj.courseId=resolved.courseId||obj.courseId||'';
     if(typeof window.grUpsertMission==='function')window.grUpsertMission(p,obj);else if(!m)p.missions.push(obj);else Object.assign(m,obj);
     savePlatoonLocal(p);closeModal();

@@ -151,6 +151,16 @@ const preview = w.grBuildMissionPreview(p, upcoming);
 assert(preview.priorCount>=1, 'preview sees prior Four Oaks');
 assert(preview.intel.some(line=>/Ryan Sweeney|Mike Sweeney/.test(line)), 'preview mentions field history');
 assert(!preview.intel.some(line=>/undefined|NaN/.test(line)), 'preview has no NaN/undefined');
+assert(typeof preview.brief==='string'&&preview.brief.split(/[.!?]/).filter(Boolean).length>=4, 'preview brief is a multi-sentence paragraph');
+assert(/Mike Sweeney|Ryan Sweeney/.test(preview.brief), 'preview brief names the field');
+
+/* Guests persist on draft prepare (array + notes tag) */
+const withGuest=w.grPrepareMissionDraft({
+  title:'Guest Test',date:'2099-09-01',teeTime:'09:00',locationName:'Four Oaks',
+  format:'Stroke play (net)',participants:['chief'],guests:['Uncle Bob'],
+  notes:'[[GR_GUESTS:["Uncle Bob"]]]',type:'battle'
+},{});
+assert(withGuest.ok&&withGuest.mission.guests.includes('Uncle Bob'), 'prepareMissionDraft keeps guests array');
 
 /* Phase 4 — four-round War accumulation + missing rounds */
 const war = {id:'war-test',title:'Test War',type:'war',status:'planned',date:'2026-04-01',format:'Points',notes:'[[GR_WAR_END:2026-04-30]]',participants:[],results:[]};
