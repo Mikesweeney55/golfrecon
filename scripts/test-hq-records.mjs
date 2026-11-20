@@ -61,13 +61,19 @@ const merged=ctx.window.grMergeHqMetaPreserve(server,p);
 assert(merged.hqMeta&&merged.hqMeta.eagleBalances?.length===1,'sync preserves local hqMeta when server omits');
 
 const htmlEagle=ctx.window.grRenderClubEagleBubble(p);
+const htmlBird=ctx.window.grRenderBirdiesBubble(p);
+const htmlAce=ctx.window.grRenderAceBubble(p);
 const htmlRec=ctx.window.grRenderRecordsBubble(p);
 assert(htmlEagle.includes('data-gr-hq-edit="eagles"'),'eagle edit icon');
 assert(htmlEagle.includes('eagle-mark')||htmlEagle.includes('gr-honor-eagle'),'flashy eagle mark');
-assert(htmlRec.includes('data-gr-hq-edit="records"'),'records edit icon');
-assert(htmlRec.includes('Birdies')||htmlRec.includes('Hole in One')||htmlRec.includes('Holes in One'),'records shows birdies/aces');
+assert(/Four Oaks|Mar |2026|Hole/i.test(htmlEagle),'eagle board shows course or date');
+assert(htmlBird.includes('BIRDIES')&&htmlBird.includes('data-gr-hq-edit="records"'),'birdies block');
+assert(htmlAce.includes('HOLE IN ONE'),'ace compact block');
+assert(htmlRec.includes('BIRDIES')&&htmlRec.includes('HOLE IN ONE'),'legacy records render splits birdies+ace');
 assert(!/Eagles \(manual|CLUB EAGLE for combined|category.?eagle/i.test(htmlRec),'records bubble has no eagle category');
 assert(!rec.eagle,'records model omits eagle category');
+const birds=ctx.window.grBirdieBoardModel(p);
+assert(birds.some(x=>x.birds>0),'birdie board has season counts');
 
 // Authz: linked cadet cannot edit; linked chief can; fail-closed for empty platoon
 assert(ctx.window.grCanEditHq({members:[{id:'cadet',name:'Josh',role:'cadet',linked:true}]})===false,'linked cadet cannot edit HQ');

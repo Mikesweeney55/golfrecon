@@ -321,50 +321,113 @@ function editIconBtn(kind){
   return `<button type="button" class="gr-hq-edit" data-gr-hq-edit="${esc(kind)}" title="Edit ${esc(kind)}" aria-label="Edit ${esc(kind)}">✎</button>`;
 }
 
-function honorHead(kind,title,sub){
-  const mark=kind==='eagles'?'🦅':'🏆';
-  const add=kind==='eagles'
-    ?`<button type="button" class="button secondary gr-hq-add-eg" data-gr-hq-edit="eagles" data-gr-hq-add="1">+ Eagle</button>`
-    :'';
+const HONOR_MARKS={eagles:'🦅',birdies:'🐦',ace:'⛳',records:'🏆',standings:'★'};
+
+function honorHead(kind,title,sub,{addHtml=''}={}){
+  const mark=HONOR_MARKS[kind]||'★';
+  const markClass=kind==='eagles'?'gr-honor-eagle':kind==='birdies'?'gr-honor-birdies':kind==='ace'?'gr-honor-ace':'gr-honor-records';
   return `<div class="eagle-lockup gr-honor-lockup">
-    <div class="eagle-mark gr-honor-mark ${kind==='eagles'?'gr-honor-eagle':'gr-honor-records'}" aria-hidden="true">${mark}</div>
+    <div class="eagle-mark gr-honor-mark ${markClass}" aria-hidden="true">${mark}</div>
     <div class="gr-honor-copy"><div class="eyebrow">${esc(title)}</div><div class="gr-honor-sub">${esc(sub)}</div></div>
-    <div class="gr-honor-actions">${add}${editIconBtn(kind)}</div>
+    <div class="gr-honor-actions">${addHtml}${editIconBtn(kind)}</div>
   </div>`;
+}
+
+function eagleEventFeed(model){
+  const events=[];
+  for(const r of model.leaders||[]){
+    for(const it of (r.items||[])){
+      if(it.kind==='balance')continue;
+      events.push({
+        playerName:r.playerName,
+        course:it.course||it.missionTitle||'',
+        hole:it.hole!=null?it.hole:null,
+        date:it.date||'',
+        kind:it.kind||'detail'
+      });
+    }
+  }
+  return events.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,12);
+}
+
+function birdieBoardModel(p){
+  const complete=(p.missions||[]).filter(m=>m.type!=='war'&&m.status==='completed');
+  const map=new Map((p.members||[]).map(m=>[m.id,{memberId:m.id,playerName:m.name,birds:0}]));
+  for(const m of complete)for(const r of (m.results||[])){
+    const mm=canon(p,r.player_name)||memberById(p,r.hole_detail_canonical_id);
+    if(!mm||!map.has(mm.id))continue;
+    const st=detailStatsLocal(r);
+    if(st.holes.length)map.get(mm.id).birds+=st.birds.length;
+  }
+  return [...map.values()].filter(x=>x.birds>0).sort((a,b)=>b.birds-a.birds||a.playerName.localeCompare(b.playerName));
+}
+
+function renderStandingsBubble(p,standingRows){
+  const lockup=`<div class="eagle-lockup gr-honor-lockup">
+    <div class="eagle-mark gr-honor-mark gr-honor-standings" aria-hidden="true">★</div>
+    <div class="gr-honor-copy"><div class="eyebrow">STANDINGS</div><div class="gr-honor-sub">Season points race</div></div>
+  </div>`;
+  const lead=standingRows[0];
+  const hero=lead?`<div class="gr-eagle-spotlight gr-standings-spotlight"><div class="gr-eagle-spotlight-label">On top</div><div class="gr-eagle-spotlight-name">${esc(lead.member.name)}</div><div class="gr-eagle-spotlight-count">${lead.points}<span> pt${lead.points===1?'':'s'}</span></div></div>`:'';
+  const rows=standingRows.length
+    ? standingRows.map((x,i)=>`<div class="gr155-recap-row gr-standings-row ${i===0?'is-lead':''}"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span class="gr-standings-pts">${x.points}</span></div>`).join('')
+    : '<div class="gr155-empty">No points yet — finish a Mission to open the board.</div>';
+  return `<section class="gr155-recap-block gr-honor-card gr-honor-standings-card" data-gr-hq="standings">${lockup}${hero}${rows}</section>`;
 }
 
 function renderClubEagleBubble(p){
   const model=clubEagleModel(p);
-  const head=honorHead('eagles','CLUB EAGLE','Per-player running totals');
+  const add=`<button type="button" class="button secondary gr-hq-add-eg" data-gr-hq-edit="eagles" data-gr-hq-add="1">+ Eagle</button>`;
+  const head=honorHead('eagles','CLUB EAGLE','Each eagle, with course & date',{addHtml:add});
   if(!model.leaders.length){
     return `<section class="gr155-recap-block gr-honor-card gr-honor-eagle-card" data-gr-hq="eagles">${head}<div class="gr155-empty">No eagles yet. Tap + Eagle to log one — each player keeps their own total.</div></section>`;
   }
   const lead=model.leaders[0];
   const hero=`<div class="gr-eagle-spotlight"><div class="gr-eagle-spotlight-label">Pace setter</div><div class="gr-eagle-spotlight-name">${esc(lead.playerName)}</div><div class="gr-eagle-spotlight-count">${lead.total}<span> eagle${lead.total===1?'':'s'}</span></div></div>`;
-  const rows=model.leaders.slice(0,8).map((r,i)=>`<div class="gr155-recap-row gr155-eagle-row ${i===0?'is-lead':''}"><span><strong>${esc(r.playerName)}</strong>${r.flags.length?' <em class="gr-hq-flag" title="Possible duplicate">⚑</em>':''}</span><span class="gr-eagle-total">${r.total}</span></div>`).join('');
-  return `<section class="gr155-recap-block gr-honor-card gr-honor-eagle-card" data-gr-hq="eagles">${head}${hero}<div class="gr-eagle-board-label">Board</div>${rows}</section>`;
+  const feed=eagleEventFeed(model);
+  const rows=feed.length
+    ? feed.map(e=>{
+        const meta=[e.course,e.hole!=null?`Hole ${e.hole}`:'',e.date?fmtDate(e.date):''].filter(Boolean).join(' · ');
+        return `<div class="gr155-recap-row gr155-eagle-row gr-eagle-event"><span><strong>${esc(e.playerName)}</strong>${meta?`<small class="gr-eagle-meta">${esc(meta)}</small>`:''}</span><span class="gr-eagle-pip" aria-hidden="true">🦅</span></div>`;
+      }).join('')
+    : model.leaders.slice(0,8).map((r,i)=>`<div class="gr155-recap-row gr155-eagle-row ${i===0?'is-lead':''}"><span><strong>${esc(r.playerName)}</strong></span><span class="gr-eagle-total">${r.total}</span></div>`).join('');
+  const totals=`<div class="gr-eagle-board-label">Running totals</div>${model.leaders.slice(0,6).map((r,i)=>`<div class="gr155-recap-row gr155-eagle-row ${i===0?'is-lead':''}"><span><strong>${esc(r.playerName)}</strong></span><span class="gr-eagle-total">${r.total}</span></div>`).join('')}`;
+  return `<section class="gr155-recap-block gr-honor-card gr-honor-eagle-card" data-gr-hq="eagles">${head}${hero}<div class="gr-eagle-board-label">Recent eagles</div>${rows}${totals}</section>`;
 }
 
-function renderRecordsBubble(p){
+function renderBirdiesBubble(p){
+  const board=birdieBoardModel(p);
+  const head=honorHead('birdies','BIRDIES','Season running list',{addHtml:''});
+  // Edit opens records editor (birdies/aces)
+  const headFixed=head.replace('data-gr-hq-edit="birdies"','data-gr-hq-edit="records"');
+  if(!board.length){
+    return `<section class="gr155-recap-block gr-honor-card gr-honor-birdies-card" data-gr-hq="birdies">${headFixed}<div class="gr155-empty">No birdies logged yet — hole detail will fill this board.</div></section>`;
+  }
+  const lead=board[0];
+  const hero=`<div class="gr-eagle-spotlight gr-birdies-spotlight"><div class="gr-eagle-spotlight-label">Birdie lead</div><div class="gr-eagle-spotlight-name">${esc(lead.playerName)}</div><div class="gr-eagle-spotlight-count">${lead.birds}<span> birdie${lead.birds===1?'':'s'}</span></div></div>`;
+  const rows=board.slice(0,10).map((r,i)=>`<div class="gr155-recap-row gr-birdie-row ${i===0?'is-lead':''}"><span><strong>${esc(r.playerName)}</strong></span><span class="gr-birdie-total">${r.birds}</span></div>`).join('');
+  return `<section class="gr155-recap-block gr-honor-card gr-honor-birdies-card" data-gr-hq="birdies">${headFixed}${hero}${rows}</section>`;
+}
+
+function renderAceBubble(p){
   const model=recordsModel(p);
-  const head=honorHead('records','RECORDS','Birdies & holes in one');
-  const bits=[];
-  const b=model.birdies;
-  if(b.display.length){
-    const t=b.display[0];
-    bits.push(`<div class="gr155-record gr-record-flash"><span class="gr155-record-label">Most Birdies in a Round</span><strong>${esc(t.player||t.playerName)} · ${t.value}</strong><small>${esc(t.missionTitle||t.mission||'')}${t.date?` · ${esc(fmtDate(t.date))}`:''}</small></div>`);
-  }else{
-    bits.push(`<div class="gr155-record"><span class="gr155-record-label">Most Birdies in a Round</span><div class="gr155-empty">No birdie record yet.</div></div>`);
-  }
-  const a=model.ace;
+  const a=model.ace||{display:[],flagged:[]};
+  const head=honorHead('ace','HOLE IN ONE','Rare air',{addHtml:''}).replace('data-gr-hq-edit="ace"','data-gr-hq-edit="records"');
+  let body;
   if(a.display.length){
-    bits.push(a.display.slice(0,4).map(x=>`<div class="gr155-record gr-record-flash"><span class="gr155-record-label">Hole in One</span><strong>${esc(x.player||x.playerName)}</strong><small>${esc(x.course||'')}${x.hole!=null?` · Hole ${x.hole}`:''}${x.date?` · ${esc(fmtDate(x.date))}`:''}</small></div>`).join(''));
+    body=a.display.slice(0,4).map(x=>{
+      const meta=[x.course||'',x.hole!=null?`Hole ${x.hole}`:'',x.date?fmtDate(x.date):''].filter(Boolean).join(' · ');
+      return `<div class="gr155-record gr-record-flash gr-ace-row"><strong>${esc(x.player||x.playerName)}</strong><small>${esc(meta)}</small></div>`;
+    }).join('');
   }else{
-    bits.push(`<div class="gr155-record"><span class="gr155-record-label">Holes in One</span><div class="gr155-empty">No aces recorded yet.</div></div>`);
+    body=`<div class="gr155-empty">Waiting on the first ace — this block stays ready.</div>`;
   }
-  const flags=[...b.flagged,...a.flagged];
-  if(flags.length)bits.push(`<div class="gr155-record gr-hq-review"><span class="gr155-record-label">Needs review</span><small>${flags.length} possible duplicate${flags.length===1?'':'s'} flagged</small></div>`);
-  return `<section class="gr155-recap-block gr-honor-card gr-honor-records-card" data-gr-hq="records">${head}${bits.join('')}</section>`;
+  return `<section class="gr155-recap-block gr-honor-card gr-honor-ace-card gr-honor-ace-compact" data-gr-hq="ace">${head}${body}</section>`;
+}
+
+/** @deprecated Records combined card — kept for tests / callers; HQ now uses birdies + ace blocks. */
+function renderRecordsBubble(p){
+  return `${renderBirdiesBubble(p)}${renderAceBubble(p)}`;
 }
 
 function playerOptions(p,selected,{placeholder='Choose player…'}={}){
@@ -781,22 +844,35 @@ function installStyles(){
   .gr-hq-msg.err{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.25);color:#ff9b96}
   .gr-hq-modes label{font-size:11px}
   .gr-honor-card{position:relative;overflow:hidden;border-color:rgba(212,175,106,.28)!important;background:linear-gradient(160deg,rgba(48,40,24,.5),rgba(14,12,10,.55))!important;box-shadow:0 16px 36px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,248,235,.1)!important}
+  .gr-clubhouse-board{grid-template-columns:1.1fr 1fr!important;gap:12px!important;margin-top:14px}
+  .gr-eagle-stack{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .gr-honor-standings-card{grid-column:1/-1;background:radial-gradient(circle at 8% -20%,rgba(212,175,106,.28),transparent 40%),linear-gradient(160deg,rgba(56,44,22,.62),rgba(12,12,10,.6))!important}
   .gr-honor-eagle-card{background:radial-gradient(circle at 92% -10%,rgba(212,175,106,.22),transparent 42%),linear-gradient(160deg,rgba(52,40,20,.55),rgba(12,12,10,.58))!important}
+  .gr-honor-birdies-card{background:radial-gradient(circle at 92% -10%,rgba(111,143,90,.22),transparent 42%),linear-gradient(160deg,rgba(28,40,24,.55),rgba(12,12,10,.58))!important}
+  .gr-honor-ace-card{background:radial-gradient(circle at 90% -10%,rgba(212,175,106,.14),transparent 40%),linear-gradient(160deg,rgba(36,32,20,.5),rgba(12,12,10,.55))!important}
+  .gr-honor-ace-compact{padding:10px 12px!important}
+  .gr-honor-ace-compact .gr-honor-mark{width:36px;height:36px;font-size:18px}
+  .gr-honor-ace-compact .gr-honor-sub{font-size:10px}
   .gr-honor-records-card{background:radial-gradient(circle at 92% -10%,rgba(111,143,90,.18),transparent 42%),linear-gradient(160deg,rgba(36,40,24,.52),rgba(12,12,10,.58))!important}
   .gr-honor-lockup{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .gr-honor-mark{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:24px;border:1px solid rgba(212,175,106,.4);background:radial-gradient(circle at 35% 30%,rgba(255,248,235,.16),rgba(212,175,106,.08) 45%,rgba(14,12,10,.55));box-shadow:0 0 18px rgba(212,175,106,.18),inset 0 1px 0 rgba(255,248,235,.2);flex:0 0 auto}
-  .gr-honor-eagle .gr-honor-mark,.gr-honor-mark.gr-honor-eagle{animation:grHonorPulse 2.8s ease-in-out infinite}
+  .gr-honor-mark.gr-honor-eagle,.gr-honor-mark.gr-honor-standings{animation:grHonorPulse 2.8s ease-in-out infinite}
   .gr-honor-copy{flex:1 1 auto;min-width:0}
   .gr-honor-sub{font-size:11px;font-weight:750;color:#e8dcc4;margin-top:2px}
   .gr-honor-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}
   .gr-eagle-spotlight{display:grid;gap:2px;padding:12px 12px 11px;margin:2px 0 10px;border-radius:14px;border:1px solid rgba(212,175,106,.35);background:linear-gradient(135deg,rgba(212,175,106,.18),rgba(20,16,10,.35));box-shadow:inset 0 1px 0 rgba(255,248,235,.12),0 10px 24px rgba(0,0,0,.2)}
+  .gr-birdies-spotlight{border-color:rgba(111,143,90,.4);background:linear-gradient(135deg,rgba(111,143,90,.2),rgba(16,20,14,.35))}
+  .gr-standings-spotlight{border-color:rgba(212,175,106,.45)}
   .gr-eagle-spotlight-label{font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:900;color:var(--accent,#d4af6a)}
   .gr-eagle-spotlight-name{font-size:18px;font-weight:950;line-height:1.1;color:#fff6e8;text-shadow:0 1px 10px rgba(0,0,0,.35)}
   .gr-eagle-spotlight-count{font-size:28px;font-weight:950;color:var(--accent,#d4af6a);line-height:1;margin-top:4px;text-shadow:0 0 18px rgba(212,175,106,.25)}
   .gr-eagle-spotlight-count span{font-size:11px;font-weight:800;margin-left:6px;color:#dce6e1;letter-spacing:.04em}
-  .gr-eagle-board-label{font-size:8px;letter-spacing:.12em;text-transform:uppercase;font-weight:900;color:var(--muted);margin:2px 0 4px}
-  .gr-eagle-total{font-size:16px!important;font-weight:950!important;color:var(--accent,#d4af6a)!important;text-shadow:0 0 12px rgba(212,175,106,.25)}
-  .gr155-eagle-row.is-lead{background:rgba(212,175,106,.08);border-radius:8px;padding-left:6px;padding-right:6px;margin:0 -6px}
+  .gr-eagle-board-label{font-size:8px;letter-spacing:.12em;text-transform:uppercase;font-weight:900;color:var(--muted);margin:8px 0 4px}
+  .gr-eagle-total,.gr-birdie-total,.gr-standings-pts{font-size:16px!important;font-weight:950!important;color:var(--accent,#d4af6a)!important;text-shadow:0 0 12px rgba(212,175,106,.25)}
+  .gr-birdie-total{color:#c5e6a8!important;text-shadow:0 0 12px rgba(111,143,90,.3)}
+  .gr-eagle-meta{display:block;font-size:10px;font-weight:650;color:#c5d4cd;margin-top:2px;letter-spacing:0;text-transform:none}
+  .gr-eagle-pip{font-size:14px;opacity:.9}
+  .gr155-eagle-row.is-lead,.gr-birdie-row.is-lead,.gr-standings-row.is-lead{background:rgba(212,175,106,.08);border-radius:8px;padding-left:6px;padding-right:6px;margin:0 -6px}
   .gr-eagle-live{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
   .gr-eagle-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid rgba(212,175,106,.3);background:rgba(212,175,106,.1)}
   .gr-eagle-chip strong{color:var(--accent);font-size:16px}
@@ -806,8 +882,11 @@ function installStyles(){
   .gr-eagle-advanced{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;background:rgba(10,12,10,.35)}
   .gr-eagle-advanced summary{cursor:pointer;font-weight:850;font-size:12px;color:var(--accent)}
   .gr-record-flash strong{font-size:14px!important;color:#fff6e8}
+  .gr-ace-row{padding:6px 0!important}
+  .gr-honor-intel{grid-column:1/-1}
   @keyframes grHonorPulse{0%,100%{box-shadow:0 0 14px rgba(212,175,106,.14),inset 0 1px 0 rgba(255,248,235,.18)}50%{box-shadow:0 0 22px rgba(212,175,106,.28),inset 0 1px 0 rgba(255,248,235,.28)}}
-  @media(prefers-reduced-motion:reduce){.gr-honor-mark.gr-honor-eagle{animation:none}}
+  @media(max-width:700px){.gr-clubhouse-board{grid-template-columns:1fr!important}.gr-honor-standings-card{grid-column:auto}}
+  @media(prefers-reduced-motion:reduce){.gr-honor-mark.gr-honor-eagle,.gr-honor-mark.gr-honor-standings{animation:none}}
   `;
 }
 
@@ -844,9 +923,10 @@ function platoonRecapMarkup(p){
     else if(finite(r.eagle_count)&&Number(r.eagle_count)>0)x.eagles+=Number(r.eagle_count);
   }
   const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
-  const standing=rows.map((x,i)=>`<div class="gr155-recap-row"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span>${x.points} pts</span></div>`).join('')||'<div class="gr155-empty">No points yet.</div>';
+  const standings=renderStandingsBubble(p,rows);
+  const birdies=renderBirdiesBubble(p);
   const eagle=renderClubEagleBubble(p);
-  const records=renderRecordsBubble(p);
+  const ace=renderAceBubble(p);
   const intel=[];
   const latest=[...complete].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
   if(latest){
@@ -861,7 +941,13 @@ function platoonRecapMarkup(p){
     if(birdVals.length){const b=Math.max(...birdVals);const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
   }
   if(!intel.length)intel.push('No completed Missions yet. The season story is still waiting to be written.');
-  return `<div class="gr155-recap-grid gr155-platoon-recap"><section class="gr155-recap-block"><div class="gr155-recap-title">PLATOON STANDINGS</div>${standing}</section>${eagle}${records}<section class="gr155-recap-block gr155-recap-copy gr155-intel-wide"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section></div>`;
+  // Clubhouse board: standings + birdies up top, eagle stack (eagle + compact HIO), intel below.
+  return `<div class="gr155-recap-grid gr155-platoon-recap gr-clubhouse-board">
+    ${standings}
+    ${birdies}
+    <div class="gr-eagle-stack">${eagle}${ace}</div>
+    <section class="gr155-recap-block gr155-recap-copy gr155-intel-wide gr-honor-intel"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section>
+  </div>`;
 }
 
 // Public API used by results renderer / sync merge
@@ -870,6 +956,9 @@ window.grHqMetaDefault=defaultHqMeta;
 window.grMergeHqMetaPreserve=mergeHqMetaPreserve;
 window.grRenderClubEagleBubble=renderClubEagleBubble;
 window.grRenderRecordsBubble=renderRecordsBubble;
+window.grRenderBirdiesBubble=renderBirdiesBubble;
+window.grRenderAceBubble=renderAceBubble;
+window.grBirdieBoardModel=birdieBoardModel;
 window.grClubEagleModel=clubEagleModel;
 window.grRecordsModel=recordsModel;
 window.grCanEditHq=canEditHq;

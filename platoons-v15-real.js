@@ -237,7 +237,31 @@ function groupsV15(){
     ? `<div class="gr-stack">${complete.map((m,i)=>completedMissionAccordion(p,m,i===0)).join('')}</div>`
     : `<div class="card gr-empty-upcoming"><strong>No completed Missions yet</strong><span class="muted">Finished rounds will stack here with standings and AAR.</span></div>`;
   const pastBtn=typeof window.grImportPastMission==='function'?`<button class="button secondary" data-gr-past-import="1" onclick="grImportPastMission()">📥 Import Past Mission</button>`:'';
-  const home=`<div class="gr-platoons-home"><section class="card gr-platoon-hq"><div><div class="eyebrow">PLATOON HQ</div><div class="gr-platoon-name">${E(p.name||'My Time')}</div><div class="gr-platoon-motto">${E(p.motto||'')}</div>${platoonStandingsMarkup(p)}<div class="gr-hq-actions"><button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button>${pastBtn}<button class="button primary" onclick="grOpenOperation()">+ Mission</button></div></div><div>${p.logoData?`<img class="gr-platoon-logo" src="${E(p.logoData)}" alt="Platoon logo">`:'<div class="gr-logo-placeholder">PLATOON<br>LOGO</div>'}</div></section>${wars.map(w=>warCard(p,w)).join('')}<section class="gr-section" id="grUpcomingMissions"><div class="gr-section-head"><h2>Upcoming Missions</h2></div>${upcomingBody}</section><section class="gr-section" id="grCompletedMissions"><div class="gr-section-head"><h2>Completed Missions</h2></div>${completedBody}</section></div>`;
+  const home=`<div class="gr-platoons-home gr-clubhouse-landing">
+    <section class="card gr-platoon-hq gr-clubhouse-hero">
+      <div class="gr-clubhouse-brand">
+        <div class="eyebrow">CLUBHOUSE</div>
+        <div class="gr-platoon-name">${E(p.name||'My Time')}</div>
+        <div class="gr-platoon-motto">${E(p.motto||'The flash board for the group.')}</div>
+        <div class="gr-hq-actions">
+          <button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button>
+          ${pastBtn}
+          <button class="button primary" onclick="grOpenOperation()">+ Mission</button>
+        </div>
+      </div>
+      <div class="gr-clubhouse-logo-wrap">${p.logoData?`<img class="gr-platoon-logo" src="${E(p.logoData)}" alt="Platoon logo">`:'<div class="gr-logo-placeholder">PLATOON<br>LOGO</div>'}</div>
+      <div class="gr-clubhouse-board-wrap">${platoonStandingsMarkup(p)}</div>
+    </section>
+    ${wars.map(w=>warCard(p,w)).join('')}
+    <section class="gr-section gr-upcoming-flash" id="grUpcomingMissions">
+      <div class="gr-section-head"><div><div class="eyebrow">NEXT UP</div><h2>Upcoming Missions</h2></div></div>
+      ${upcomingBody}
+    </section>
+    <section class="gr-section" id="grCompletedMissions">
+      <div class="gr-section-head"><div><div class="eyebrow">ARCHIVE</div><h2>Completed Missions</h2></div></div>
+      ${completedBody}
+    </section>
+  </div>`;
   return withSubNav(home);
 }
 
@@ -245,7 +269,87 @@ function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=
 function closeModal(){document.getElementById('grPlatoonDialog')?.close()}
 window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW MISSION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-choice-grid"><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenMissionEditor()"><strong>Single Mission</strong><span class="muted">One competitive round — league night, Saturday game, outing</span></button><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenWarEditor()"><strong>War</strong><span class="muted">Multiple Missions under one season / league series</span></button></div>`)};
 window.grCloseModal=closeModal;
-window.grOpenSetup=()=>{const p=loadPlatoonLocal(),d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><label>Name<input id="grPName" value="${E(p.name||'')}"></label><label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label><div class="grid two"><label>Season<input id="grPSeason" type="number" value="${E(p.season||new Date().getFullYear())}"></label><label>Visibility<select id="grPVis"><option ${p.visibility==='Private'?'selected':''}>Private</option><option ${p.visibility==='Invite only'?'selected':''}>Invite only</option></select></label></div><label class="gr-logo-upload">${p.logoData?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/*"></label><div class="dialog-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);d.querySelector('#grPLogo').onchange=e=>{const f=e.target.files?.[0];if(!f)return;const img=new Image(),r=new FileReader();r.onload=()=>{img.onload=()=>{const c=document.createElement('canvas'),max=256,scale=Math.min(1,max/Math.max(img.width,img.height));c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);d.dataset.logo=c.toDataURL('image/jpeg',.82)};img.src=r.result};r.readAsDataURL(f)};d.querySelector('#grPSave').onclick=()=>{p.name=d.querySelector('#grPName').value.trim()||'My Time';p.motto=d.querySelector('#grPMotto').value.trim();p.season=Number(d.querySelector('#grPSeason').value)||new Date().getFullYear();p.visibility=d.querySelector('#grPVis').value;if(d.dataset.logo)p.logoData=d.dataset.logo;savePlatoonLocal(p);closeModal()}};
+function compressImageFile(file,{max=1280,quality=.72}={}){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(),r=new FileReader();
+    r.onerror=()=>reject(r.error||new Error('Read failed'));
+    r.onload=()=>{
+      img.onload=()=>{
+        const c=document.createElement('canvas');
+        const scale=Math.min(1,max/Math.max(img.width,img.height));
+        c.width=Math.max(1,Math.round(img.width*scale));
+        c.height=Math.max(1,Math.round(img.height*scale));
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        resolve(c.toDataURL('image/jpeg',quality));
+      };
+      img.onerror=()=>reject(new Error('Image decode failed'));
+      img.src=r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function clubhousePhotosOf(p){
+  return Array.isArray(p?.clubhousePhotos)?p.clubhousePhotos.filter(x=>x&&x.dataUrl).slice(0,8):[];
+}
+function renderClubhousePhotoThumbs(photos){
+  if(!photos.length)return '<div class="muted" style="font-size:11px">No platoon photos yet — stock course shots still rotate.</div>';
+  return `<div class="gr-clubhouse-thumbs">${photos.map(ph=>`<div class="gr-clubhouse-thumb" data-photo-id="${E(ph.id)}"><img src="${E(ph.dataUrl)}" alt=""><button type="button" class="gr-clubhouse-thumb-del" data-del-photo="${E(ph.id)}" title="Remove">✕</button></div>`).join('')}</div>`;
+}
+
+window.grOpenSetup=()=>{
+  const p=loadPlatoonLocal();
+  let photos=clubhousePhotosOf(p).map(x=>({...x}));
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+    <label>Name<input id="grPName" value="${E(p.name||'')}"></label>
+    <label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label>
+    <div class="grid two">
+      <label>Season<input id="grPSeason" type="number" value="${E(p.season||new Date().getFullYear())}"></label>
+      <label>Visibility<select id="grPVis"><option ${p.visibility==='Private'?'selected':''}>Private</option><option ${p.visibility==='Invite only'?'selected':''}>Invite only</option></select></label>
+    </div>
+    <label class="gr-logo-upload">${p.logoData?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/*"></label>
+    <div class="gr-clubhouse-photos-setup">
+      <div class="eyebrow" style="margin-top:14px">CLUBHOUSE PHOTOS</div>
+      <p class="muted" style="font-size:11px;margin:6px 0 8px">Mix your group shots into the background rotation with the stock course/lodge pics. Up to 8 photos (compressed on device).</p>
+      <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
+      <label class="gr-logo-upload" style="margin-top:8px">Add clubhouse photos<input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
+    </div>
+    <div class="dialog-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);
+  const thumbs=d.querySelector('#grClubhouseThumbs');
+  const refreshThumbs=()=>{thumbs.innerHTML=renderClubhousePhotoThumbs(photos)};
+  d.querySelector('#grPLogo').onchange=async e=>{
+    const f=e.target.files?.[0];if(!f)return;
+    try{d.dataset.logo=await compressImageFile(f,{max:256,quality:.82})}catch(err){alert(err.message||'Logo upload failed')}
+  };
+  d.querySelector('#grPClubPhotos').onchange=async e=>{
+    const files=[...(e.target.files||[])];
+    e.target.value='';
+    for(const f of files){
+      if(photos.length>=8){alert('Max 8 clubhouse photos for now.');break}
+      try{
+        const dataUrl=await compressImageFile(f,{max:1280,quality:.7});
+        photos.push({id:`ph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,dataUrl,createdAt:new Date().toISOString()});
+      }catch(err){alert(err.message||'Photo upload failed')}
+    }
+    refreshThumbs();
+  };
+  thumbs.onclick=e=>{
+    const del=e.target.closest('[data-del-photo]');
+    if(!del)return;
+    photos=photos.filter(x=>String(x.id)!==String(del.getAttribute('data-del-photo')));
+    refreshThumbs();
+  };
+  d.querySelector('#grPSave').onclick=()=>{
+    p.name=d.querySelector('#grPName').value.trim()||'My Time';
+    p.motto=d.querySelector('#grPMotto').value.trim();
+    p.season=Number(d.querySelector('#grPSeason').value)||new Date().getFullYear();
+    p.visibility=d.querySelector('#grPVis').value;
+    if(d.dataset.logo)p.logoData=d.dataset.logo;
+    p.clubhousePhotos=photos.slice(0,8);
+    savePlatoonLocal(p);
+    if(typeof window.grRefreshAtmos==='function')window.grRefreshAtmos();
+    closeModal();
+  };
+};
 
 window.grOpenMissionEditor=(id='',warId='',opts={})=>{
   const p=loadPlatoonLocal();
