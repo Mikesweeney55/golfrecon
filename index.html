@@ -31,9 +31,13 @@
   --font-display:"Cormorant Garamond",Georgia,"Times New Roman",serif;
   --font-stencil:"Oswald",ui-sans-serif,system-ui,sans-serif;
   --font-body:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+  /* Type scale — only three sizes app-wide */
+  --fs-title:22px;
+  --fs-subtitle:15px;
+  --fs-data:13px;
 }
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(circle at 18% -8%,#2a2218 0,#0e0c09 42%),var(--bg);color:var(--text);font:16px/1.45 var(--font-body)}
+body{margin:0;background:radial-gradient(circle at 18% -8%,#2a2218 0,#0e0c09 42%),var(--bg);color:var(--text);font:var(--fs-subtitle)/1.45 var(--font-body)}
 button,input,select{font:inherit}
 button{cursor:pointer}
 .app-shell{max-width:920px;margin:0 auto;min-height:100vh;padding:18px 18px 96px}
@@ -392,7 +396,7 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .swing-card textarea:focus{border-color:rgba(184,234,104,.55)}
 .swing-save-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}.swing-save-status{font-size:10px;color:var(--muted)}
 .game-keys-card{margin:12px 0}.game-key-group{padding:10px 0;border-bottom:1px solid var(--line)}.game-key-group:last-child{border-bottom:0}
-.game-key-group strong{font-size:11px}.game-key-list{margin-top:5px;display:flex;gap:6px;flex-wrap:wrap}.game-key-pill{font-size:10px;border:1px solid rgba(184,234,104,.22);background:rgba(184,234,104,.05);padding:5px 7px;border-radius:999px}
+.game-key-group strong{font-size:var(--fs-subtitle)}.game-key-list{margin-top:5px;display:flex;gap:6px;flex-wrap:wrap}.game-key-pill{font-size:var(--fs-data);border:1px solid rgba(184,234,104,.22);background:rgba(184,234,104,.05);padding:6px 10px;border-radius:999px;text-transform:capitalize}
 .groups-hero{padding:20px}.groups-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.group-feature{padding:14px}.group-feature h3{font-size:13px;margin:5px 0}.coming-badge{display:inline-block;border:1px solid rgba(184,234,104,.25);color:var(--accent);border-radius:999px;padding:4px 7px;font-size:9px;font-weight:900}
 @media(max-width:640px){.swing-grid,.groups-grid{grid-template-columns:1fr}.user-chip{display:none}.user-tools{gap:3px}.mini-link{font-size:9px}}
 
@@ -507,18 +511,18 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .pregame-hero .course-stat strong{font-size:13px}
 .pregame-hero .course-stat span,.pregame-hero .course-stat-row .row-label{font-size:8px}
 
-/* v13.6 compact Game Keys */
+/* Game Keys — sizes come from Title/Subtitle/Data scale */
 .game-keys-card{margin:14px 0 10px;padding:13px 16px 11px}
 .game-keys-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px}
-.game-keys-title h2{font-size:17px;line-height:1.1;margin:0}
-.game-keys-title .eyebrow{font-size:9px}
+.game-keys-title h2{font-size:var(--fs-title);line-height:1.15;margin:0}
+.game-keys-title .eyebrow{font-size:var(--fs-subtitle)}
 .game-keys-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
 .game-key-column{min-width:0}
 .game-key-group{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08)}
 .game-key-column .game-key-group:last-child{border-bottom:0}
-.game-key-group strong{font-size:10px;display:block;margin-bottom:4px}
-.game-key-list{margin-top:0;display:flex;gap:5px;flex-wrap:wrap}
-.game-key-pill{font-size:9px;padding:4px 7px;line-height:1.2}
+.game-key-group strong{font-size:var(--fs-subtitle);display:block;margin-bottom:6px}
+.game-key-list{margin-top:0;display:flex;gap:6px;flex-wrap:wrap}
+.game-key-pill{font-size:var(--fs-data);padding:6px 10px;line-height:1.3;text-transform:capitalize}
 @media(max-width:640px){
   .pregame-hero{top:4px;padding:12px 12px 11px;border-radius:17px}
   .pregame-hero-head{grid-template-columns:1fr;gap:7px;align-items:start}
@@ -530,10 +534,10 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
   .pregame-hero .course-stat-lines{margin-top:7px}
   .pregame-hero .course-stat-row{padding:5px 0}
   .game-keys-card{padding:12px 13px 10px}
-  .game-keys-title{display:block;margin-bottom:5px}.game-keys-title h2{font-size:16px;margin-top:2px}
+  .game-keys-title{display:block;margin-bottom:5px}.game-keys-title h2{font-size:var(--fs-title);margin-top:2px}
   .game-keys-grid{grid-template-columns:1fr 1fr;gap:0 12px}
   .game-key-group{padding:6px 0}
-  .game-key-pill{font-size:8px;padding:4px 6px}
+  .game-key-pill{font-size:var(--fs-data);padding:6px 9px}
 }
 
 
@@ -1210,7 +1214,7 @@ body::after{
 }
 .gr-mark:before,.gr-mark:after{box-shadow:none!important;background:var(--accent)!important;opacity:.45!important}
 .gr-flag{color:var(--accent)!important;text-shadow:0 0 8px rgba(212,175,106,.35)!important}
-.gr-word strong{color:#f4ebe0!important;text-shadow:none!important;font-size:19px!important}
+.gr-word strong{color:#f4ebe0!important;text-shadow:none!important;font-size:var(--fs-title)!important}
 .gr-word small{color:#b8a888!important}
 .giq-logo{
   border:1px solid rgba(212,175,106,.18)!important;
@@ -1478,7 +1482,7 @@ body::before,body::after{opacity:0!important}
 }
 .gr-word strong{
   font-family:var(--font-display)!important;
-  font-size:20px!important;
+  font-size:var(--fs-title)!important;
   letter-spacing:.12em!important;
 }
 /* Liquid glass data panels — more atmos bleed-through, readable type */
@@ -1590,8 +1594,166 @@ body::before,body::after{opacity:0!important}
   }
 }
 
+/* ========== Type scale: Title / Subtitle / Data ==========
+   Display → titles · Stencil → short ALL-CAPS labels · Body → everything else */
+.type-title,.gr-type-title{font-family:var(--font-display)!important;font-size:var(--fs-title)!important;font-weight:600!important;line-height:1.15!important}
+.type-subtitle,.gr-type-subtitle{font-family:var(--font-body)!important;font-size:var(--fs-subtitle)!important;font-weight:700!important;line-height:1.3!important}
+.type-data,.gr-type-data{font-family:var(--font-body)!important;font-size:var(--fs-data)!important;font-weight:600!important;line-height:1.35!important}
+.type-label,.gr-type-label{
+  font-family:var(--font-stencil)!important;
+  font-size:var(--fs-subtitle)!important;
+  font-weight:600!important;
+  letter-spacing:.14em!important;
+  text-transform:uppercase!important;
+  line-height:1.25!important;
+}
+
+/* Titles — brand + section heads */
+h1,h2,
+.hero h2,
+.section-head h2,
+.gr-section-head h2,
+.gr-platoon-name,
+.gr-clubhouse-hero .gr-platoon-name,
+.gr-upcoming-flash .gr-section-head h2,
+.game-keys-title h2,
+.pregame-hero h2,
+.auth-logo,
+.brand-title,
+.platoon-title,
+.gr-mission-title,
+.gr-event-name,
+.gr-word strong,
+.gr-eagle-spotlight-name,
+.gr-eagle-spotlight-count,
+.gr-eagle-total,.gr-birdie-total,.gr-standings-pts,
+.metric,.score-big,
+.chart-head strong{
+  font-family:var(--font-display)!important;
+  font-size:var(--fs-title)!important;
+  font-weight:600!important;
+  line-height:1.15!important;
+}
+.gr-clubhouse-hero .gr-platoon-name,
+.gr-upcoming-flash .gr-section-head h2{
+  font-family:var(--font-display)!important; /* was stencil — titles use display */
+  letter-spacing:.02em!important;
+  text-transform:none;
+}
+
+/* Subtitles — labels, category heads, buttons, featured UI */
+h3,
+.eyebrow,
+.brand-meta,
+.metric-label,
+.gr-platoon-motto,
+.gr-platoon-subtab,
+.button,
+.chip,
+.filter-tab,.game-tab,.stat-tab,.putting-round,.course-pill,.game-round-btn,
+.game-key-group strong,
+.gr-honor-copy .eyebrow,
+.gr-standings-title,
+.gr-war-standings-label,
+.gr-eagle-spotlight-label,
+.gr-eagle-board-label,
+.gr-hq-mode-tag,
+.pregame-stat strong,
+.course-stat strong,
+.key strong,
+.gr-choice strong,
+.gr-eagle-spotlight-count span,
+.gr-eagle-chip strong,
+.gr-record-flash strong,
+.gr-date .d,
+.hole-number,
+.nav-item small,
+.global-course-label .eyebrow,
+.section-head .eyebrow{
+  font-size:var(--fs-subtitle)!important;
+  line-height:1.3!important;
+}
+.eyebrow,.brand-meta,.metric-label,.nav-item small,
+.global-course-label .eyebrow,.section-head .eyebrow,
+.gr-standings-title,.gr-war-standings-label,
+.gr-eagle-spotlight-label,.gr-eagle-board-label,.gr-hq-mode-tag,
+.gr-honor-copy .eyebrow{
+  font-family:var(--font-stencil)!important;
+  font-weight:600!important;
+  letter-spacing:.14em!important;
+  text-transform:uppercase!important;
+}
+.button,.chip,.filter-tab,.game-tab,.stat-tab,.putting-round,.course-pill,.game-round-btn,
+.game-key-group strong,.gr-platoon-motto,.gr-platoon-subtab,
+.pregame-stat strong,.course-stat strong,.key strong,.gr-choice strong{
+  font-family:var(--font-body)!important;
+  font-weight:700!important;
+  letter-spacing:0!important;
+  text-transform:none!important;
+}
+
+/* Data — lists, pills, stats, helpers, tags */
+.muted,
+small,
+.game-key-pill,
+.gr-tag,.gr-player,.gr-time-chip,.gr-guest-pill,
+.gr-honor-sub,.gr-eagle-meta,
+.gr-platoon-standing-row,
+.gr-net-row,.gr-highlights strong,.gr-highlights span,
+.gr-meta-cell span,.gr-meta-cell strong,
+.gr-mission-course,.gr-preview p,.gr-preview-brief,.gr-summary p,
+.gr-hq-command-copy,.gr-after-narrative,.gr-after-empty,
+.gr-date .m,.gr-date .w,
+.pregame-stat span,.course-stat span,
+.course-stat-row .row-label,.hole-stat-row .row-label,
+.hole-stat strong,.hole-stat span,.hole-insight,
+.history,.strategy,.file-item,.upload-zone span,
+.auth-foot,.game-scope-note,.multi-note,.target-note,
+.gr-leaderboard th,.gr-leaderboard td,
+.gr-cal-hint,.gr-cal-dows,.gr-cal-daynum,.gr-cal-mission,.gr-cal-add,
+.bar-value,.bar-label,.y-axis,
+.putt-grid-head,.putt-stack-label,.putt-stack-count,.putt-legend-item,
+.pregame-course-meta,.pregame-no-data,
+.gr-empty-upcoming .muted,.gr-empty-upcoming strong,
+.practice-item .why,.practice-score,
+.gr155-eagle-row,.gr-birdie-row,.gr-standings-row,
+.gr-ace-row,
+.key .muted,
+.gr-hq-msg,.gr-hq-modes label,.gr-hq-check,
+.gr-hq-add-eg,
+.gr-mini-actions .button{
+  font-family:var(--font-body)!important;
+  font-size:var(--fs-data)!important;
+  line-height:1.35!important;
+}
+.game-key-pill{
+  text-transform:capitalize!important;
+  font-weight:700!important;
+  padding:6px 10px!important;
+}
+.game-keys-title .eyebrow{font-size:var(--fs-subtitle)!important}
+.game-key-group strong{font-size:var(--fs-subtitle)!important;margin-bottom:6px!important}
+.gr-mini-actions .button{padding:8px 12px!important}
+
+/* Dense tables still Data — never below --fs-data */
+.pregame-hero .course-stat span,
+.pregame-hero .course-stat-row .row-label,
+.pregame-hero .course-stat strong,
+.pregame-course-picker span,
+.pregame-course-select{
+  font-size:var(--fs-data)!important;
+}
+.pregame-hero .course-stat strong{font-size:var(--fs-subtitle)!important}
+
+/* Mobile: keep the same three sizes (no 8px crush) */
+@media(max-width:700px){
+  .hero h2,.pregame-hero h2,.gr-clubhouse-hero .gr-platoon-name{font-size:var(--fs-title)!important}
+  .game-key-pill,.gr-platoon-subtab,.nav-item small{font-size:var(--fs-data)!important}
+  .gr-mini-actions .button{font-size:var(--fs-data)!important}
+}
+
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=185">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=189">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -5084,8 +5246,8 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=4"></script>
   <script src="platoon-mission-core.js?v=6"></script>
-  <script src="platoon-hq-records.js?v=177"></script>
-  <script src="platoons-v15-real.js?v=188"></script>
+  <script src="platoon-hq-records.js?v=189"></script>
+  <script src="platoons-v15-real.js?v=189"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=181"></script>
 <script src="past-mission-import.js?v=172"></script>
