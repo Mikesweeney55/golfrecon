@@ -357,7 +357,7 @@ function clubhousePhotosOf(p){
 }
 function renderClubhousePhotoThumbs(photos){
   if(!photos.length)return '<div class="muted" style="font-size:11px">No platoon photos yet — stock course shots still rotate.</div>';
-  return `<div class="gr-clubhouse-thumbs">${photos.map(ph=>`<div class="gr-clubhouse-thumb" data-photo-id="${E(ph.id)}"><img src="${E(ph.dataUrl)}" alt=""><button type="button" class="gr-clubhouse-thumb-del" data-del-photo="${E(ph.id)}" title="Remove">✕</button></div>`).join('')}</div>`;
+  return `<div class="gr-clubhouse-thumbs">${photos.map((ph,i)=>`<div class="gr-clubhouse-thumb" data-photo-id="${E(ph.id)}"><img src="${E(ph.dataUrl)}" alt="Clubhouse photo ${i+1}"><div class="gr-clubhouse-thumb-actions"><button type="button" class="gr-clubhouse-thumb-replace" data-replace-photo="${E(ph.id)}" title="Replace this photo">Replace</button><button type="button" class="gr-clubhouse-thumb-del" data-del-photo="${E(ph.id)}" title="Remove">✕</button></div></div>`).join('')}</div>`;
 }
 function setupAliasesOf(m){
   if(typeof window.grAliasesOf==='function')return window.grAliasesOf(m);
@@ -392,9 +392,13 @@ window.grOpenSetup=()=>{
     </div>
     <div class="gr-clubhouse-photos-setup">
       <div class="eyebrow" style="margin-top:14px">CLUBHOUSE PHOTOS</div>
-      <p class="muted" style="font-size:11px;margin:6px 0 8px">Upload group shots to mix into the background rotation with the stock course/lodge pics. Up to 8 photos · JPG/PNG/WebP (HEIC from iPhone Camera often needs Most Compatible).</p>
+      <p class="muted" style="font-size:11px;margin:6px 0 8px">Add group shots for the background rotation (up to 8). Use <strong>Replace</strong> on a thumb to swap one, ✕ to remove, or Clear all. JPG/PNG preferred.</p>
       <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
-      <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin-top:8px;cursor:pointer"><strong>📷 Add clubhouse photos</strong><span class="muted" style="display:block;font-size:10px;margin-top:4px;font-weight:600">Tap to choose · JPG/PNG preferred</span><input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
+      <input id="grPClubReplace" type="file" accept="image/*" hidden>
+      <div class="gr-clubhouse-photo-actions" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">
+        <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin:0;cursor:pointer"><strong>📷 Add photos</strong><input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
+        <button class="button secondary" id="grPClubClear" type="button" ${photos.length?'':'hidden'}>Clear all</button>
+      </div>
     </div>
     <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
       <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:10px">Names used for screenshot recognition. Recognition names can be comma-separated.</div></div>
@@ -405,7 +409,13 @@ window.grOpenSetup=()=>{
   const thumbs=d.querySelector('#grClubhouseThumbs');
   const roster=d.querySelector('#grRosterRows');
   const logoRemove=d.querySelector('#grPLogoRemove');
-  const refreshThumbs=()=>{thumbs.innerHTML=renderClubhousePhotoThumbs(photos)};
+  const clearBtn=d.querySelector('#grPClubClear');
+  const replaceInput=d.querySelector('#grPClubReplace');
+  let replaceTargetId='';
+  const refreshThumbs=()=>{
+    thumbs.innerHTML=renderClubhousePhotoThumbs(photos);
+    clearBtn.hidden=!photos.length;
+  };
   const drawRoster=()=>{
     roster.innerHTML=(p.members||[]).map((m,i)=>`<div class="gr155-roster-row" data-i="${i}" style="display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px"><label style="margin-top:0">Name<input data-name value="${E(m.name||'')}"></label><label style="margin-top:0">Recognize as<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label></div>`).join('');
   };
@@ -440,11 +450,37 @@ window.grOpenSetup=()=>{
     }
     refreshThumbs();
   };
+  clearBtn.onclick=()=>{
+    if(!photos.length)return;
+    if(!confirm(`Remove all ${photos.length} clubhouse photo${photos.length===1?'':'s'}?`))return;
+    photos=[];
+    refreshThumbs();
+  };
+  replaceInput.onchange=async e=>{
+    const f=e.target.files?.[0];
+    const id=replaceTargetId;
+    e.target.value='';
+    replaceTargetId='';
+    if(!f||!id)return;
+    try{
+      const dataUrl=await compressImageFile(f,{max:1280,quality:.7});
+      const idx=photos.findIndex(x=>String(x.id)===String(id));
+      if(idx<0)return;
+      photos[idx]={...photos[idx],dataUrl,createdAt:new Date().toISOString()};
+      refreshThumbs();
+    }catch(err){alert(err.message||'Photo replace failed')}
+  };
   thumbs.onclick=e=>{
     const del=e.target.closest('[data-del-photo]');
-    if(!del)return;
-    photos=photos.filter(x=>String(x.id)!==String(del.getAttribute('data-del-photo')));
-    refreshThumbs();
+    if(del){
+      photos=photos.filter(x=>String(x.id)!==String(del.getAttribute('data-del-photo')));
+      refreshThumbs();
+      return;
+    }
+    const rep=e.target.closest('[data-replace-photo]');
+    if(!rep)return;
+    replaceTargetId=rep.getAttribute('data-replace-photo')||'';
+    replaceInput.click();
   };
   d.querySelector('#grPSave').onclick=()=>{
     p.name=d.querySelector('#grPName').value.trim()||'My Time';
