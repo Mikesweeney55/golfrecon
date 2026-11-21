@@ -299,24 +299,58 @@ function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=
 function closeModal(){document.getElementById('grPlatoonDialog')?.close()}
 window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW MISSION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-choice-grid"><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenMissionEditor()"><strong>Single Mission</strong><span class="muted">One competitive round — league night, Saturday game, outing</span></button><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenWarEditor()"><strong>War</strong><span class="muted">Multiple Missions under one season / league series</span></button></div>`)};
 window.grCloseModal=closeModal;
-function compressImageFile(file,{max=1280,quality=.72}={}){
-  return new Promise((resolve,reject)=>{
-    const img=new Image(),r=new FileReader();
-    r.onerror=()=>reject(r.error||new Error('Read failed'));
-    r.onload=()=>{
-      img.onload=()=>{
-        const c=document.createElement('canvas');
-        const scale=Math.min(1,max/Math.max(img.width,img.height));
-        c.width=Math.max(1,Math.round(img.width*scale));
-        c.height=Math.max(1,Math.round(img.height*scale));
-        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-        resolve(c.toDataURL('image/jpeg',quality));
-      };
-      img.onerror=()=>reject(new Error('Image decode failed'));
-      img.src=r.result;
+function unsupportedImageHint(file){
+  const name=String(file?.name||'').toLowerCase();
+  const type=String(file?.type||'').toLowerCase();
+  if(type.includes('heic')||type.includes('heif')||/\.heic$|\.heif$/i.test(name)){
+    return 'This photo is HEIC/HEIF, which this browser cannot decode. On iPhone: Settings → Camera → Formats → Most Compatible, or share/export as JPG first.';
+  }
+  return 'Could not read that image. Try JPG or PNG.';
+}
+function canvasFromSize(w,h,draw,quality){
+  const c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(w));
+  c.height=Math.max(1,Math.round(h));
+  draw(c.getContext('2d'),c.width,c.height);
+  return c.toDataURL('image/jpeg',quality);
+}
+async function compressImageFile(file,{max=1280,quality=.72}={}){
+  if(!file)throw new Error('No image selected');
+  const paint=(srcW,srcH,draw)=>{
+    const scale=Math.min(1,max/Math.max(srcW,srcH));
+    return canvasFromSize(srcW*scale,srcH*scale,draw,quality);
+  };
+  // Prefer createImageBitmap — more reliable than Image()+dataURL for camera-roll photos.
+  if(typeof createImageBitmap==='function'){
+    try{
+      const bmp=await createImageBitmap(file);
+      try{
+        return paint(bmp.width,bmp.height,(ctx,w,h)=>ctx.drawImage(bmp,0,0,w,h));
+      }finally{bmp.close?.()}
+    }catch{/* fall through */}
+  }
+  const fromUrl=url=>new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{resolve(paint(img.naturalWidth||img.width,img.naturalHeight||img.height,(ctx,w,h)=>ctx.drawImage(img,0,0,w,h)))}
+      catch(e){reject(e)}
     };
+    img.onerror=()=>reject(new Error(unsupportedImageHint(file)));
+    img.src=url;
+  });
+  try{
+    const objUrl=URL.createObjectURL(file);
+    try{return await fromUrl(objUrl)}
+    finally{try{URL.revokeObjectURL(objUrl)}catch{}}
+  }catch{/* fall through */}
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onerror=()=>reject(r.error||new Error('Read failed'));
+    r.onload=()=>resolve(String(r.result||''));
     r.readAsDataURL(file);
   });
+  try{return await fromUrl(dataUrl)}
+  catch(e){throw e instanceof Error?e:new Error(unsupportedImageHint(file))}
 }
 function clubhousePhotosOf(p){
   return Array.isArray(p?.clubhousePhotos)?p.clubhousePhotos.filter(x=>x&&x.dataUrl).slice(0,8):[];
@@ -337,7 +371,10 @@ function setupAliasesOf(m){
 window.grOpenSetup=()=>{
   const p=loadPlatoonLocal();
   let photos=clubhousePhotosOf(p).map(x=>({...x}));
+  let pendingLogo=p.logoData||'';
+  let logoCleared=false;
   p.members=Array.isArray(p.members)?p.members:[];
+  const coOptions=['<option value="">No Co-Chief selected</option>',...(p.members||[]).filter(m=>m.role!=='chief').map(m=>`<option value="${E(m.id)}" ${String(p.coChief||'')===String(m.id)?'selected':''}>${E(m.name||'Cadet')}</option>`)].join('');
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <label>Name<input id="grPName" value="${E(p.name||'')}"></label>
     <label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label>
@@ -345,12 +382,19 @@ window.grOpenSetup=()=>{
       <label>Season<input id="grPSeason" type="number" value="${E(p.season||new Date().getFullYear())}"></label>
       <label>Visibility<select id="grPVis"><option ${p.visibility==='Private'?'selected':''}>Private</option><option ${p.visibility==='Invite only'?'selected':''}>Invite only</option></select></label>
     </div>
-    <label class="gr-logo-upload">${p.logoData?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/*"></label>
+    <div class="grid two">
+      <label>Platoon Chief<input value="${E((p.members||[]).find(m=>m.role==='chief')?.name||p.chief||'')}" disabled></label>
+      <label>Co-Chief<select id="grPCoChief">${coOptions}</select></label>
+    </div>
+    <div class="gr-logo-setup-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
+      <label class="gr-logo-upload" style="margin:0">${pendingLogo?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/*"></label>
+      <button class="button secondary" id="grPLogoRemove" type="button" ${pendingLogo?'':'hidden'}>Remove Logo</button>
+    </div>
     <div class="gr-clubhouse-photos-setup">
       <div class="eyebrow" style="margin-top:14px">CLUBHOUSE PHOTOS</div>
-      <p class="muted" style="font-size:11px;margin:6px 0 8px">Upload group shots to mix into the background rotation with the stock course/lodge pics. Up to 8 photos (compressed on this device).</p>
+      <p class="muted" style="font-size:11px;margin:6px 0 8px">Upload group shots to mix into the background rotation with the stock course/lodge pics. Up to 8 photos · JPG/PNG/WebP (HEIC from iPhone Camera often needs Most Compatible).</p>
       <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
-      <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin-top:8px;cursor:pointer"><strong>📷 Add clubhouse photos</strong><span class="muted" style="display:block;font-size:10px;margin-top:4px;font-weight:600">Tap to choose from camera roll · JPG/PNG</span><input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
+      <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin-top:8px;cursor:pointer"><strong>📷 Add clubhouse photos</strong><span class="muted" style="display:block;font-size:10px;margin-top:4px;font-weight:600">Tap to choose · JPG/PNG preferred</span><input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
     </div>
     <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
       <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:10px">Names used for screenshot recognition. Recognition names can be comma-separated.</div></div>
@@ -360,6 +404,7 @@ window.grOpenSetup=()=>{
     <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);
   const thumbs=d.querySelector('#grClubhouseThumbs');
   const roster=d.querySelector('#grRosterRows');
+  const logoRemove=d.querySelector('#grPLogoRemove');
   const refreshThumbs=()=>{thumbs.innerHTML=renderClubhousePhotoThumbs(photos)};
   const drawRoster=()=>{
     roster.innerHTML=(p.members||[]).map((m,i)=>`<div class="gr155-roster-row" data-i="${i}" style="display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px"><label style="margin-top:0">Name<input data-name value="${E(m.name||'')}"></label><label style="margin-top:0">Recognize as<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label></div>`).join('');
@@ -371,7 +416,17 @@ window.grOpenSetup=()=>{
   };
   d.querySelector('#grPLogo').onchange=async e=>{
     const f=e.target.files?.[0];if(!f)return;
-    try{d.dataset.logo=await compressImageFile(f,{max:256,quality:.82})}catch(err){alert(err.message||'Logo upload failed')}
+    try{
+      pendingLogo=await compressImageFile(f,{max:256,quality:.82});
+      logoCleared=false;
+      logoRemove.hidden=false;
+    }catch(err){alert(err.message||'Logo upload failed')}
+  };
+  logoRemove.onclick=()=>{
+    pendingLogo='';
+    logoCleared=true;
+    logoRemove.hidden=true;
+    d.querySelector('#grPLogo').value='';
   };
   d.querySelector('#grPClubPhotos').onchange=async e=>{
     const files=[...(e.target.files||[])];
@@ -396,7 +451,10 @@ window.grOpenSetup=()=>{
     p.motto=d.querySelector('#grPMotto').value.trim();
     p.season=Number(d.querySelector('#grPSeason').value)||new Date().getFullYear();
     p.visibility=d.querySelector('#grPVis').value;
-    if(d.dataset.logo)p.logoData=d.dataset.logo;
+    p.coChief=String(d.querySelector('#grPCoChief').value||'');
+    p.members=(p.members||[]).map(m=>({...m,role:m.role==='chief'?'chief':(p.coChief===m.id?'co_chief':(m.linked?'member':'cadet'))}));
+    if(logoCleared)p.logoData='';
+    else if(pendingLogo)p.logoData=pendingLogo;
     p.clubhousePhotos=photos.slice(0,8);
     [...roster.querySelectorAll('.gr155-roster-row')].forEach(row=>{
       const m=p.members[Number(row.dataset.i)];if(!m)return;
@@ -409,6 +467,9 @@ window.grOpenSetup=()=>{
     closeModal();
   };
 };
+// Legacy index.html Setup/Mission entry points → canonical v15 dialogs (avoid dual UI wipe).
+window.openPlatoonSetup=()=>window.grOpenSetup();
+window.openMissionEditor=(date='',missionId='')=>window.grOpenMissionEditor(missionId||'','',date?{date}:{});
 window.grCompressImageFile=compressImageFile;
 
 window.grOpenMissionEditor=(id='',warId='',opts={})=>{
@@ -644,26 +705,36 @@ window.grViewMission=id=>{
   const pre=previewFor(p,m),phase=phaseOf(m);
   const eyebrow=phase==='completed'?'AFTER ACTION REPORT':phase==='in_progress'?'IN PROGRESS':'PRE-MISSION INTEL';
   const body=phase==='completed'?`<div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>`:previewMarkup(pre);
-  modal(`<div class="dialog-head"><div><div class="eyebrow">${eyebrow}</div><h2>${E(m.title||'Mission')}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-event-banner"><div class="gr-event-course">${E(courseLabel(m.locationName))}</div><div class="gr-event-facts"><span class="gr-event-fact">📅 ${E(fmtDate(m.date))}</span><span class="gr-event-fact">⏱ ${E(fmtTime(m.teeTime))}</span><span class="gr-event-fact">${E(m.format||'')}</span><span class="gr-event-fact">${statusTag(m)}</span></div></div>${body}<div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Close</button>${phase==='draft'?`<button class="button primary" onclick="grCloseModal();grLockMission('${E(m.id)}')">Create Preview / Lock</button>`:''}${phase==='ready'?`<button class="button primary" onclick="grCloseModal();grStartMission('${E(m.id)}')">Start Round</button>`:''}${phase!=='completed'?`<button class="button secondary" onclick="grCloseModal();grUploadScores('${E(m.id)}')">Import Scores</button>`:''}</div>`);
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">${eyebrow}</div><h2>${E(m.title||'Mission')}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-event-banner"><div class="gr-event-course">${E(courseLabel(m.locationName))}</div><div class="gr-event-facts"><span class="gr-event-fact">📅 ${E(fmtDate(m.date))}</span><span class="gr-event-fact">⏱ ${E(fmtTime(m.teeTime))}</span><span class="gr-event-fact">${E(m.format||'')}</span><span class="gr-event-fact">${statusTag(m)}</span></div></div>${body}<div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Close</button>${phase==='draft'?`<button class="button primary" onclick="grCloseModal();grLockMission('${E(m.id)}')">Create Preview / Lock</button>`:''}${phase==='ready'?`<button class="button primary" onclick="grCloseModal();grStartMission('${E(m.id)}')">Start Round</button>`:''}${phase!=='completed'?`<button class="button secondary" onclick="grCloseModal();grUploadScores('${E(m.id)}')">Import Scores</button>`:''}<button class="button secondary" data-gr-delete-mission="${E(m.id)}" type="button" style="border-color:rgba(255,110,110,.45);color:#ffaaaa">🗑 Delete</button></div>`);
+  const delBtn=d.querySelector('[data-gr-delete-mission]');
+  if(delBtn)delBtn.onclick=e=>{e.preventDefault();window.grDeleteMission(m.id,delBtn)};
 };
-window.grUploadScores=id=>{if(typeof openMissionImport==='function')openMissionImport(id);else alert('Score import is unavailable.')};
+// Prefer official vs hole-by-hole chooser when results.js is loaded; otherwise fall back.
+window.grUploadScores=id=>{
+  if(typeof window.grOpenResultsChooser==='function')return window.grOpenResultsChooser(id);
+  if(typeof openMissionImport==='function')return openMissionImport(id);
+  alert('Score import is unavailable.');
+};
 
-window.grDeleteMission=id=>{
-  if(typeof window.grRemoveMission==='function')return window.grRemoveMission(id);
+window.grDeleteMission=async(id,btn)=>{
   const p=loadPlatoonLocal(),m=(p.missions||[]).find(x=>x.id===id);if(!m)return;
   if(!confirm(`Delete ${m.title||'this Mission'}?\n\nThis permanently removes the Mission and its Platoon results. Your personal Golf Recon rounds are not deleted.`))return;
-  (async()=>{
-    try{
-      if(typeof callPlatoonFunction==='function'){
-        const out=await callPlatoonFunction({action:'delete_mission',mission_id:id});
-        if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
-        else{p.missions=(p.missions||[]).filter(x=>x.id!==id);if(typeof writePlatoonLocal==='function')writePlatoonLocal(p);else savePlatoonLocal(p)}
-      }else{p.missions=(p.missions||[]).filter(x=>x.id!==id);savePlatoonLocal(p)}
-      document.querySelectorAll('dialog[open]').forEach(d=>{try{d.close()}catch{}});
-      renderGroups();
-    }catch(e){alert(`Delete failed: ${e?.message||e}`)}
-  })();
+  const old=btn?.textContent||'🗑 Delete';
+  if(btn){btn.disabled=true;btn.textContent='Deleting…'}
+  try{
+    if(typeof callPlatoonFunction==='function'){
+      const out=await callPlatoonFunction({action:'delete_mission',mission_id:id});
+      if(out?.platoon&&typeof writePlatoonLocal==='function')writePlatoonLocal(out.platoon);
+      else{p.missions=(p.missions||[]).filter(x=>x.id!==id);if(typeof writePlatoonLocal==='function')writePlatoonLocal(p);else savePlatoonLocal(p)}
+    }else{p.missions=(p.missions||[]).filter(x=>x.id!==id);savePlatoonLocal(p)}
+    document.querySelectorAll('dialog[open]').forEach(d=>{try{d.close()}catch{}});
+    if(typeof render==='function')render();else renderGroups();
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent=old}
+    alert(`Delete failed: ${e?.message||e}`);
+  }
 };
+window.grRemoveMission=(id)=>window.grDeleteMission(id);
 
 if(!document.body.dataset.grPlatoonShellBound){
   document.body.dataset.grPlatoonShellBound='1';
