@@ -162,7 +162,7 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
   margin:0!important;
 }
 
-.gr-hq-command{margin-top:18px}
+.gr-hq-command{margin-top:10px}
 .gr-hq-command-card{padding:14px 16px}
 .gr-hq-command-copy{font-size:13px;margin:0 0 10px;line-height:1.4}
 .gr-hq-command .gr-hq-actions{margin-top:0}

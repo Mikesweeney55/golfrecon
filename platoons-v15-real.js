@@ -277,6 +277,16 @@ function groupsV15(){
       <div class="gr-clubhouse-logo-wrap">${p.logoData?`<img class="gr-platoon-logo" src="${E(p.logoData)}" alt="Platoon logo">`:'<div class="gr-logo-placeholder">PLATOON<br>LOGO</div>'}</div>
       <div class="gr-clubhouse-board-wrap">${platoonStandingsMarkup(p)}</div>
     </section>
+    <section class="gr-section gr-hq-command" id="grHqCommand">
+      <div class="gr-section-head"><div><div class="eyebrow">COMMAND</div><h2>Platoon tools</h2></div></div>
+      <div class="card gr-hq-command-card">
+        <div class="gr-hq-actions">
+          <button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button>
+          ${pastBtn}
+          <button class="button primary" onclick="grOpenOperation()">+ Mission</button>
+        </div>
+      </div>
+    </section>
     ${wars.map(w=>warCard(p,w)).join('')}
     <section class="gr-section gr-upcoming-flash" id="grUpcomingMissions">
       <div class="gr-section-head"><div><div class="eyebrow">NEXT UP</div><h2>Upcoming Missions</h2></div></div>
@@ -285,17 +295,6 @@ function groupsV15(){
     <section class="gr-section" id="grCompletedMissions">
       <div class="gr-section-head"><div><div class="eyebrow">ARCHIVE</div><h2>Completed Missions</h2></div></div>
       ${completedBody}
-    </section>
-    <section class="gr-section gr-hq-command" id="grHqCommand">
-      <div class="gr-section-head"><div><div class="eyebrow">COMMAND</div><h2>Platoon tools</h2></div></div>
-      <div class="card gr-hq-command-card">
-        <p class="muted gr-hq-command-copy">Setup, imports, and new Missions live down here so the clubhouse board stays front and center.</p>
-        <div class="gr-hq-actions">
-          <button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button>
-          ${pastBtn}
-          <button class="button primary" onclick="grOpenOperation()">+ Mission</button>
-        </div>
-      </div>
     </section>
   </div>`;
   return withSubNav(home);
@@ -309,6 +308,17 @@ function looksLikeHeic(file){
   const name=String(file?.name||'').toLowerCase();
   const type=String(file?.type||'').toLowerCase();
   return type.includes('heic')||type.includes('heif')||/\.heic$|\.heif$/i.test(name);
+}
+async function sniffHeic(file){
+  if(looksLikeHeic(file))return true;
+  try{
+    const buf=await file.slice(0,16).arrayBuffer();
+    const bytes=new Uint8Array(buf);
+    // ISO BMFF: ....ftyp + brand heic/heif/mif1/msf1
+    if(bytes.length<12)return false;
+    const brand=String.fromCharCode(...bytes.slice(8,12)).toLowerCase();
+    return ['heic','heix','hevc','hevx','heim','heis','hevm','hevs','mif1','msf1','heif'].includes(brand);
+  }catch{return false}
 }
 function unsupportedImageHint(file){
   if(looksLikeHeic(file)){
@@ -329,16 +339,18 @@ function loadHeic2Any(){
   if(heicLoader)return heicLoader;
   heicLoader=new Promise((resolve,reject)=>{
     const existing=document.querySelector('script[data-gr-heic2any]');
+    const done=()=>typeof window.heic2any==='function'?resolve(window.heic2any):reject(new Error('HEIC converter unavailable'));
     if(existing){
-      existing.addEventListener('load',()=>typeof window.heic2any==='function'?resolve(window.heic2any):reject(new Error('HEIC converter unavailable')));
+      if(typeof window.heic2any==='function'){done();return}
+      existing.addEventListener('load',done);
       existing.addEventListener('error',()=>reject(new Error('HEIC converter failed to load')));
       return;
     }
     const s=document.createElement('script');
-    s.src='heic2any.min.js?v=1';
+    s.src='heic2any.min.js?v=2';
     s.async=true;
     s.dataset.grHeic2any='1';
-    s.onload=()=>typeof window.heic2any==='function'?resolve(window.heic2any):reject(new Error('HEIC converter unavailable'));
+    s.onload=done;
     s.onerror=()=>reject(new Error('HEIC converter failed to load'));
     document.head.appendChild(s);
   }).catch(err=>{heicLoader=null;throw err});
@@ -346,56 +358,67 @@ function loadHeic2Any(){
 }
 async function convertHeicToJpegFile(file){
   const heic2any=await loadHeic2Any();
-  const converted=await heic2any({blob:file,toType:'image/jpeg',quality:0.92});
+  const converted=await heic2any({blob:file,toType:'image/jpeg',quality:0.9});
   const blob=Array.isArray(converted)?converted[0]:converted;
   if(!blob)throw new Error('HEIC conversion returned empty image');
   const base=String(file?.name||'photo').replace(/\.(heic|heif)$/i,'')||'photo';
   return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
 }
-async function decodeImageToDataUrl(file,{max=1280,quality=.72}={}){
+async function decodeImageToDataUrl(file,{max=1280,quality=.72,preferImg=false}={}){
   const paint=(srcW,srcH,draw)=>{
-    const scale=Math.min(1,max/Math.max(srcW,srcH));
-    return canvasFromSize(srcW*scale,srcH*scale,draw,quality);
+    const scale=Math.min(1,max/Math.max(srcW||1,srcH||1));
+    return canvasFromSize((srcW||1)*scale,(srcH||1)*scale,draw,quality);
   };
-  if(typeof createImageBitmap==='function'){
-    try{
-      const bmp=await createImageBitmap(file);
-      try{
-        return paint(bmp.width,bmp.height,(ctx,w,h)=>ctx.drawImage(bmp,0,0,w,h));
-      }finally{bmp.close?.()}
-    }catch{/* fall through */}
-  }
   const fromUrl=url=>new Promise((resolve,reject)=>{
     const img=new Image();
     img.onload=()=>{
-      try{resolve(paint(img.naturalWidth||img.width,img.naturalHeight||img.height,(ctx,w,h)=>ctx.drawImage(img,0,0,w,h)))}
-      catch(e){reject(e)}
+      try{
+        const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+        if(!w||!h){reject(new Error('decode-failed'));return}
+        resolve(paint(w,h,(ctx,cw,ch)=>ctx.drawImage(img,0,0,cw,ch)));
+      }catch(e){reject(e)}
     };
     img.onerror=()=>reject(new Error('decode-failed'));
     img.src=url;
   });
-  try{
+  const viaImg=async()=>{
     const objUrl=URL.createObjectURL(file);
     try{return await fromUrl(objUrl)}
     finally{try{URL.revokeObjectURL(objUrl)}catch{}}
-  }catch{/* fall through */}
-  const dataUrl=await new Promise((resolve,reject)=>{
-    const r=new FileReader();
-    r.onerror=()=>reject(r.error||new Error('Read failed'));
-    r.onload=()=>resolve(String(r.result||''));
-    r.readAsDataURL(file);
-  });
-  return fromUrl(dataUrl);
+  };
+  const viaBitmap=async()=>{
+    if(typeof createImageBitmap!=='function')throw new Error('no-bitmap');
+    const bmp=await createImageBitmap(file);
+    try{return paint(bmp.width,bmp.height,(ctx,w,h)=>ctx.drawImage(bmp,0,0,w,h))}
+    finally{bmp.close?.()}
+  };
+  const viaFileReader=async()=>{
+    const dataUrl=await new Promise((resolve,reject)=>{
+      const r=new FileReader();
+      r.onerror=()=>reject(r.error||new Error('Read failed'));
+      r.onload=()=>resolve(String(r.result||''));
+      r.readAsDataURL(file);
+    });
+    return fromUrl(dataUrl);
+  };
+  // Safari often decodes HEIC via <img>/blob URL even when createImageBitmap fails.
+  const order=preferImg?[viaImg,viaBitmap,viaFileReader]:[viaBitmap,viaImg,viaFileReader];
+  let last=null;
+  for(const step of order){
+    try{return await step()}catch(e){last=e}
+  }
+  throw last||new Error('decode-failed');
 }
 async function compressImageFile(file,{max=1280,quality=.72}={}){
   if(!file)throw new Error('No image selected');
-  // Native decode first (Safari can sometimes read HEIC).
-  try{return await decodeImageToDataUrl(file,{max,quality})}catch{/* convert path */}
-  // iPhone camera-roll HEIC: convert in-browser, then compress as JPEG.
-  if(looksLikeHeic(file)){
+  const heic=await sniffHeic(file);
+  // Native decode first (Safari <img> path preferred for HEIC).
+  try{return await decodeImageToDataUrl(file,{max,quality,preferImg:heic})}catch{/* convert path */}
+  // Convert HEIC/HEIF in-browser, then compress as JPEG.
+  if(heic){
     try{
       const jpeg=await convertHeicToJpegFile(file);
-      return await decodeImageToDataUrl(jpeg,{max,quality});
+      return await decodeImageToDataUrl(jpeg,{max,quality,preferImg:false});
     }catch(err){
       console.warn('HEIC convert failed',err);
       throw new Error(unsupportedImageHint(file));
@@ -403,6 +426,7 @@ async function compressImageFile(file,{max=1280,quality=.72}={}){
   }
   throw new Error(unsupportedImageHint(file));
 }
+
 function clubhousePhotosOf(p){
   return Array.isArray(p?.clubhousePhotos)?p.clubhousePhotos.filter(x=>x&&x.dataUrl).slice(0,8):[];
 }
@@ -481,7 +505,7 @@ window.grOpenSetup=()=>{
       pendingLogo=await compressImageFile(f,{max:256,quality:.82});
       logoCleared=false;
       logoRemove.hidden=false;
-    }catch(err){alert(err.message||'Logo upload failed')}
+    }catch(err){console.warn('Logo upload failed',err);alert(err.message||'Logo upload failed')}
   };
   logoRemove.onclick=()=>{
     pendingLogo='';
@@ -492,14 +516,31 @@ window.grOpenSetup=()=>{
   d.querySelector('#grPClubPhotos').onchange=async e=>{
     const files=[...(e.target.files||[])];
     e.target.value='';
+    if(!files.length)return;
+    let added=0,failed=0,hitMax=false;
+    const uploadLabel=d.querySelector('.gr-clubhouse-photo-upload strong');
+    const prevLabel=uploadLabel?.textContent||'📷 Add photos';
+    if(uploadLabel)uploadLabel.textContent='Adding photos…';
     for(const f of files){
-      if(photos.length>=8){alert('Max 8 clubhouse photos for now.');break}
+      if(photos.length>=8){hitMax=true;break}
       try{
         const dataUrl=await compressImageFile(f,{max:1280,quality:.7});
         photos.push({id:`ph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,dataUrl,createdAt:new Date().toISOString()});
-      }catch(err){alert(err.message||'Photo upload failed')}
+        added++;
+        refreshThumbs();
+      }catch(err){
+        failed++;
+        console.warn('Clubhouse photo skipped', f?.name, err);
+      }
     }
+    if(uploadLabel)uploadLabel.textContent=prevLabel;
     refreshThumbs();
+    if(added&&!failed&&!hitMax)return;
+    const bits=[];
+    if(added)bits.push(`Added ${added} photo${added===1?'':'s'}`);
+    if(failed)bits.push(`${failed} could not be read (often HEIC on some browsers — try JPG, or we will keep improving conversion)`);
+    if(hitMax)bits.push('Max 8 clubhouse photos for now');
+    if(bits.length)alert(bits.join('. ')+'.');
   };
   clearBtn.onclick=()=>{
     if(!photos.length)return;
