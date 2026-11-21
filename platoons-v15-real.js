@@ -312,19 +312,18 @@ function looksLikeHeic(file){
 async function sniffHeic(file){
   if(looksLikeHeic(file))return true;
   try{
-    const buf=await file.slice(0,16).arrayBuffer();
+    const buf=await file.slice(0,24).arrayBuffer();
     const bytes=new Uint8Array(buf);
-    // ISO BMFF: ....ftyp + brand heic/heif/mif1/msf1
     if(bytes.length<12)return false;
     const brand=String.fromCharCode(...bytes.slice(8,12)).toLowerCase();
-    return ['heic','heix','hevc','hevx','heim','heis','hevm','hevs','mif1','msf1','heif'].includes(brand);
+    if(['heic','heix','hevc','hevx','heim','heis','hevm','hevs','mif1','msf1','heif'].includes(brand))return true;
+    // Some iPhone files put compatible brands a few bytes later.
+    const ascii=String.fromCharCode(...bytes).toLowerCase();
+    return /ftyp/.test(ascii)&&/(heic|heif|mif1|msf1)/.test(ascii);
   }catch{return false}
 }
 function unsupportedImageHint(file){
-  if(looksLikeHeic(file)){
-    return 'Could not convert this HEIC photo. Try exporting as JPG from Photos, or set iPhone Camera → Formats → Most Compatible.';
-  }
-  return 'Could not read that image. Try JPG or PNG.';
+  return 'Could not read that photo. If it is an iPhone Live Photo / HEIC, export JPG from Photos and try again.';
 }
 function canvasFromSize(w,h,draw,quality){
   const c=document.createElement('canvas');
@@ -347,7 +346,7 @@ function loadHeic2Any(){
       return;
     }
     const s=document.createElement('script');
-    s.src='heic2any.min.js?v=2';
+    s.src='heic2any.min.js?v=3';
     s.async=true;
     s.dataset.grHeic2any='1';
     s.onload=done;
@@ -358,11 +357,22 @@ function loadHeic2Any(){
 }
 async function convertHeicToJpegFile(file){
   const heic2any=await loadHeic2Any();
-  const converted=await heic2any({blob:file,toType:'image/jpeg',quality:0.9});
-  const blob=Array.isArray(converted)?converted[0]:converted;
-  if(!blob)throw new Error('HEIC conversion returned empty image');
-  const base=String(file?.name||'photo').replace(/\.(heic|heif)$/i,'')||'photo';
-  return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+  const buf=await file.arrayBuffer();
+  const typed=new Blob([buf],{type:file.type&&/heic|heif/i.test(file.type)?file.type:'image/heic'});
+  let lastErr=null;
+  for(const quality of [0.88,0.7,0.55]){
+    try{
+      const converted=await heic2any({blob:typed,toType:'image/jpeg',quality});
+      const blobs=(Array.isArray(converted)?converted:[converted]).filter(Boolean);
+      if(!blobs.length)continue;
+      // Live Photo containers can return multiple images — keep the largest still.
+      blobs.sort((a,b)=>(b.size||0)-(a.size||0));
+      const blob=blobs[0];
+      const base=String(file?.name||'photo').replace(/\.(heic|heif)$/i,'')||'photo';
+      return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+    }catch(err){lastErr=err}
+  }
+  throw lastErr||new Error('HEIC conversion failed');
 }
 async function decodeImageToDataUrl(file,{max=1280,quality=.72,preferImg=false}={}){
   const paint=(srcW,srcH,draw)=>{
@@ -401,7 +411,6 @@ async function decodeImageToDataUrl(file,{max=1280,quality=.72,preferImg=false}=
     });
     return fromUrl(dataUrl);
   };
-  // Safari often decodes HEIC via <img>/blob URL even when createImageBitmap fails.
   const order=preferImg?[viaImg,viaBitmap,viaFileReader]:[viaBitmap,viaImg,viaFileReader];
   let last=null;
   for(const step of order){
@@ -412,19 +421,15 @@ async function decodeImageToDataUrl(file,{max=1280,quality=.72,preferImg=false}=
 async function compressImageFile(file,{max=1280,quality=.72}={}){
   if(!file)throw new Error('No image selected');
   const heic=await sniffHeic(file);
-  // Native decode first (Safari <img> path preferred for HEIC).
   try{return await decodeImageToDataUrl(file,{max,quality,preferImg:heic})}catch{/* convert path */}
-  // Convert HEIC/HEIF in-browser, then compress as JPEG.
-  if(heic){
-    try{
-      const jpeg=await convertHeicToJpegFile(file);
-      return await decodeImageToDataUrl(jpeg,{max,quality,preferImg:false});
-    }catch(err){
-      console.warn('HEIC convert failed',err);
-      throw new Error(unsupportedImageHint(file));
-    }
+  // After native failure, always try HEIC converter — iPhone files are often mislabeled.
+  try{
+    const jpeg=await convertHeicToJpegFile(file);
+    return await decodeImageToDataUrl(jpeg,{max,quality,preferImg:false});
+  }catch(err){
+    console.warn('Photo convert failed', file?.name, err);
+    throw new Error(unsupportedImageHint(file));
   }
-  throw new Error(unsupportedImageHint(file));
 }
 
 function clubhousePhotosOf(p){
@@ -513,6 +518,18 @@ window.grOpenSetup=()=>{
     logoRemove.hidden=true;
     d.querySelector('#grPLogo').value='';
   };
+  const setUploadStatus=msg=>{
+    let status=d.querySelector('#grClubhouseUploadStatus');
+    if(!status){
+      status=document.createElement('div');
+      status.id='grClubhouseUploadStatus';
+      status.className='muted';
+      status.style.cssText='font-size:11px;margin-top:6px;line-height:1.35';
+      const actions=d.querySelector('.gr-clubhouse-photo-actions');
+      (actions||thumbs).insertAdjacentElement('afterend',status);
+    }
+    status.textContent=msg||'';
+  };
   d.querySelector('#grPClubPhotos').onchange=async e=>{
     const files=[...(e.target.files||[])];
     e.target.value='';
@@ -521,6 +538,7 @@ window.grOpenSetup=()=>{
     const uploadLabel=d.querySelector('.gr-clubhouse-photo-upload strong');
     const prevLabel=uploadLabel?.textContent||'📷 Add photos';
     if(uploadLabel)uploadLabel.textContent='Adding photos…';
+    setUploadStatus('Working through your photos…');
     for(const f of files){
       if(photos.length>=8){hitMax=true;break}
       try{
@@ -535,12 +553,16 @@ window.grOpenSetup=()=>{
     }
     if(uploadLabel)uploadLabel.textContent=prevLabel;
     refreshThumbs();
-    if(added&&!failed&&!hitMax)return;
-    const bits=[];
-    if(added)bits.push(`Added ${added} photo${added===1?'':'s'}`);
-    if(failed)bits.push(`${failed} could not be read (often HEIC on some browsers — try JPG, or we will keep improving conversion)`);
-    if(hitMax)bits.push('Max 8 clubhouse photos for now');
-    if(bits.length)alert(bits.join('. ')+'.');
+    if(added&&!failed&&!hitMax){setUploadStatus(`Added ${added} photo${added===1?'':'s'}.`);return}
+    if(added&&failed){
+      setUploadStatus(`Added ${added}. Skipped ${failed} (usually a Live Photo / odd HEIC). The ones below are ready — tap Save.`);
+      return; // no alert when some succeeded
+    }
+    if(failed&&!added){
+      setUploadStatus(`Couldn't read ${failed} photo${failed===1?'':'s'}. Export as JPG from Photos and try again.`);
+      return;
+    }
+    if(hitMax)setUploadStatus('Max 8 clubhouse photos for now.');
   };
   clearBtn.onclick=()=>{
     if(!photos.length)return;
