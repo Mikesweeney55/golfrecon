@@ -139,7 +139,17 @@ function prepareMissionDraft(input,opts={}){
   if(Array.isArray(existing?.photos))mission.photos=cleanPhotos(existing.photos);
   if(Array.isArray(input?.photos))mission.photos=cleanPhotos(input.photos);
   else if(!Array.isArray(mission.photos))mission.photos=cleanPhotos(existing?.photos);
+  // league_points: true/undefined = count toward My Time ⛳; false = exclude
+  if(input?.league_points!=null)mission.league_points=!!input.league_points;
+  else if(existing?.league_points!=null)mission.league_points=!!existing.league_points;
+  else mission.league_points=true;
   return {ok:true,mission};
+}
+
+/** Whether a completed Mission feeds the My Time ⛳ Points cup. Default include. */
+function countsForLeaguePoints(m){
+  if(!m||m.type==='war'||m.status!=='completed')return false;
+  return m.league_points!==false;
 }
 
 /** Upsert mission into platoon snapshot without changing other missions' ids. */
@@ -330,7 +340,8 @@ function buildCompletedMissionFromImport(input){
     participants:[...new Set((input?.participants||[]).map(String))],
     guests:guestList,
     results,
-    photos:(Array.isArray(input?.photos)?input.photos:[]).filter(x=>x&&x.dataUrl).slice(0,3)
+    photos:(Array.isArray(input?.photos)?input.photos:[]).filter(x=>x&&x.dataUrl).slice(0,3),
+    league_points:input?.league_points===false?false:true
   };
   const story=String(input?.recap_note||input?.notes||'').trim();
   if(story)mission.recap_note=story;
@@ -616,6 +627,7 @@ function fmtMyTimePoints(n){
 }
 function myTimePointsStandings(p){
   const complete=(p?.missions||[]).filter(m=>m&&m.type!=='war'&&m.status==='completed');
+  const cupMissions=complete.filter(countsForLeaguePoints);
   const map=new Map((p?.members||[]).filter(m=>m&&m.status!=='inactive').map(m=>[m.id,{
     id:m.id,
     member:m,
@@ -624,7 +636,7 @@ function myTimePointsStandings(p){
     totalPoints:0,
     points:0
   }]));
-  for(const m of complete){
+  for(const m of cupMissions){
     for(const r of normalizeOfficialResults(m.results||[])){
       const mem=canon(p,r.player_name)||(r.hole_detail_canonical_id
         ? (p?.members||[]).find(x=>String(x.id)===String(r.hole_detail_canonical_id))
@@ -640,7 +652,7 @@ function myTimePointsStandings(p){
     return {...r,points,myTimePoints:points};
   });
   rows.sort((a,b)=>b.points-a.points||b.played-a.played||b.totalPoints-a.totalPoints||String(a.name).localeCompare(String(b.name)));
-  return {complete:complete.length,rows};
+  return {complete:complete.length,cupRounds:cupMissions.length,rows};
 }
 
 function wouldDuplicateOfficialImport(mission,rows){
@@ -685,6 +697,7 @@ window.grPreviewFromMission=previewJsonOf;
 window.grWarChildMissions=warChildMissions;
 window.grWarStandings=warStandings;
 window.grFmtMyTimePoints=fmtMyTimePoints;
+window.grCountsForLeaguePoints=countsForLeaguePoints;
 window.grMyTimePointsStandings=myTimePointsStandings;
 window.grResultsFingerprint=resultsFingerprint;
 window.grWouldDuplicateOfficialImport=wouldDuplicateOfficialImport;
