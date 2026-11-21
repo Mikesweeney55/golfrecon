@@ -166,3 +166,11 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
 .gr-hq-command-card{padding:14px 16px}
 .gr-hq-command-copy{font-size:var(--fs-data);margin:0 0 10px;line-height:1.4}
 .gr-hq-command .gr-hq-actions{margin-top:0}
+
+/* Tee time 10-min wheel */
+.gr-tee-wheel{margin-top:4px}
+.gr-tee-wheel-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gr-tee-wheel-col span{display:block;font-size:var(--fs-data);color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:700;margin-bottom:4px}
+.gr-tee-select{width:100%;min-height:44px;font-size:var(--fs-subtitle)!important;font-weight:700}
+.gr-guest-pool-chip{cursor:pointer;background:rgba(212,175,106,.12)!important}
+.gr-guest-pool-picks{margin:6px 0}

@@ -299,6 +299,11 @@ function buildCompletedMissionFromImport(input){
   if(!date)return {ok:false,error:'Confirm the round date before creating the Mission.'};
   const results=normalizeOfficialResults(input?.results||[]);
   if(!results.length)return {ok:false,error:'Match at least one player before creating the Mission.'};
+  const guestList=[...new Set((Array.isArray(input?.guests)?input.guests:[]).map(g=>String(g||'').trim()).filter(Boolean))];
+  let notes=String(input?.notes||'');
+  if(guestList.length&&!/\[\[GR_GUESTS:/.test(notes)){
+    notes=`${notes}${notes?'\n':''}[[GR_GUESTS:${JSON.stringify(guestList)}]]`;
+  }
   const mission={
     id:input?.id||uid('mission'),
     date,
@@ -308,9 +313,10 @@ function buildCompletedMissionFromImport(input){
     locationName:cleanCourse(input?.locationName||'Course TBD'),
     title:String(input?.title||'').trim()||'Past Mission',
     format:String(input?.format||'').trim()||'Stroke Play',
-    notes:String(input?.notes||''),
+    notes,
     status:'completed',
     participants:[...new Set((input?.participants||[]).map(String))],
+    guests:guestList,
     results
   };
   const story=String(input?.recap_note||input?.notes||'').trim();

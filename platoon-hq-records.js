@@ -39,7 +39,9 @@ function defaultHqMeta(){
     records:[],
     eagleBalances:[],
     eagleDetails:[],
-    suppressedAuto:[]
+    suppressedAuto:[],
+    constitution:'',
+    guestPool:[]
   };
 }
 function normalizeHqMeta(raw){
@@ -50,7 +52,67 @@ function normalizeHqMeta(raw){
   d.eagleBalances=Array.isArray(x.eagleBalances)?x.eagleBalances.map(normalizeBalance).filter(Boolean):[];
   d.eagleDetails=Array.isArray(x.eagleDetails)?x.eagleDetails.map(normalizeEagleDetail).filter(Boolean):[];
   d.suppressedAuto=Array.isArray(x.suppressedAuto)?x.suppressedAuto.filter(s=>s&&s.fingerprint):[];
+  d.constitution=String(x.constitution||'').trim();
+  d.guestPool=Array.isArray(x.guestPool)?x.guestPool.map(normalizeGuestPoolEntry).filter(Boolean):[];
   return d;
+}
+function normalizeGuestPoolEntry(g){
+  if(!g||typeof g!=='object')return null;
+  const name=String(g.name||'').trim();
+  if(!name)return null;
+  const aliases=Array.isArray(g.aliases)?g.aliases.map(a=>String(a||'').trim()).filter(Boolean)
+    :(typeof g.aliases==='string'?g.aliases.split(/[,|]/).map(a=>a.trim()).filter(Boolean):[]);
+  return {
+    id:String(g.id||uid('gst')),
+    name,
+    aliases:[...new Set(aliases)],
+    createdAt:g.createdAt||new Date().toISOString(),
+    updatedAt:g.updatedAt||new Date().toISOString()
+  };
+}
+function guestPoolOf(p){return hqMetaOf(p).guestPool||[]}
+function constitutionOf(p){return hqMetaOf(p).constitution||''}
+function upsertGuestPool(p,name,{aliases=[]}={}){
+  const meta=hqMetaOf(p);
+  const clean=String(name||'').trim();
+  if(!clean)return null;
+  const key=clean.toLowerCase();
+  let g=meta.guestPool.find(x=>String(x.name||'').toLowerCase()===key
+    ||(x.aliases||[]).some(a=>String(a).toLowerCase()===key));
+  if(g){
+    const extra=[...aliases,clean].map(a=>String(a||'').trim()).filter(Boolean);
+    g.aliases=[...new Set([...(g.aliases||[]),...extra.filter(a=>a.toLowerCase()!==String(g.name).toLowerCase())])];
+    g.updatedAt=new Date().toISOString();
+  }else{
+    g=normalizeGuestPoolEntry({id:uid('gst'),name:clean,aliases:aliases.filter(a=>String(a).toLowerCase()!==key)});
+    meta.guestPool.push(g);
+  }
+  writeHqMeta(p,meta);
+  return g;
+}
+function setConstitution(p,text){
+  const meta=hqMetaOf(p);
+  meta.constitution=String(text||'').trim();
+  writeHqMeta(p,meta);
+  return meta.constitution;
+}
+function openConstitutionEditor(){
+  const p=getP();if(!p)return;
+  if(!canEditHq(p)){alert('Only the Platoon Chief or Co-Chief can edit the Constitution.');return}
+  const dlgFn=typeof platoonDialog==='function'?platoonDialog:null;
+  if(!dlgFn){alert('Editor unavailable.');return}
+  const cur=constitutionOf(p);
+  const d=dlgFn(`<div class="dialog-head"><div><div class="eyebrow">CLUBHOUSE</div><h2>My Time Constitution</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
+    <p class="muted" style="font-size:var(--fs-data);margin:0 0 10px">House rules, vibe, dues, dress code — whatever defines My Time. Shows on the Clubhouse board.</p>
+    <label>Constitution<textarea id="grConstitutionText" rows="8" placeholder="e.g. Be ready on the first tee. No sandbagging. Winner buys the first round…">${esc(cur)}</textarea></label>
+    <div class="dialog-actions sticky-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog()">Cancel</button><button class="button primary" id="grConstitutionSave" type="button">Save</button></div>`);
+  d.querySelector('#grConstitutionSave').onclick=()=>{
+    setConstitution(p,d.querySelector('#grConstitutionText').value);
+    if(typeof writePlatoonLocal==='function')writePlatoonLocal(p);
+    if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,!window.grTestEnvActive);
+    d.close();
+    setTimeout(()=>{if(typeof render==='function')render()},0);
+  };
 }
 function normalizeRecord(r){
   if(!r||typeof r!=='object')return null;
@@ -132,6 +194,21 @@ function mergeHqMetaPreserve(serverP,localP){
   }else{
     serverP.hqMeta=serverMeta;
   }
+  // Always preserve Constitution + Guest Pool text/lists (do not wipe on lagging server).
+  const out=normalizeHqMeta(serverP.hqMeta);
+  if(localMeta){
+    if((localMeta.constitution||'').length>=(out.constitution||'').length)out.constitution=localMeta.constitution||out.constitution;
+    const byId=new Map((out.guestPool||[]).map(g=>[g.id,g]));
+    for(const g of (localMeta.guestPool||[])){
+      const hit=[...byId.values()].find(x=>x.id===g.id||x.name.toLowerCase()===g.name.toLowerCase());
+      if(hit){
+        hit.aliases=[...new Set([...(hit.aliases||[]),...(g.aliases||[])])];
+        if((g.updatedAt||'')>(hit.updatedAt||''))Object.assign(hit,{name:g.name,updatedAt:g.updatedAt});
+      }else byId.set(g.id,g);
+    }
+    out.guestPool=[...byId.values()];
+  }
+  serverP.hqMeta=out;
   return serverP;
 }
 
@@ -884,7 +961,10 @@ function installStyles(){
   .gr-eagle-advanced summary{cursor:pointer;font-weight:700;font-size:var(--fs-data);color:var(--accent)}
   .gr-record-flash strong{font-size:var(--fs-subtitle)!important;color:#fff6e8}
   .gr-ace-row{padding:6px 0!important}
-  .gr-honor-intel{grid-column:1/-1}
+  .gr-honor-intel,.gr-honor-constitution{grid-column:1/-1}
+  .gr-constitution-body{font-size:var(--fs-data);line-height:1.55;color:#e8f0ea;white-space:pre-wrap}
+  .gr-honor-constitution{background:radial-gradient(circle at 12% -20%,rgba(212,175,106,.16),transparent 42%),linear-gradient(160deg,rgba(40,34,22,.55),rgba(12,12,10,.58))!important}
+  @media(max-width:700px){.gr-constitution-body{font-size:var(--fs-data);line-height:1.5}}
   .gr-clubhouse-board .gr-honor-lockup{margin-bottom:8px;gap:8px}
   .gr-clubhouse-board .gr-honor-mark{width:40px;height:40px;font-size:var(--fs-title)}
   .gr-clubhouse-board .gr-honor-sub{font-size:var(--fs-data)}
@@ -905,6 +985,11 @@ function bindUi(){
     const kind=b.getAttribute('data-gr-hq-edit');
     if(kind==='records')openRecordsEditor();
     else if(kind==='eagles')openEaglesEditor({add:!!b.getAttribute('data-gr-hq-add')});
+  },true);
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('[data-gr-edit-constitution]'))return;
+    e.preventDefault();e.stopPropagation();
+    openConstitutionEditor();
   },true);
 }
 
@@ -952,6 +1037,10 @@ function platoonRecapMarkup(p){
     ${birdies}
     <div class="gr-eagle-stack">${eagle}${ace}</div>
     <section class="gr155-recap-block gr155-recap-copy gr155-intel-wide gr-honor-intel"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section>
+    <section class="gr155-recap-block gr155-recap-copy gr155-intel-wide gr-honor-constitution">
+      <div class="gr-hq-title-row"><div class="gr155-recap-title">MY TIME CONSTITUTION</div>${canEditHq(p)?`<button type="button" class="gr-hq-edit" data-gr-edit-constitution title="Edit Constitution">✎</button>`:''}</div>
+      ${constitutionOf(p)?`<div class="gr-constitution-body">${esc(constitutionOf(p)).replace(/\n/g,'<br>')}</div>`:`<p class="muted" style="margin:0">No constitution yet.${canEditHq(p)?' Tap edit to write the house rules.':''}</p>`}
+    </section>
   </div>`;
 }
 
@@ -970,6 +1059,11 @@ window.grCanEditHq=canEditHq;
 window.grOpenRecordsEditor=openRecordsEditor;
 window.grOpenEaglesEditor=openEaglesEditor;
 window.grPlatoonRecapMarkup=platoonRecapMarkup;
+window.grGuestPoolOf=guestPoolOf;
+window.grUpsertGuestPool=upsertGuestPool;
+window.grConstitutionOf=constitutionOf;
+window.grSetConstitution=setConstitution;
+window.grOpenConstitutionEditor=openConstitutionEditor;
 window.grHqRecordsReady=true;
 
 installStyles();
