@@ -279,7 +279,25 @@ function previewMarkup(pre){
 }
 function resultRows(m){return Array.isArray(m.results)?m.results:[]}
 function netStandings(m){return resultRows(m).filter(r=>Number.isFinite(Number(r.net))).map(r=>({...r,net:Number(r.net)})).sort((a,b)=>a.net-b.net||Number(a.finish_position??999)-Number(b.finish_position??999))}
-function platoonStandings(p){const members=membersOf(p),score=new Map(members.map(m=>[String(m.name||'').trim().toLowerCase(),{name:m.name,points:0}]));for(const m of (p.missions||[])){if(m.type==='war'||m.status!=='completed')continue;for(const r of resultRows(m)){const k=String(r.player_name||'').trim().toLowerCase();if(score.has(k))score.get(k).points+=Number(r.raw_points||0)}}return [...score.values()].sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name))}
+function platoonStandings(p){
+  if(typeof window.grMyTimePointsStandings==='function'){
+    return window.grMyTimePointsStandings(p).rows
+      .filter(r=>Number(r.played||0)>0)
+      .map(r=>({name:r.name,points:r.points,played:r.played,totalPoints:r.totalPoints}));
+  }
+  const members=membersOf(p),score=new Map(members.map(m=>[String(m.name||'').trim().toLowerCase(),{name:m.name,points:0,played:0,totalPoints:0}]));
+  for(const m of (p.missions||[])){
+    if(m.type==='war'||m.status!=='completed')continue;
+    for(const r of resultRows(m)){
+      const k=String(r.player_name||'').trim().toLowerCase();
+      if(!score.has(k))continue;
+      const x=score.get(k);
+      x.played+=1;
+      x.totalPoints+=Number(r.raw_points||0);
+    }
+  }
+  return [...score.values()].map(r=>({...r,points:r.played?Math.round((r.totalPoints/r.played)*10)/10:0})).filter(r=>r.played>0).sort((a,b)=>b.points-a.points||b.played-a.played||a.name.localeCompare(b.name));
+}
 function missionHighlights(m){const rows=resultRows(m),net=netStandings(m),gross=rows.filter(r=>Number.isFinite(Number(r.gross))).map(r=>({...r,gross:Number(r.gross)})).sort((a,b)=>a.gross-b.gross),pts=rows.filter(r=>Number.isFinite(Number(r.raw_points))).map(r=>({...r,raw_points:Number(r.raw_points)})).sort((a,b)=>b.raw_points-a.raw_points),eagles=rows.filter(r=>Number(r.eagle_count)>0).sort((a,b)=>Number(b.eagle_count)-Number(a.eagle_count));return {lowNet:net[0]||null,lowGross:gross[0]||null,points:pts[0]||null,eagles:eagles[0]||null}}
 function summaryText(m){const net=netStandings(m),h=missionHighlights(m);if(!net.length){const rows=resultRows(m);if(!rows.length)return 'Mission complete.';const ranked=[...rows].sort((a,b)=>(a.finish_position??999)-(b.finish_position??999));const w=ranked[0];return w?`${w.player_name} led the field${w.gross!=null?` with ${w.gross} gross`:''}.`:'Mission complete.'}const w=net[0],runner=net[1];let s=`${w.player_name} took low net at ${w.net}`;if(runner){const margin=runner.net-w.net;s+=margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${runner.player_name}`:` in a tie with ${runner.player_name}`}if(h.lowGross&&h.lowGross.player_name!==w.player_name)s+=`. ${h.lowGross.player_name} posted the low gross at ${h.lowGross.gross}`;if(h.points&&Number(h.points.raw_points)>0)s+=`. ${h.points.player_name} earned ${h.points.raw_points} point${Number(h.points.raw_points)===1?'':'s'}`;return s+'.'}
 function missionSummaryMarkup(m){const p=loadPlatoonLocal();if(typeof window.grMissionRecapMarkup==='function')return window.grMissionRecapMarkup(p,m);const net=netStandings(m).slice(0,6),h=missionHighlights(m);const netRows=net.length?net.map((r,i)=>`<div class="gr-net-row"><span><b>${i+1}</b> ${E(r.player_name||'Player')}</span><strong>${r.net}</strong></div>`).join(''):'<div class="gr-after-empty">No net scores</div>';const highlights=[h.lowGross?`<div><span>Low Gross</span><strong>${E(h.lowGross.player_name)} · ${h.lowGross.gross}</strong></div>`:'',h.points&&Number(h.points.raw_points)>0?`<div><span>Points</span><strong>${E(h.points.player_name)} · ${h.points.raw_points}</strong></div>`:'',h.eagles?`<div><span>Eagles</span><strong>${E(h.eagles.player_name)} · ${h.eagles.eagle_count}</strong></div>`:''].filter(Boolean).join('')||'<div class="gr-after-empty">No extra highlights</div>';return `<div class="gr-after-grid"><section class="gr-after-panel"><h4>Net Standings</h4>${netRows}</section><section class="gr-after-panel gr-highlights"><h4>Highlights</h4>${highlights}</section></div><div class="gr-after-narrative">${E(summaryText(m))}</div>`}
@@ -287,7 +305,7 @@ function platoonStandingsMarkup(p){
   if(typeof window.grPlatoonRecapMarkup==='function')return window.grPlatoonRecapMarkup(p);
   const rows=platoonStandings(p);
   const season=p.season||new Date().getFullYear();
-  return `<div class="gr-platoon-standings"><div class="gr-standings-title">${E(season)} My Time Points</div>${rows.map((r,i)=>`<div class="gr-platoon-standing-row"><span><b>${i+1}</b> ${E(r.name)}</span><strong>${Number(r.points||0)}</strong></div>`).join('')}</div>`;
+  return `<div class="gr-platoon-standings"><div class="gr-standings-title">${E(season)} My Time ⛳ Points</div>${rows.map((r,i)=>`<div class="gr-platoon-standing-row"><span><b>${i+1}</b> ${E(r.name)}${r.played!=null?`<small class="gr-standings-meta"> · ${Number(r.totalPoints||0)} pts · ${Number(r.played||0)} rnd</small>`:''}</span><strong>${Number(r.points||0)}</strong></div>`).join('')}</div>`;
 }
 
 function missionActions(m,warId){
