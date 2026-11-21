@@ -6,7 +6,7 @@ function renderGroups(){try{if(typeof render==='function')render()}catch{}}
 function goSubpage(name){platoonSubpage=name||'home';renderGroups()}
 function subNav(){const tabs=[{id:'home',label:'Missions'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Blog'}];return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${E(t.label)}</button>`).join('')}</nav>`}
 function withSubNav(html){return `<div class="gr-platoons-shell">${html||''}${subNav()}</div>`}
-function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${E(title)}</h2>${sub?`<div class="muted" style="font-size:12px;margin-top:4px">${E(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
+function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${E(title)}</h2>${sub?`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">${E(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
 function monthStart(){if(calendarCursor)return new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);const now=new Date(),rows=(loadPlatoonLocal().missions||[]).filter(m=>m.date&&m.type!=='war').map(m=>new Date(m.date+'T12:00:00')).filter(d=>!isNaN(d));const next=rows.filter(d=>d>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a,b)=>a-b)[0];calendarCursor=new Date((next||now).getFullYear(),(next||now).getMonth(),1);return calendarCursor}
 const MISSION_FORMATS=[
   'Stroke play (gross)',
@@ -247,7 +247,7 @@ function warCard(p,w){
   const avgHead=mode.toLowerCase().includes('gross')?'Avg G':'Avg N';
   const rows=board.rows||[];
   const table=rows.length?`<div class="gr-war-standings-label">War Standings</div><table class="gr-leaderboard"><thead><tr><th>Player</th><th>Played</th><th>Pts</th><th>${avgHead}</th></tr></thead><tbody>${rows.map((r,i)=>{const avg=mode.toLowerCase().includes('gross')?(r.avgGross!=null?Math.round(r.avgGross*10)/10:'—'):(r.avgNet!=null?Math.round(r.avgNet*10)/10:'—');return `<tr><td>${i+1}. ${E(r.name)}</td><td>${r.played||0}</td><td>${r.points||0}</td><td>${avg}</td></tr>`}).join('')}</tbody></table>`:'';
-  return `<div class="card gr-war-card"><div class="gr-war-head"><div><div class="eyebrow">WAR</div><h3>${E(w.title||'War')}</h3><div class="muted" style="font-size:11px">${done} of ${kids.length} Missions complete${warEndOf(w)?` · through ${E(fmtDate(warEndOf(w)))}`:''} · ${E(mode)}</div></div><span class="gr-tag gr-war">${done===kids.length&&kids.length?'COMPLETE':'ACTIVE'}</span></div><div class="gr-progress"><span style="width:${pct}%"></span></div>${table}<div class="gr-mini-actions"><button class="button primary" onclick="grOpenMissionEditor('','${E(w.id)}')">+ Mission</button><button class="button secondary" onclick="grOpenWarEditor('${E(w.id)}')">Edit War</button></div><div class="gr-stack" style="margin-top:9px"><div class="gr-war-standings-label">Mission Results</div>${kids.map(m=>missionCard(p,m,false)).join('')||'<div class="muted" style="font-size:11px">No Missions yet.</div>'}</div></div>`;
+  return `<div class="card gr-war-card"><div class="gr-war-head"><div><div class="eyebrow">WAR</div><h3>${E(w.title||'War')}</h3><div class="muted" style="font-size:var(--fs-data)">${done} of ${kids.length} Missions complete${warEndOf(w)?` · through ${E(fmtDate(warEndOf(w)))}`:''} · ${E(mode)}</div></div><span class="gr-tag gr-war">${done===kids.length&&kids.length?'COMPLETE':'ACTIVE'}</span></div><div class="gr-progress"><span style="width:${pct}%"></span></div>${table}<div class="gr-mini-actions"><button class="button primary" onclick="grOpenMissionEditor('','${E(w.id)}')">+ Mission</button><button class="button secondary" onclick="grOpenWarEditor('${E(w.id)}')">Edit War</button></div><div class="gr-stack" style="margin-top:9px"><div class="gr-war-standings-label">Mission Results</div>${kids.map(m=>missionCard(p,m,false)).join('')||'<div class="muted" style="font-size:var(--fs-data)">No Missions yet.</div>'}</div></div>`;
 }
 
 function groupsV15(){
@@ -521,7 +521,7 @@ function clubhousePhotosOf(p){
   return photos;
 }
 function renderClubhousePhotoThumbs(photos){
-  if(!photos.length)return '<div class="muted" style="font-size:11px">No platoon photos yet — stock course shots still rotate.</div>';
+  if(!photos.length)return '<div class="muted" style="font-size:var(--fs-data)">No platoon photos yet — stock course shots still rotate.</div>';
   return `<div class="gr-clubhouse-thumbs">${photos.map((ph,i)=>`<div class="gr-clubhouse-thumb" data-photo-id="${E(ph.id)}"><img src="${String(ph.dataUrl||'').replace(/"/g,'')}" alt="Clubhouse photo ${i+1}"><div class="gr-clubhouse-thumb-actions"><button type="button" class="gr-clubhouse-thumb-replace" data-replace-photo="${E(ph.id)}" title="Replace this photo">Replace</button><button type="button" class="gr-clubhouse-thumb-del" data-del-photo="${E(ph.id)}" title="Remove">✕</button></div></div>`).join('')}</div>`;
 }
 function setupAliasesOf(m){
@@ -557,7 +557,7 @@ window.grOpenSetup=()=>{
     </div>
     <div class="gr-clubhouse-photos-setup">
       <div class="eyebrow" style="margin-top:14px">CLUBHOUSE PHOTOS</div>
-      <p class="muted" style="font-size:11px;margin:6px 0 8px">Add group shots for the background rotation (up to 8). Use <strong>Replace</strong> on a thumb to swap one, ✕ to remove, or Clear all. iPhone Live Photos / HEIC convert to JPG on this device (still frame only).</p>
+      <p class="muted" style="font-size:var(--fs-data);margin:6px 0 8px">Add group shots for the background rotation (up to 8). Use <strong>Replace</strong> on a thumb to swap one, ✕ to remove, or Clear all. iPhone Live Photos / HEIC convert to JPG on this device (still frame only).</p>
       <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
       <input id="grPClubReplace" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" hidden>
       <div class="gr-clubhouse-photo-actions" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">
@@ -566,7 +566,7 @@ window.grOpenSetup=()=>{
       </div>
     </div>
     <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
-      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:10px">Names used for screenshot recognition. Recognition names can be comma-separated.</div></div>
+      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Names used for screenshot recognition. Recognition names can be comma-separated.</div></div>
       <button class="button secondary" id="grAddRoster" type="button">+ Player</button>
     </div>
     <div id="grRosterRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
@@ -609,7 +609,7 @@ window.grOpenSetup=()=>{
       status=document.createElement('div');
       status.id='grClubhouseUploadStatus';
       status.className='muted';
-      status.style.cssText='font-size:11px;margin-top:6px;line-height:1.35';
+      status.style.cssText='font-size:var(--fs-data);margin-top:6px;line-height:1.35';
       const actions=d.querySelector('.gr-clubhouse-photo-actions');
       (actions||thumbs).insertAdjacentElement('afterend',status);
     }
@@ -726,7 +726,7 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">MISSION</div><h2>${m?'Edit Mission':'New Mission'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <div class="gr-event-banner"><div class="gr-event-name" id="grBannerTitle">${E(presetTitle||'Event name')}</div><div class="gr-event-course" id="grBannerCourse">${E(courseLabel(m?.locationName))}</div><div class="gr-event-facts"><span class="gr-event-fact" id="grBannerDate">📅 ${E(fmtDate(presetDate))}</span><span class="gr-event-fact" id="grBannerTime">⏱ ${E(fmtTime(presetTime))}</span><span class="gr-event-fact" id="grBannerFormat">${E(presetFormat||'Format TBD')}</span></div></div>
     <label>Event Name<input id="grMTitle" value="${E(presetTitle)}" placeholder="e.g. League Night 4"></label>
-    <label>Course${courseSelectMarkup(m?.locationName,m?.courseId)}<span class="muted" style="font-size:10px;font-weight:600">Add new course to save tees, rating, slope &amp; par.</span></label>
+    <label>Course${courseSelectMarkup(m?.locationName,m?.courseId)}<span class="muted" style="font-size:var(--fs-data);font-weight:600">Add new course to save tees, rating, slope &amp; par.</span></label>
     <div id="grCourseMeta" class="gr-course-meta muted" hidden></div>
     <div class="grid two">
       <label>Date<input id="grMDate" class="gr-datetime gr-date-picker" type="date" value="${E(presetDate)}" inputmode="none" autocomplete="off"></label>
@@ -807,7 +807,7 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
       participants:[...d.querySelectorAll('[data-member]:checked')].map(x=>x.dataset.member)
     };
     const wiz=modal(`<div class="dialog-head"><div><div class="eyebrow">COURSE</div><h2>Add course</h2></div><button class="icon-button" id="grCourseCancel" type="button">✕</button></div>
-      <p class="muted" style="font-size:12px">Saves into your Golf Recon course list with scorecard basics (par / rating / slope). Hole-by-hole maps can still come from Hole Preview later.</p>
+      <p class="muted" style="font-size:var(--fs-data)">Saves into your Golf Recon course list with scorecard basics (par / rating / slope). Hole-by-hole maps can still come from Hole Preview later.</p>
       <label>Course name<input id="grCName" placeholder="Four Oaks Country Club" required></label>
       <div class="grid two"><label>Tees<input id="grCTees" placeholder="White / Blue" value="White"></label><label>Holes<select id="grCHoles"><option value="18">18</option><option value="9">9</option></select></label></div>
       <div class="grid three"><label>Par<input id="grCPar" type="number" inputmode="numeric" placeholder="72"></label><label>Rating<input id="grCRating" type="number" inputmode="decimal" step="0.1" placeholder="71.2"></label><label>Slope<input id="grCSlope" type="number" inputmode="numeric" placeholder="128"></label></div>
