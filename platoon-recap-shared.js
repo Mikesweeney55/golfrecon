@@ -98,16 +98,31 @@ function cleanCourseName(v){
   return s||'Course TBD';
 }
 
+function binaryHoleStat(v){
+  if(v===true||v===1||v==='1')return 1;
+  if(v===false||v===0||v==='0')return 0;
+  const x=String(v??'').trim().toLowerCase();
+  if(x==='true'||x==='hit'||x==='yes')return 1;
+  if(x==='false'||x==='miss'||x==='no')return 0;
+  return null;
+}
+
 function cleanHoles(holes){
   const map=new Map();
   for(const h of (Array.isArray(holes)?holes:[])){
     const hole=Number(h?.hole);
     if(!Number.isInteger(hole)||hole<1||hole>18)continue;
+    const fairway=binaryHoleStat(h?.fairway_hit??h?.fairway??h?.fw);
+    const gir=binaryHoleStat(h?.gir??h?.gir_hit);
+    const putts=finite(h?.putts)?Number(h.putts):null;
     map.set(hole,{
       hole,
       par:finite(h?.par)?Number(h.par):null,
       score:finite(h?.score)?Number(h.score):null,
-      net:finite(h?.net)?Number(h.net):null
+      net:finite(h?.net)?Number(h.net):null,
+      fairway,
+      gir,
+      putts
     });
   }
   return [...map.values()].sort((a,b)=>a.hole-b.hole);
@@ -157,7 +172,18 @@ function holeNetValue(h,hcp,parByHole){
   return Number(h.score)-strokesOnHole(hcp,h.hole);
 }
 
-function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true}={}){
+function markCell(hit){
+  if(hit===1)return`<div class="gr-hsc-cell gr-hsc-stat"><span class="gr-hsc-mark hit" title="Hit">●</span></div>`;
+  if(hit===0)return`<div class="gr-hsc-cell gr-hsc-stat"><span class="gr-hsc-mark miss" title="Miss">○</span></div>`;
+  return`<div class="gr-hsc-cell gr-hsc-empty">·</div>`;
+}
+function statHitRate(vals){
+  const known=vals.filter(v=>v===0||v===1);
+  if(!known.length)return null;
+  const hits=known.filter(v=>v===1).length;
+  return {hits,n:known.length,pct:Math.round(100*hits/known.length)};
+}
+function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true,showStats=true}={}){
   if(!holeNums.length)return'';
   const totalLabel=holeNums[0]<=9?'OUT':'IN';
   const cols=`44px repeat(${holeNums.length},minmax(24px,1fr)) 38px`;
@@ -186,11 +212,49 @@ function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true
     const netSum=netVals.every(finite)?netVals.reduce((s,v)=>s+Number(v),0):null;
     netRow=row('gr-hsc-nets','NET',netCells,netSum!=null?netSum:'·');
   }
+  let statsRows='';
+  if(showStats){
+    const fwVals=holeNums.map(n=>{
+      const h=playerHoleMap.get(n);
+      const par=h?.par??parByHole.get(n);
+      if(Number(par)===3)return null; // FIR N/A on par 3
+      return h?.fairway??null;
+    });
+    const girVals=holeNums.map(n=>playerHoleMap.get(n)?.gir??null);
+    const puttVals=holeNums.map(n=>playerHoleMap.get(n)?.putts);
+    const hasFw=fwVals.some(v=>v===0||v===1);
+    const hasGir=girVals.some(v=>v===0||v===1);
+    const hasPutts=puttVals.some(finite);
+    if(hasFw){
+      const rate=statHitRate(fwVals);
+      const cells=fwVals.map((v,i)=>{
+        const par=playerHoleMap.get(holeNums[i])?.par??parByHole.get(holeNums[i]);
+        if(Number(par)===3)return`<div class="gr-hsc-cell gr-hsc-empty">—</div>`;
+        return markCell(v);
+      }).join('');
+      statsRows+=row('gr-hsc-stats gr-hsc-fw','FIR',cells,rate?`${rate.hits}/${rate.n}`:'·');
+    }
+    if(hasGir){
+      const rate=statHitRate(girVals);
+      const cells=girVals.map(v=>markCell(v)).join('');
+      statsRows+=row('gr-hsc-stats gr-hsc-gir','GIR',cells,rate?`${rate.hits}/${rate.n}`:'·');
+    }
+    if(hasPutts){
+      const cells=puttVals.map(v=>{
+        if(!finite(v))return`<div class="gr-hsc-cell gr-hsc-empty">·</div>`;
+        return`<div class="gr-hsc-cell gr-hsc-putt">${Number(v)}</div>`;
+      }).join('');
+      const known=puttVals.filter(finite);
+      const puttSum=known.length===holeNums.length?known.reduce((s,v)=>s+Number(v),0):(known.length?known.reduce((s,v)=>s+Number(v),0):null);
+      statsRows+=row('gr-hsc-stats gr-hsc-putts','PUTTS',cells,puttSum!=null?puttSum:'·');
+    }
+  }
   return `<div class="gr-hsc-nine" aria-label="${totalLabel} nine">
     ${row('gr-hsc-holes','HOLE',holeCells,totalLabel)}
     ${row('gr-hsc-pars','PAR',parCells,hasPar?parSum:'·')}
     ${row('gr-hsc-scores','GROSS',grossCells,grossSum!=null?grossSum:'·')}
     ${netRow}
+    ${statsRows}
   </div>`;
 }
 
@@ -223,7 +287,69 @@ function holeScoreboardMarkup(p,m,detail){
       </div>
     </article>`;
   }).join('');
-  return `<section class="gr-hsc-board"><div class="gr-hsc-board-head"><div class="gr155-recap-title">SCORECARD</div><span class="gr-hsc-legend">○ birdie · □ bogey</span></div>${cards}</section>`;
+  return `<section class="gr-hsc-board"><div class="gr-hsc-board-head"><div class="gr155-recap-title">SCORECARD</div><span class="gr-hsc-legend">○ birdie · □ bogey · ● hit · ○ miss</span></div>${cards}</section>`;
+}
+
+/** Plaque scorecard for a personal round (scores + FIR/GIR/putts). */
+function personalRoundScorecardMarkup(opts={}){
+  const holeNumbers=Array.isArray(opts.holeNumbers)&&opts.holeNumbers.length
+    ? opts.holeNumbers.map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=18)
+    : Array.from({length:18},(_,i)=>i+1);
+  const pars=Array.isArray(opts.pars)?opts.pars:[];
+  const scores=Array.isArray(opts.scores)?opts.scores:[];
+  const fairways=Array.isArray(opts.fairways)?opts.fairways:[];
+  const gir=Array.isArray(opts.gir)?opts.gir:[];
+  const putts=Array.isArray(opts.putts)?opts.putts:[];
+  const parByHole=new Map();
+  const map=new Map();
+  holeNumbers.forEach((n,i)=>{
+    if(finite(pars[i]))parByHole.set(n,Number(pars[i]));
+    map.set(n,{
+      hole:n,
+      par:finite(pars[i])?Number(pars[i]):null,
+      score:finite(scores[i])?Number(scores[i]):null,
+      net:null,
+      fairway:binaryHoleStat(fairways[i]),
+      gir:binaryHoleStat(gir[i]),
+      putts:finite(putts[i])?Number(putts[i]):null
+    });
+  });
+  const front=[1,2,3,4,5,6,7,8,9].filter(n=>holeNumbers.includes(n));
+  const back=[10,11,12,13,14,15,16,17,18].filter(n=>holeNumbers.includes(n));
+  const isNine=Number(opts.holes)===9 || (holeNumbers.length<=9 && !holeNumbers.some(n=>n>=10));
+  // 18-hole rounds always get Out+In (blanks stay ·). Nine-hole rounds show only the played side.
+  const useFront=front.length?front:(isNine&&back.length?[]:[1,2,3,4,5,6,7,8,9]);
+  const useBack=back.length?back:(isNine?[]:[10,11,12,13,14,15,16,17,18]);
+  const name=String(opts.playerName||opts.name||'Round').trim()||'Round';
+  const gross=finite(opts.gross)?Number(opts.gross):null;
+  const net=finite(opts.net)?Number(opts.net):null;
+  const hcp=finite(opts.handicap??opts.hcp)?Number(opts.handicap??opts.hcp):null;
+  const fwRate=statHitRate(holeNumbers.map(n=>map.get(n)?.fairway));
+  const girRate=statHitRate(holeNumbers.map(n=>map.get(n)?.gir));
+  const puttKnown=holeNumbers.map(n=>map.get(n)?.putts).filter(finite);
+  const puttSum=puttKnown.length?puttKnown.reduce((s,v)=>s+Number(v),0):null;
+  const chips=[
+    gross!=null?`<span class="gr-hsc-chip"><em>G</em>${gross}</span>`:'',
+    net!=null?`<span class="gr-hsc-chip"><em>N</em>${net}</span>`:'',
+    hcp!=null?`<span class="gr-hsc-chip"><em>H</em>${hcp}</span>`:'',
+    fwRate?`<span class="gr-hsc-chip"><em>FIR</em>${fwRate.hits}/${fwRate.n}</span>`:'',
+    girRate?`<span class="gr-hsc-chip"><em>GIR</em>${girRate.hits}/${girRate.n}</span>`:'',
+    puttSum!=null?`<span class="gr-hsc-chip"><em>P</em>${puttSum}</span>`:''
+  ].filter(Boolean).join('');
+  const sub=[opts.courseName,opts.date,opts.tees?`${opts.tees} tees`:''].filter(Boolean).map(esc).join(' · ');
+  const strips=[
+    nineStripMarkup(useFront,parByHole,map,{hcp,showNet:net!=null||hcp!=null,showStats:true}),
+    useBack.length?nineStripMarkup(useBack,parByHole,map,{hcp,showNet:net!=null||hcp!=null,showStats:true}):''
+  ].join('');
+  return `<section class="gr-hsc-board gr-hsc-personal"><div class="gr-hsc-board-head"><div class="gr155-recap-title">SCORECARD</div><span class="gr-hsc-legend">○ birdie · □ bogey · ● hit · ○ miss</span></div>
+    <article class="gr-hsc-card">
+      <div class="gr-hsc-plate">
+        <header class="gr-hsc-nameplate"><strong>${esc(name)}</strong><div class="gr-hsc-chips">${chips}</div></header>
+        ${sub?`<div class="gr-hsc-sub">${sub}</div>`:''}
+        <div class="gr-hsc-plate-face"><div class="gr-hsc-scroll">${strips}</div></div>
+      </div>
+    </article>
+  </section>`;
 }
 
 function detailStats(r){
@@ -510,6 +636,14 @@ function installStyles(){
 .gr-hsc-netcell{color:#1f5a3a;font-weight:800}
 .gr-hsc-nets .gr-hsc-tot{color:#1f5a3a}
 .gr-hsc-empty{color:rgba(60,40,20,.28);font-weight:700}
+.gr-hsc-sub{margin:-2px 8px 8px;padding:0 2px;font-size:var(--fs-data);color:#5a4018;font-weight:700;letter-spacing:.02em;opacity:.85}
+.gr-hsc-stats{background:rgba(90,70,30,.04)}
+.gr-hsc-stats .gr-hsc-label{font-size:9px;letter-spacing:.06em}
+.gr-hsc-mark{display:inline-block;font-size:11px;line-height:1;font-weight:900}
+.gr-hsc-mark.hit{color:#1f5a3a}
+.gr-hsc-mark.miss{color:#8a6a28;opacity:.75}
+.gr-hsc-putt{color:#2a1c10;font-weight:800}
+.gr-hsc-personal{margin-top:0}
 @media(max-width:700px){
   .gr155-recap-grid{grid-template-columns:1fr}
   .gr155-recap-block{padding:11px}
@@ -541,5 +675,6 @@ window.grMissionStandingsMarkup=(m,p)=>standingsTableMarkup(p,m);
 window.grMissionRecapMarkup=missionRecapMarkup;
 window.grNorm=typeof norm==='function'?norm:s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 window.grCleanHoles=cleanHoles;
+window.grPersonalRoundScorecardMarkup=personalRoundScorecardMarkup;
 window.grSharedRecapReady=true;
 })();
