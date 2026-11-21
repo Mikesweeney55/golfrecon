@@ -22,7 +22,45 @@ const MISSION_FORMATS=[
   'Wolf',
   'Other'
 ];
-const TEE_TIME_PRESETS=['07:00','07:30','08:00','08:30','09:00','09:30','10:00','11:00','12:00','13:00','14:00'];
+const TEE_HOURS=['05','06','07','08','09','10','11','12','13','14','15','16','17','18'];
+const TEE_MINS=['00','10','20','30','40','50'];
+function parseTeeParts(t){
+  const m=String(t||'').match(/^(\d{1,2}):(\d{2})/);
+  if(!m)return {h:'07',min:'00'};
+  let h=Math.min(18,Math.max(5,Number(m[1])));
+  let min=Math.round(Number(m[2])/10)*10;
+  if(min===60){min=0;h=Math.min(18,h+1)}
+  if(min<0)min=0;
+  return {h:String(h).padStart(2,'0'),min:String(min).padStart(2,'0')};
+}
+function teeHourLabel(h){
+  const n=Number(h);const ampm=n>=12?'PM':'AM';const twelve=((n+11)%12)+1;
+  return `${twelve} ${ampm}`;
+}
+function teeTimeWheelMarkup(id,value){
+  const {h,min}=parseTeeParts(value);
+  return `<div class="gr-tee-wheel" data-tee-for="${E(id)}">
+    <input type="hidden" id="${E(id)}" value="${E(h+':'+min)}">
+    <div class="gr-tee-wheel-cols">
+      <label class="gr-tee-wheel-col"><span>Hour</span><select id="${E(id)}H" class="gr-tee-select" aria-label="Tee hour">${TEE_HOURS.map(x=>`<option value="${x}" ${x===h?'selected':''}>${teeHourLabel(x)}</option>`).join('')}</select></label>
+      <label class="gr-tee-wheel-col"><span>Min (10)</span><select id="${E(id)}M" class="gr-tee-select" aria-label="Tee minutes">${TEE_MINS.map(x=>`<option value="${x}" ${x===min?'selected':''}>:${x}</option>`).join('')}</select></label>
+    </div>
+  </div>`;
+}
+function wireTeeTimeWheel(root,id,onChange){
+  const sync=()=>{
+    const hh=root.querySelector('#'+id+'H')?.value||'07';
+    const mm=root.querySelector('#'+id+'M')?.value||'00';
+    const el=root.querySelector('#'+id);
+    if(el)el.value=`${hh}:${mm}`;
+    onChange?.(el?.value||'');
+  };
+  root.querySelector('#'+id+'H')?.addEventListener('change',sync);
+  root.querySelector('#'+id+'M')?.addEventListener('change',sync);
+  sync();
+}
+window.grTeeTimeWheelMarkup=teeTimeWheelMarkup;
+window.grWireTeeTimeWheel=wireTeeTimeWheel;
 function isoDate(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function calendarView(){
   const p=loadPlatoonLocal(),cur=monthStart(),y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate();
@@ -543,6 +581,7 @@ window.grOpenSetup=()=>{
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <label>Name<input id="grPName" value="${E(p.name||'')}"></label>
     <label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label>
+    <label>My Time Constitution<textarea id="grPConstitution" rows="4" placeholder="House rules shown on the Clubhouse board">${E(typeof window.grConstitutionOf==='function'?window.grConstitutionOf(p):(p.hqMeta?.constitution||''))}</textarea></label>
     <div class="grid two">
       <label>Season<input id="grPSeason" type="number" value="${E(p.season||new Date().getFullYear())}"></label>
       <label>Visibility<select id="grPVis"><option ${p.visibility==='Private'?'selected':''}>Private</option><option ${p.visibility==='Invite only'?'selected':''}>Invite only</option></select></label>
@@ -566,6 +605,11 @@ window.grOpenSetup=()=>{
       </div>
     </div>
     <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
+      <div><div class="eyebrow">GUEST POOL</div><div class="muted" style="font-size:var(--fs-data)">Returning non-members. Used on Missions &amp; past imports — not full My Time members.</div></div>
+      <button class="button secondary" id="grAddGuestPool" type="button">+ Guest</button>
+    </div>
+    <div id="grGuestPoolRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
+    <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
       <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Names used for screenshot recognition. Recognition names can be comma-separated.</div></div>
       <button class="button secondary" id="grAddRoster" type="button">+ Player</button>
     </div>
@@ -584,10 +628,26 @@ window.grOpenSetup=()=>{
   const drawRoster=()=>{
     roster.innerHTML=(p.members||[]).map((m,i)=>`<div class="gr155-roster-row" data-i="${i}" style="display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px"><label style="margin-top:0">Name<input data-name value="${E(m.name||'')}"></label><label style="margin-top:0">Recognize as<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label></div>`).join('');
   };
+  let guestPool=(typeof window.grGuestPoolOf==='function'?window.grGuestPoolOf(p):[]).map(g=>({...g,aliases:[...(g.aliases||[])]}));
+  const guestRows=d.querySelector('#grGuestPoolRows');
+  const drawGuestPool=()=>{
+    guestRows.innerHTML=guestPool.map((g,i)=>`<div class="gr155-roster-row" data-gi="${i}" style="display:grid;grid-template-columns:minmax(120px,.8fr) minmax(140px,1.2fr) auto;gap:8px;align-items:end"><label style="margin-top:0">Name<input data-gname value="${E(g.name||'')}"></label><label style="margin-top:0">Also known as<input data-galias value="${E((g.aliases||[]).join(', '))}" placeholder="optional"></label><button type="button" class="button secondary" data-del-guest="${i}">Remove</button></div>`).join('')
+      ||'<div class="muted" style="font-size:var(--fs-data)">No guests in the pool yet.</div>';
+  };
   drawRoster();
+  drawGuestPool();
   d.querySelector('#grAddRoster').onclick=()=>{
     p.members.push({id:'cadet-'+Date.now(),name:'New Player',role:'cadet',linked:false,aliases:[]});
     drawRoster();
+  };
+  d.querySelector('#grAddGuestPool').onclick=()=>{
+    guestPool.push({id:'gst-'+Date.now().toString(36),name:'New Guest',aliases:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+    drawGuestPool();
+  };
+  guestRows.onclick=e=>{
+    const b=e.target.closest('[data-del-guest]');if(!b)return;
+    guestPool.splice(Number(b.getAttribute('data-del-guest')),1);
+    drawGuestPool();
   };
   d.querySelector('#grPLogo').onchange=async e=>{
     const f=e.target.files?.[0];if(!f)return;
@@ -684,6 +744,22 @@ window.grOpenSetup=()=>{
   d.querySelector('#grPSave').onclick=()=>{
     p.name=d.querySelector('#grPName').value.trim()||'My Time';
     p.motto=d.querySelector('#grPMotto').value.trim();
+    const constitutionText=d.querySelector('#grPConstitution')?.value||'';
+    if(typeof window.grSetConstitution==='function')window.grSetConstitution(p,constitutionText);
+    else{
+      p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+      p.hqMeta.constitution=String(constitutionText||'').trim();
+    }
+    // rebuild guest pool from rows
+    const nextPool=[];
+    [...guestRows.querySelectorAll('.gr155-roster-row')].forEach(row=>{
+      const name=row.querySelector('[data-gname]')?.value.trim();
+      if(!name)return;
+      const aliases=(row.querySelector('[data-galias]')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+      const prev=guestPool[Number(row.dataset.gi)]||{};
+      nextPool.push({id:prev.id||('gst-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)),name,aliases,createdAt:prev.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()});
+    });
+    p.hqMeta=typeof window.grHqMetaNormalize==='function'?window.grHqMetaNormalize({...(p.hqMeta||{}),guestPool:nextPool,constitution:String(constitutionText||'').trim()}):{...(p.hqMeta||{}),guestPool:nextPool,constitution:String(constitutionText||'').trim()};
     p.season=Number(d.querySelector('#grPSeason').value)||new Date().getFullYear();
     p.visibility=d.querySelector('#grPVis').value;
     p.coChief=String(d.querySelector('#grPCoChief').value||'');
@@ -722,7 +798,6 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
   const presetFormat=opts.format||m?.format||'Stroke play (net)';
   const presetTitle=opts.title!=null?String(opts.title):(m?.title||'');
   const warOptions=`<option value="">None — standalone Mission</option>${wars.map(w=>`<option value="${E(w.id)}" ${String(w.id)===String(linkedWarId)?'selected':''}>${E(w.title||'War')}</option>`).join('')}`;
-  const timeChips=TEE_TIME_PRESETS.map(t=>`<button type="button" class="gr-time-chip" data-tee-preset="${t}">${fmtTime(t)}</button>`).join('');
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">MISSION</div><h2>${m?'Edit Mission':'New Mission'}</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <div class="gr-event-banner"><div class="gr-event-name" id="grBannerTitle">${E(presetTitle||'Event name')}</div><div class="gr-event-course" id="grBannerCourse">${E(courseLabel(m?.locationName))}</div><div class="gr-event-facts"><span class="gr-event-fact" id="grBannerDate">📅 ${E(fmtDate(presetDate))}</span><span class="gr-event-fact" id="grBannerTime">⏱ ${E(fmtTime(presetTime))}</span><span class="gr-event-fact" id="grBannerFormat">${E(presetFormat||'Format TBD')}</span></div></div>
     <label>Event Name<input id="grMTitle" value="${E(presetTitle)}" placeholder="e.g. League Night 4"></label>
@@ -730,30 +805,56 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     <div id="grCourseMeta" class="gr-course-meta muted" hidden></div>
     <div class="grid two">
       <label>Date<input id="grMDate" class="gr-datetime gr-date-picker" type="date" value="${E(presetDate)}" inputmode="none" autocomplete="off"></label>
-      <label>Tee Time<input id="grMTime" class="gr-datetime gr-time-picker" type="time" step="900" value="${E(presetTime)}" inputmode="none" autocomplete="off"></label>
+      <label>Tee Time <span class="muted" style="font-weight:600">(10 min)</span>${teeTimeWheelMarkup('grMTime',presetTime)}</label>
     </div>
     <div class="gr-date-quick"><button type="button" class="gr-time-chip" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-date-preset="sun">Next Sun</button></div>
-    <div class="gr-time-presets">${timeChips}</div>
     <label>Format${formatSelectMarkup(presetFormat)}</label>
     <label>Attach to War<select id="grMWar" class="gr-mission-select">${warOptions}</select></label>
     <label>Cadets Playing<div class="gr-check-grid">${membersOf(p).map(x=>`<label class="gr-check"><input type="checkbox" data-member="${E(x.id)}" ${memberIds.includes(x.id)?'checked':''}>${E(x.name)}</label>`).join('')}</div></label>
-    <label>Guests<div class="gr-guest-add"><input id="grGuestName" placeholder="Guest name"><button class="button secondary" id="grAddGuest" type="button">Add</button></div><div class="gr-guest-list" id="grGuests"></div></label>
+    <label>Guests<span class="muted" style="font-weight:600;display:block;margin-top:2px">Guest pool keeps returning players without making them members.</span>
+      <div class="gr-guest-pool-picks" id="grGuestPoolPicks"></div>
+      <div class="gr-guest-add"><input id="grGuestName" placeholder="New guest name"><button class="button secondary" id="grAddGuest" type="button">Add guest</button></div>
+      <div class="gr-guest-list" id="grGuests"></div>
+    </label>
     <label>Notes<textarea id="grMNotes" rows="2" placeholder="Optional">${E(baseNotes)}</textarea></label>
     <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grMSave">Save Mission</button></div>`);
 
   let guests=[...gs].map(g=>String(g||'').trim()).filter(Boolean);
-  const drawGuests=()=>d.querySelector('#grGuests').innerHTML=guests.map((g,i)=>`<span class="gr-guest-pill">${E(g)} <button type="button" data-rmguest="${i}">✕</button></span>`).join('');
+  const poolOf=()=>typeof window.grGuestPoolOf==='function'?window.grGuestPoolOf(p):[];
+  const drawGuests=()=>{
+    d.querySelector('#grGuests').innerHTML=guests.map((g,i)=>`<span class="gr-guest-pill">${E(g)} <button type="button" data-rmguest="${i}">✕</button></span>`).join('');
+    const picks=d.querySelector('#grGuestPoolPicks');
+    if(picks){
+      const pool=poolOf().filter(g=>!guests.some(x=>x.toLowerCase()===String(g.name).toLowerCase()));
+      picks.innerHTML=pool.length
+        ? `<div class="muted" style="font-size:var(--fs-data);margin:4px 0">From guest pool — tap to add</div><div class="gr-guest-list">${pool.map(g=>`<button type="button" class="gr-guest-pill gr-guest-pool-chip" data-pool-guest="${E(g.name)}">${E(g.name)}</button>`).join('')}</div>`
+        : '';
+    }
+  };
   drawGuests();
+  const rememberGuest=name=>{
+    if(typeof window.grUpsertGuestPool==='function')window.grUpsertGuestPool(p,name);
+  };
+  const addGuestName=v=>{
+    const name=String(v||'').trim();
+    if(!name)return;
+    if(guests.some(g=>g.toLowerCase()===name.toLowerCase()))return;
+    guests.push(name);
+    rememberGuest(name);
+    drawGuests();
+  };
   const addGuest=()=>{
     const input=d.querySelector('#grGuestName');
     const v=String(input?.value||'').trim();
     if(!v)return;
-    if(guests.some(g=>g.toLowerCase()===v.toLowerCase())){input.value='';return}
-    guests.push(v);
+    addGuestName(v);
     input.value='';
-    drawGuests();
   };
   d.querySelector('#grGuests').onclick=e=>{const btn=e.target.closest('[data-rmguest]');if(!btn)return;guests.splice(Number(btn.getAttribute('data-rmguest')),1);drawGuests()};
+  d.querySelector('#grGuestPoolPicks')?.addEventListener('click',e=>{
+    const b=e.target.closest('[data-pool-guest]');if(!b)return;
+    addGuestName(b.getAttribute('data-pool-guest'));
+  });
   d.querySelector('#grAddGuest').onclick=e=>{e.preventDefault();addGuest()};
   d.querySelector('#grGuestName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addGuest()}});
 
@@ -766,6 +867,7 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     d.querySelector('#grBannerTime').textContent='⏱ '+fmtTime(d.querySelector('#grMTime').value);
     d.querySelector('#grBannerFormat').textContent=readMissionFormat(d)||'Format TBD';
   };
+  wireTeeTimeWheel(d,'grMTime',()=>syncBanner());
   const syncCourseMeta=()=>{
     const meta=d.querySelector('#grCourseMeta');
     const resolved=resolveCourseSelection(courseEl()?.value);
@@ -785,7 +887,6 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
 
   ['grMTitle','grMDate','grMTime','grMFormatOther'].forEach(x=>d.querySelector('#'+x)?.addEventListener('input',syncBanner));
   d.querySelector('#grMFormatPick')?.addEventListener('change',syncFormatOther);
-  d.querySelectorAll('[data-tee-preset]').forEach(b=>b.addEventListener('click',()=>{d.querySelector('#grMTime').value=b.dataset.teePreset;syncBanner()}));
   d.querySelectorAll('[data-date-preset]').forEach(b=>b.addEventListener('click',()=>{
     const now=new Date();
     let target=new Date(now.getFullYear(),now.getMonth(),now.getDate());
@@ -863,6 +964,7 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     const resolved=resolveCourseSelection(courseEl()?.value);
     const chosenWar=String(d.querySelector('#grMWar')?.value||'');
     const guestList=guests.map(g=>String(g||'').trim()).filter(Boolean);
+    guestList.forEach(name=>{if(typeof window.grUpsertGuestPool==='function')window.grUpsertGuestPool(p,name)});
     const composed=composeNotes(d.querySelector('#grMNotes').value,guestList,chosenWar);
     const draftInput={
       title:d.querySelector('#grMTitle').value.trim()||'Mission',
