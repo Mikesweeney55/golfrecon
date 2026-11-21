@@ -142,54 +142,82 @@ function missionHoleFrame(detail){
   return {holes,front,back,parByHole,players:withHoles};
 }
 
-function nineStripMarkup(holeNums,parByHole,playerHoleMap,{showNet=false}={}){
+/** Strokes received on a hole when SI is unknown — hole # stands in as rank. */
+function strokesOnHole(hcp,hole){
+  if(!finite(hcp)||Number(hcp)<=0||!Number.isInteger(hole))return 0;
+  const h=Math.max(0,Math.floor(Number(hcp)));
+  const full=Math.floor(h/18);
+  const rem=h%18;
+  return full+(hole<=rem?1:0);
+}
+function holeNetValue(h,hcp,parByHole){
+  if(finite(h?.net))return Number(h.net);
+  if(!finite(h?.score))return null;
+  if(!finite(hcp))return null;
+  return Number(h.score)-strokesOnHole(hcp,h.hole);
+}
+
+function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true}={}){
   if(!holeNums.length)return'';
   const totalLabel=holeNums[0]<=9?'Out':'In';
+  const cols=`42px repeat(${holeNums.length},minmax(26px,1fr)) 36px`;
+  const row=(cls,label,cells,tot)=>`<div class="gr-hsc-row ${cls}" style="grid-template-columns:${cols}"><div class="gr-hsc-label">${label}</div>${cells}<div class="gr-hsc-cell gr-hsc-tot">${tot}</div></div>`;
+  const holeCells=holeNums.map(n=>`<div class="gr-hsc-cell gr-hsc-num">${n}</div>`).join('');
   const parCells=holeNums.map(n=>`<div class="gr-hsc-cell gr-hsc-par">${parByHole.has(n)?parByHole.get(n):'—'}</div>`).join('');
   const parSum=holeNums.reduce((s,n)=>s+(parByHole.has(n)?parByHole.get(n):0),0);
-  const scoreCells=holeNums.map(n=>{
+  const grossCells=holeNums.map(n=>{
     const h=playerHoleMap.get(n);
-    if(!h||!finite(h.score))return`<div class="gr-hsc-cell gr-hsc-empty">—</div>`;
+    if(!h||!finite(h.score))return`<div class="gr-hsc-cell gr-hsc-empty">·</div>`;
     const cls=scoreMarkerClass(h.score,h.par??parByHole.get(n));
-    const netBit=showNet&&finite(h.net)?`<span class="gr-hsc-net">${Number(h.net)}</span>`:'';
-    return`<div class="gr-hsc-cell gr-hsc-score ${cls}"><span class="gr-hsc-gross">${Number(h.score)}</span>${netBit}</div>`;
+    return`<div class="gr-hsc-cell gr-hsc-score ${cls}"><span class="gr-hsc-gross">${Number(h.score)}</span></div>`;
   }).join('');
-  const grossSum=holeNums.every(n=>finite(playerHoleMap.get(n)?.score))
-    ? holeNums.reduce((s,n)=>s+Number(playerHoleMap.get(n).score),0)
-    : null;
-  const netSum=showNet&&holeNums.every(n=>finite(playerHoleMap.get(n)?.net))
-    ? holeNums.reduce((s,n)=>s+Number(playerHoleMap.get(n).net),0)
-    : null;
-  const cols=`36px repeat(${holeNums.length},minmax(28px,1fr)) 34px`;
-  return `<div class="gr-hsc-nine">
-    <div class="gr-hsc-row gr-hsc-holes" style="grid-template-columns:${cols}"><div class="gr-hsc-label">Hole</div>${holeNums.map(n=>`<div class="gr-hsc-cell gr-hsc-num">${n}</div>`).join('')}<div class="gr-hsc-cell gr-hsc-tot">${totalLabel}</div></div>
-    <div class="gr-hsc-row gr-hsc-pars" style="grid-template-columns:${cols}"><div class="gr-hsc-label">Par</div>${parCells}<div class="gr-hsc-cell gr-hsc-tot">${parSum||'—'}</div></div>
-    <div class="gr-hsc-row gr-hsc-scores" style="grid-template-columns:${cols}"><div class="gr-hsc-label">Gross</div>${scoreCells}<div class="gr-hsc-cell gr-hsc-tot">${grossSum!=null?grossSum:'—'}${netSum!=null?`<span class="gr-hsc-net-tot">N ${netSum}</span>`:''}</div></div>
+  const grossVals=holeNums.map(n=>playerHoleMap.get(n)?.score).filter(finite);
+  const grossSum=grossVals.length===holeNums.length?grossVals.reduce((s,v)=>s+Number(v),0):null;
+  let netRow='';
+  if(showNet){
+    const netCells=holeNums.map(n=>{
+      const h=playerHoleMap.get(n);
+      const nv=holeNetValue(h,hcp,parByHole);
+      if(!finite(nv))return`<div class="gr-hsc-cell gr-hsc-empty">·</div>`;
+      return`<div class="gr-hsc-cell gr-hsc-netcell">${Number(nv)}</div>`;
+    }).join('');
+    const netVals=holeNums.map(n=>holeNetValue(playerHoleMap.get(n),hcp,parByHole));
+    const netSum=netVals.every(finite)?netVals.reduce((s,v)=>s+Number(v),0):null;
+    netRow=row('gr-hsc-nets','Net',netCells,netSum!=null?netSum:'·');
+  }
+  return `<div class="gr-hsc-nine" aria-label="${totalLabel} nine">
+    ${row('gr-hsc-holes','Hole',holeCells,totalLabel)}
+    ${row('gr-hsc-pars','Par',parCells,parSum||'·')}
+    ${row('gr-hsc-scores','Gross',grossCells,grossSum!=null?grossSum:'·')}
+    ${netRow}
   </div>`;
 }
 
 function holeScoreboardMarkup(p,m,detail){
   const frame=missionHoleFrame(detail);
   if(!frame)return'';
-  const anyHoleNet=frame.players.some(x=>x.s.holes.some(h=>finite(h.net)));
   const cards=frame.players.map(x=>{
     const name=labeledDetailName(p,m,x.r);
     const map=new Map(x.s.holes.map(h=>[h.hole,h]));
     const gross=finite(x.r.gross)?Number(x.r.gross):(x.s.holes.length?x.s.holes.reduce((s,h)=>s+(finite(h.score)?h.score:0),0):null);
     const net=finite(x.r.net)?Number(x.r.net):null;
     const hcp=finite(x.r.handicap)?Number(x.r.handicap):null;
-    const meta=[
-      gross!=null?`Gross ${gross}`:null,
-      net!=null?`Net ${net}`:null,
-      hcp!=null?`HCP ${hcp}`:null
-    ].filter(Boolean).join(' · ');
-    const strips=[
-      nineStripMarkup(frame.front,frame.parByHole,map,{showNet:anyHoleNet}),
-      nineStripMarkup(frame.back,frame.parByHole,map,{showNet:anyHoleNet})
+    const showNet=net!=null||hcp!=null||x.s.holes.some(h=>finite(h.net));
+    const chips=[
+      gross!=null?`<span class="gr-hsc-chip"><em>G</em>${gross}</span>`:'',
+      net!=null?`<span class="gr-hsc-chip"><em>N</em>${net}</span>`:'',
+      hcp!=null?`<span class="gr-hsc-chip"><em>H</em>${hcp}</span>`:''
     ].filter(Boolean).join('');
-    return `<div class="gr-hsc-player"><div class="gr-hsc-player-head"><strong>${esc(name)}</strong>${meta?`<span>${esc(meta)}</span>`:''}</div><div class="gr-hsc-scroll">${strips}</div></div>`;
+    const strips=[
+      nineStripMarkup(frame.front,frame.parByHole,map,{hcp,showNet}),
+      nineStripMarkup(frame.back,frame.parByHole,map,{hcp,showNet})
+    ].filter(Boolean).join('');
+    return `<article class="gr-hsc-card">
+      <header class="gr-hsc-nameplate"><strong>${esc(name)}</strong><div class="gr-hsc-chips">${chips}</div></header>
+      <div class="gr-hsc-paper"><div class="gr-hsc-scroll">${strips}</div></div>
+    </article>`;
   }).join('');
-  return `<section class="gr155-recap-block gr-hsc-board"><div class="gr155-recap-title">HOLE BY HOLE</div><p class="gr-hsc-legend muted">Gross per hole · birdie ○ · bogey □${anyHoleNet?' · net under score':''}</p>${cards}</section>`;
+  return `<section class="gr-hsc-board"><div class="gr-hsc-board-head"><div class="gr155-recap-title">SCORECARD</div><span class="gr-hsc-legend">○ birdie · □ bogey</span></div>${cards}</section>`;
 }
 
 function detailStats(r){
@@ -365,31 +393,73 @@ function installStyles(){
 .gr-mission-photo-thumb{position:relative;width:92px;height:92px;border-radius:12px;overflow:hidden;border:1px solid rgba(212,175,106,.28);background:#14110e}
 .gr-mission-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .gr-mission-photo-thumbs .gr-clubhouse-thumb-actions{position:absolute;inset:auto 0 0 0;display:flex;justify-content:flex-end;padding:5px;background:linear-gradient(transparent,rgba(0,0,0,.78))}
-.gr-hsc-board{margin-top:10px}
-.gr-hsc-legend{font-size:var(--fs-data);margin:0 0 10px;line-height:1.35}
-.gr-hsc-player{border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(16,20,14,.55);padding:10px;margin-top:8px}
-.gr-hsc-player:first-of-type{margin-top:0}
-.gr-hsc-player-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-bottom:8px}
-.gr-hsc-player-head strong{font-size:var(--fs-data);font-weight:900}
-.gr-hsc-player-head span{font-size:var(--fs-data);color:var(--muted);font-weight:700}
-.gr-hsc-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
-.gr-hsc-nine{display:inline-block;min-width:min(100%,420px);margin-right:12px;vertical-align:top}
+.gr-hsc-board{margin-top:12px;display:grid;gap:10px}
+.gr-hsc-board-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:0 2px}
+.gr-hsc-board-head .gr155-recap-title{margin:0}
+.gr-hsc-legend{font-size:var(--fs-data);color:#c4b49a;font-weight:700;letter-spacing:.04em}
+.gr-hsc-card{
+  border-radius:14px;padding:10px 10px 11px;overflow:hidden;
+  border:1px solid rgba(92,64,36,.65);
+  background:
+    linear-gradient(180deg,rgba(255,236,200,.07),transparent 28%),
+    repeating-linear-gradient(90deg,rgba(60,38,20,.18) 0 1px,transparent 1px 7px),
+    linear-gradient(145deg,#5a3d24 0%,#3d2816 42%,#2a1a0f 100%);
+  box-shadow:inset 0 1px 0 rgba(255,220,170,.18),inset 0 -1px 0 rgba(0,0,0,.35),0 10px 22px rgba(0,0,0,.28);
+}
+.gr-hsc-nameplate{display:flex;align-items:center;gap:8px;min-width:0;margin-bottom:8px;padding:0 2px}
+.gr-hsc-nameplate strong{
+  flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--font-display,Cormorant Garamond,Georgia,serif);font-size:var(--fs-subtitle);font-weight:700;
+  color:#f3e2c4;text-shadow:0 1px 0 rgba(0,0,0,.45);letter-spacing:.01em;
+}
+.gr-hsc-chips{display:flex;flex-wrap:nowrap;gap:5px;margin-left:auto;flex:0 0 auto}
+.gr-hsc-chip{
+  display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:999px;
+  background:rgba(20,12,6,.45);border:1px solid rgba(212,175,106,.35);color:#f0e0c4;
+  font-size:var(--fs-data);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;
+}
+.gr-hsc-chip em{font-style:normal;color:#d4af6a;font-size:10px;letter-spacing:.06em;font-weight:900}
+.gr-hsc-paper{
+  border-radius:8px;overflow:hidden;
+  border:1px solid rgba(70,48,28,.55);
+  background:
+    linear-gradient(180deg,rgba(255,248,230,.92),rgba(236,220,188,.9)),
+    repeating-linear-gradient(0deg,transparent,transparent 27px,rgba(120,90,50,.08) 28px);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 1px 0 rgba(0,0,0,.2);
+}
+.gr-hsc-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 6px 7px}
+.gr-hsc-nine{display:inline-block;min-width:min(100%,440px);margin-right:10px;vertical-align:top}
 .gr-hsc-nine:last-child{margin-right:0}
-.gr-hsc-row{display:grid;gap:3px;align-items:center;margin-top:3px;font-variant-numeric:tabular-nums}
-.gr-hsc-label{font-size:var(--fs-data);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:800}
-.gr-hsc-cell{min-height:28px;display:grid;place-items:center;text-align:center;font-size:var(--fs-data);font-weight:800;line-height:1.05}
-.gr-hsc-num{color:#c9b08a;font-weight:900}
-.gr-hsc-par,.gr-hsc-tot{color:var(--muted);font-weight:700}
-.gr-hsc-score{position:relative;color:var(--text);padding:2px}
-.gr-hsc-score.birdie{border:1.5px solid #dfe9e3;border-radius:50%}
-.gr-hsc-score.eagle{border:1.5px solid #dfe9e3;border-radius:50%;box-shadow:0 0 0 2px #101914,0 0 0 3.5px #dfe9e3}
-.gr-hsc-score.bogey{border:1.5px solid #dfe9e3;border-radius:0}
-.gr-hsc-score.double{border:1.5px solid #dfe9e3;border-radius:0;box-shadow:0 0 0 2px #101914,0 0 0 3.5px #dfe9e3}
-.gr-hsc-score.worse{border:1.5px solid #ff8b7a;border-radius:0;box-shadow:0 0 0 2px #101914,0 0 0 3.5px #ff8b7a}
+.gr-hsc-row{display:grid;gap:0;align-items:stretch;font-variant-numeric:tabular-nums;border-bottom:1px solid rgba(90,62,34,.22)}
+.gr-hsc-row:last-child{border-bottom:0}
+.gr-hsc-holes{background:linear-gradient(180deg,#6b4a2c,#4a311c);border-bottom-color:rgba(40,24,12,.5)}
+.gr-hsc-holes .gr-hsc-label,.gr-hsc-holes .gr-hsc-cell{color:#f0ddb8;font-weight:900}
+.gr-hsc-pars{background:rgba(120,90,50,.1)}
+.gr-hsc-nets{background:rgba(80,110,90,.08)}
+.gr-hsc-label{
+  display:flex;align-items:center;padding:0 5px;font-size:10px;text-transform:uppercase;
+  letter-spacing:.05em;font-weight:800;color:#6a4e32;border-right:1px solid rgba(90,62,34,.22);
+}
+.gr-hsc-holes .gr-hsc-label{border-right-color:rgba(255,220,170,.12);color:#e8d3a8}
+.gr-hsc-cell{
+  min-height:24px;display:grid;place-items:center;text-align:center;
+  font-size:var(--fs-data);font-weight:800;line-height:1;color:#2a1c10;
+  border-right:1px solid rgba(90,62,34,.14);padding:2px 1px;
+}
+.gr-hsc-cell:last-child{border-right:0}
+.gr-hsc-num{font-weight:900}
+.gr-hsc-par{color:#6a5538;font-weight:700}
+.gr-hsc-tot{color:#5a4028;font-weight:900;background:rgba(120,90,50,.08)}
+.gr-hsc-holes .gr-hsc-tot{background:rgba(0,0,0,.12);color:#f0ddb8}
+.gr-hsc-score{position:relative;color:#1c140c}
+.gr-hsc-score.birdie{box-shadow:inset 0 0 0 1.5px #2a1c10;border-radius:50%;margin:1px}
+.gr-hsc-score.eagle{box-shadow:inset 0 0 0 1.5px #2a1c10,0 0 0 2px #efe2c4,0 0 0 3.5px #2a1c10;border-radius:50%;margin:1px}
+.gr-hsc-score.bogey{box-shadow:inset 0 0 0 1.5px #2a1c10;border-radius:0;margin:1px}
+.gr-hsc-score.double{box-shadow:inset 0 0 0 1.5px #2a1c10,0 0 0 2px #efe2c4,0 0 0 3.5px #2a1c10;border-radius:0;margin:1px}
+.gr-hsc-score.worse{box-shadow:inset 0 0 0 1.5px #8a3020,0 0 0 2px #efe2c4,0 0 0 3.5px #8a3020;border-radius:0;margin:1px;color:#7a2818}
 .gr-hsc-gross{display:block}
-.gr-hsc-net{display:block;font-size:10px;font-weight:700;color:#b8a4d9;margin-top:1px;line-height:1}
-.gr-hsc-net-tot{display:block;font-size:10px;color:#b8a4d9;font-weight:700;margin-top:1px}
-.gr-hsc-empty{color:rgba(255,255,255,.25)}
+.gr-hsc-netcell{color:#3d5a48;font-weight:800}
+.gr-hsc-empty{color:rgba(60,40,20,.28);font-weight:700}
 @media(max-width:700px){
   .gr155-recap-grid{grid-template-columns:1fr}
   .gr155-recap-block{padding:11px}
@@ -397,8 +467,10 @@ function installStyles(){
   .grstd-head,.grstd-row{grid-template-columns:minmax(0,1fr) 44px 54px 56px;column-gap:6px}
   .grstd-row{font-size:var(--fs-data)}
   .gr-mission-photo-thumb{width:78px;height:78px}
-  .gr-hsc-row{gap:2px}
-  .gr-hsc-cell{min-height:26px}
+  .gr-hsc-card{padding:8px}
+  .gr-hsc-cell{min-height:22px;font-size:var(--fs-data)}
+  .gr-hsc-nameplate{gap:6px}
+  .gr-hsc-chip{padding:2px 6px}
 }
 `;
   document.head.appendChild(s);
