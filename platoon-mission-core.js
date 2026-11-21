@@ -135,6 +135,10 @@ function prepareMissionDraft(input,opts={}){
       try{mission.guests=(JSON.parse(hit[1])||[]).map(g=>String(g||'').trim()).filter(Boolean)}catch{mission.guests=[]}
     }else mission.guests=[];
   }
+  const cleanPhotos=arr=>(Array.isArray(arr)?arr:[]).filter(x=>x&&x.dataUrl).slice(0,3);
+  if(Array.isArray(existing?.photos))mission.photos=cleanPhotos(existing.photos);
+  if(Array.isArray(input?.photos))mission.photos=cleanPhotos(input.photos);
+  else if(!Array.isArray(mission.photos))mission.photos=cleanPhotos(existing?.photos);
   return {ok:true,mission};
 }
 
@@ -325,7 +329,8 @@ function buildCompletedMissionFromImport(input){
     status:'completed',
     participants:[...new Set((input?.participants||[]).map(String))],
     guests:guestList,
-    results
+    results,
+    photos:(Array.isArray(input?.photos)?input.photos:[]).filter(x=>x&&x.dataUrl).slice(0,3)
   };
   const story=String(input?.recap_note||input?.notes||'').trim();
   if(story)mission.recap_note=story;
@@ -395,7 +400,7 @@ function guestsFromMission(m){
 }
 
 function wittyPreviewBrief(p,m,{course,cadets,guests,prior,rivals,eagleNames}){
-  const field=[...cadets,...guests.map(g=>`${g} (guest)`)];
+  const field=[...cadets,...guests.map(g=>`${g} (Guest)`)];
   const n=field.length;
   const courseBit=course||'wherever the GPS gives up';
   const open=n
@@ -569,7 +574,9 @@ function warStandings(p,war){
       const mem=canon(p,r.player_name);
       const name=mem?.name||r.player_name||'Player';
       const key=mem?.id||String(name).toLowerCase();
-      const row=map.get(key)||{id:key,name,played:0,points:0,net:0,gross:0,nets:[],grosses:[]};
+      const guest=!mem&&(typeof window.grIsGuestPlayer==='function'?window.grIsGuestPlayer(p,m,r.player_name):true);
+      const row=map.get(key)||{id:key,name,guest:!!guest,played:0,points:0,net:0,gross:0,nets:[],grosses:[]};
+      if(guest)row.guest=true;
       row.played+=1;
       row.points+=Number(r.raw_points||0);
       if(finite(r.net)){row.net+=Number(r.net);row.nets.push(Number(r.net))}
@@ -579,6 +586,7 @@ function warStandings(p,war){
   }
   const rows=[...map.values()].map(r=>({
     ...r,
+    guest:!!r.guest,
     avgNet:r.nets.length?r.net/r.nets.length:null,
     avgGross:r.grosses.length?r.gross/r.grosses.length:null
   }));

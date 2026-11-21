@@ -105,11 +105,32 @@ function courseSelectMarkup(currentName,currentId){
   }catch{}
   return `<select id="grMCourse" class="gr-mission-select"><option value="">Select course…</option>${opts.join('')}<option value="__gr_add_course__">＋ Add new course…</option></select>`;
 }
-function formatSelectMarkup(current){
-  const cur=String(current||'Stroke play (net)').trim();
+function mapImportFormat(raw){
+  const s=String(raw||'').trim();
+  if(!s)return 'Stroke play (net)';
+  if(MISSION_FORMATS.includes(s))return s;
+  const n=s.toLowerCase().replace(/\s+/g,' ');
+  if(/stroke/.test(n)&&(/\bgross\b|\(g\)/.test(n)))return 'Stroke play (gross)';
+  if(/stroke/.test(n)&&(/\bnet\b|\(n\)/.test(n)))return 'Stroke play (net)';
+  if(/^stroke\s*play$/.test(n)||n==='stroke')return 'Stroke play (net)';
+  if(/stableford/.test(n))return 'Stableford';
+  if(/match/.test(n))return 'Match play';
+  if(/best.?ball|fourball|four.?ball/.test(n))return 'Best Ball / Fourball';
+  if(/scramble/.test(n))return 'Scramble';
+  if(/alternate|foursome/.test(n))return 'Alternate Shot / Foursomes';
+  if(/skins/.test(n))return 'Skins';
+  if(/nassau/.test(n))return 'Nassau';
+  if(/wolf/.test(n))return 'Wolf';
+  if(/\bpoints\b/.test(n))return 'Points';
+  return s;
+}
+function formatSelectMarkup(current,ids={}){
+  const pickId=ids.pickId||'grMFormatPick';
+  const otherId=ids.otherId||'grMFormatOther';
+  const cur=mapImportFormat(current||'Stroke play (net)');
   const known=MISSION_FORMATS.includes(cur);
   const opts=MISSION_FORMATS.map(f=>`<option value="${E(f)}" ${(known?cur===f:(f==='Other'))?'selected':''}>${E(f)}</option>`).join('');
-  return `<select id="grMFormatPick" class="gr-mission-select">${opts}</select><input id="grMFormatOther" class="gr-format-other" style="${known?'display:none':''}" value="${E(known?'':cur)}" placeholder="Custom format">`;
+  return `<select id="${E(pickId)}" class="gr-mission-select">${opts}</select><input id="${E(otherId)}" class="gr-format-other" style="${known?'display:none':''}" value="${E(known?'':cur)}" placeholder="Custom format">`;
 }
 function resolveCourseSelection(raw){
   const v=String(raw||'').trim();
@@ -125,11 +146,31 @@ function resolveCourseSelection(raw){
   if(v.startsWith('name:'))return {courseId:'',locationName:v.slice(5)};
   return {courseId:'',locationName:v};
 }
-function readMissionFormat(root){
-  const pick=root.querySelector('#grMFormatPick')?.value||'';
-  if(pick==='Other')return String(root.querySelector('#grMFormatOther')?.value||'').trim()||'Other';
+function readMissionFormat(root,ids={}){
+  const pickId=ids.pickId||'grMFormatPick';
+  const otherId=ids.otherId||'grMFormatOther';
+  const pick=root.querySelector('#'+pickId)?.value||'';
+  if(pick==='Other')return String(root.querySelector('#'+otherId)?.value||'').trim()||'Other';
   return pick;
 }
+function wireFormatSelect(root,ids={},onChange){
+  const pickId=ids.pickId||'grMFormatPick';
+  const otherId=ids.otherId||'grMFormatOther';
+  const pick=root.querySelector('#'+pickId);
+  const other=root.querySelector('#'+otherId);
+  const sync=()=>{
+    if(other)other.style.display=pick?.value==='Other'?'block':'none';
+    onChange?.(readMissionFormat(root,ids));
+  };
+  pick?.addEventListener('change',sync);
+  other?.addEventListener('input',()=>onChange?.(readMissionFormat(root,ids)));
+  sync();
+}
+window.grMissionFormats=MISSION_FORMATS;
+window.grMapImportFormat=mapImportFormat;
+window.grFormatSelectMarkup=formatSelectMarkup;
+window.grReadMissionFormat=readMissionFormat;
+window.grWireFormatSelect=wireFormatSelect;
 function slugifyCourse(s){return String(s||'course').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48)||'course'}
 function ensureCourseInDb({name,tees,holes,par,rating,slope}){
   if(typeof db==='undefined'||!Array.isArray(db.courses))return null;
@@ -177,6 +218,26 @@ function composeNotes(base,guests=[],warId='',warEnd=''){let s=cleanNotes(base);
 function membersOf(p){return (p.members||[]).filter(m=>m.status!=='inactive')}
 function playersOf(p,m){const map=new Map(membersOf(p).map(x=>[x.id,x.name]));return (m.participants||[]).map(id=>map.get(id)).filter(Boolean)}
 function peopleOf(p,m){return [...playersOf(p,m).map(name=>({name,guest:false})),...guestsOf(m).map(name=>({name,guest:true}))]}
+function isGuestPlayer(p,m,raw){
+  const rawName=String(raw||'').trim();
+  if(!rawName)return false;
+  if(typeof window.grCanonicalMember==='function'&&window.grCanonicalMember(p,rawName))return false;
+  const n=rawName.toLowerCase();
+  if(guestsOf(m).some(g=>String(g||'').trim().toLowerCase()===n))return true;
+  const pool=typeof window.grGuestPoolOf==='function'?window.grGuestPoolOf(p):[];
+  for(const g of pool){
+    const vals=[g?.name,...(Array.isArray(g?.aliases)?g.aliases:[])].map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+    if(vals.includes(n))return true;
+  }
+  return false;
+}
+function formatPlayerLabel(p,m,raw){
+  const base=typeof window.grDisplayName==='function'?window.grDisplayName(p,raw):(raw||'Player');
+  return isGuestPlayer(p,m,raw)?`${base} (Guest)`:base;
+}
+window.grGuestsOf=guestsOf;
+window.grIsGuestPlayer=isGuestPlayer;
+window.grFormatPlayerLabel=formatPlayerLabel;
 function courseLabel(v){return typeof window.grCleanCourseName==='function'?window.grCleanCourseName(v):(v||'Course TBD')}
 function phaseOf(m){return typeof window.grMissionPhase==='function'?window.grMissionPhase(m):(m.status==='completed'?'completed':m.status==='ready'?'ready':'draft')}
 function statusTag(m){
@@ -246,30 +307,32 @@ function missionActions(m,warId){
 function missionCard(p,m,featured=false){
   const people=peopleOf(p,m),pre=previewFor(p,m),warId=warIdOf(m),phase=phaseOf(m);
   const showPrev=phase==='ready'||phase==='in_progress';
-  return `<div class="gr-mission ${featured?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}</div></div><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' · GUEST':''}</span>`).join('')}</div>${showPrev?previewMarkup(pre):''}${phase==='completed'?`<div class="gr-summary gr-summary-compact">${missionSummaryMarkup(m)}</div>`:''}${missionActions(m,warId)}</div>`;
+  return `<div class="gr-mission ${featured?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}</div></div><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div>${showPrev?previewMarkup(pre):''}${phase==='completed'?`<div class="gr-summary gr-summary-compact">${missionSummaryMarkup(m)}</div>`:''}${missionActions(m,warId)}</div>`;
 }
 
 function completedMissionAccordion(p,m,open=false){
   const people=peopleOf(p,m),warId=warIdOf(m),phase=phaseOf(m);
-  return `<details class="gr-mission gr-mission-accordion ${open?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}" ${open?'open':''}><summary class="gr-mission-accordion-sum"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}</div></div></summary><div class="gr-mission-accordion-body"><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' · GUEST':''}</span>`).join('')}</div><div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>${missionActions(m,warId)}</div></details>`;
+  return `<details class="gr-mission gr-mission-accordion ${open?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}" ${open?'open':''}><summary class="gr-mission-accordion-sum"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}</div></div></summary><div class="gr-mission-accordion-body"><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div><div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>${missionActions(m,warId)}</div></details>`;
 }
 
 function leaderboard(p,war){
   if(typeof window.grWarStandings==='function'){
     const ws=window.grWarStandings(p,war);
-    return {mode:ws.mode,rows:ws.rows.map(r=>({name:r.name,played:r.played,points:r.points,avgNet:r.avgNet,avgGross:r.avgGross}))};
+    return {mode:ws.mode,rows:ws.rows.map(r=>({name:r.name,guest:!!r.guest,played:r.played,points:r.points,avgNet:r.avgNet,avgGross:r.avgGross}))};
   }
   const kids=(p.missions||[]).filter(m=>m.type!=='war'&&warIdOf(m)===war.id&&m.status==='completed');
   const map=new Map();
   for(const m of kids)for(const r of (m.results||[])){
-    const k=r.player_name||'Player',x=map.get(k)||{name:k,played:0,points:0,net:0,gross:0,nc:0,gc:0};
+    const k=r.player_name||'Player',guest=isGuestPlayer(p,m,r.player_name);
+    const x=map.get(k)||{name:k,guest:false,played:0,points:0,net:0,gross:0,nc:0,gc:0};
+    if(guest)x.guest=true;
     x.played++;x.points+=Number(r.raw_points||0);
     if(Number.isFinite(Number(r.net))){x.net+=Number(r.net);x.nc++}
     if(Number.isFinite(Number(r.gross))){x.gross+=Number(r.gross);x.gc++}
     map.set(k,x);
   }
   const mode=String(war.format||'Points').toLowerCase();
-  const rows=[...map.values()].map(r=>({name:r.name,played:r.played,points:r.points,avgNet:r.nc?r.net/r.nc:null,avgGross:r.gc?r.gross/r.gc:null}));
+  const rows=[...map.values()].map(r=>({name:r.name,guest:!!r.guest,played:r.played,points:r.points,avgNet:r.nc?r.net/r.nc:null,avgGross:r.gc?r.gross/r.gc:null}));
   rows.sort((a,b)=>mode.includes('net')?(a.avgNet??999)-(b.avgNet??999):mode.includes('gross')?(a.avgGross??999)-(b.avgGross??999):b.points-a.points);
   return {mode,rows};
 }
@@ -284,7 +347,7 @@ function warCard(p,w){
   const mode=String(w.format||'Points');
   const avgHead=mode.toLowerCase().includes('gross')?'Avg G':'Avg N';
   const rows=board.rows||[];
-  const table=rows.length?`<div class="gr-war-standings-label">War Standings</div><table class="gr-leaderboard"><thead><tr><th>Player</th><th>Played</th><th>Pts</th><th>${avgHead}</th></tr></thead><tbody>${rows.map((r,i)=>{const avg=mode.toLowerCase().includes('gross')?(r.avgGross!=null?Math.round(r.avgGross*10)/10:'—'):(r.avgNet!=null?Math.round(r.avgNet*10)/10:'—');return `<tr><td>${i+1}. ${E(r.name)}</td><td>${r.played||0}</td><td>${r.points||0}</td><td>${avg}</td></tr>`}).join('')}</tbody></table>`:'';
+  const table=rows.length?`<div class="gr-war-standings-label">War Standings</div><table class="gr-leaderboard"><thead><tr><th>Player</th><th>Played</th><th>Pts</th><th>${avgHead}</th></tr></thead><tbody>${rows.map((r,i)=>{const avg=mode.toLowerCase().includes('gross')?(r.avgGross!=null?Math.round(r.avgGross*10)/10:'—'):(r.avgNet!=null?Math.round(r.avgNet*10)/10:'—');const guestBit=r.guest?' (Guest)':'';return `<tr><td>${i+1}. ${E(r.name)}${guestBit}</td><td>${r.played||0}</td><td>${r.points||0}</td><td>${avg}</td></tr>`}).join('')}</tbody></table>`:'';
   return `<div class="card gr-war-card"><div class="gr-war-head"><div><div class="eyebrow">WAR</div><h3>${E(w.title||'War')}</h3><div class="muted" style="font-size:var(--fs-data)">${done} of ${kids.length} Missions complete${warEndOf(w)?` · through ${E(fmtDate(warEndOf(w)))}`:''} · ${E(mode)}</div></div><span class="gr-tag gr-war">${done===kids.length&&kids.length?'COMPLETE':'ACTIVE'}</span></div><div class="gr-progress"><span style="width:${pct}%"></span></div>${table}<div class="gr-mini-actions"><button class="button primary" onclick="grOpenMissionEditor('','${E(w.id)}')">+ Mission</button><button class="button secondary" onclick="grOpenWarEditor('${E(w.id)}')">Edit War</button></div><div class="gr-stack" style="margin-top:9px"><div class="gr-war-standings-label">Mission Results</div>${kids.map(m=>missionCard(p,m,false)).join('')||'<div class="muted" style="font-size:var(--fs-data)">No Missions yet.</div>'}</div></div>`;
 }
 
@@ -531,6 +594,62 @@ function writeClubhousePhotosSide(p,photos){
     return false;
   }
 }
+const MISSION_PHOTOS_KEY='golfreconMissionPhotosV1';
+const MISSION_PHOTOS_MAX=3;
+function missionPhotosStorageKey(p,missionId){
+  return `${MISSION_PHOTOS_KEY}:${String(p?.id||p?.serverId||'local')}:${String(missionId||'')}`;
+}
+function cleanMissionPhotos(photos){
+  return (Array.isArray(photos)?photos:[]).filter(x=>x&&x.dataUrl).slice(0,MISSION_PHOTOS_MAX);
+}
+function readMissionPhotosSide(p,missionId){
+  try{
+    const raw=localStorage.getItem(missionPhotosStorageKey(p,missionId));
+    const arr=raw?JSON.parse(raw):[];
+    return cleanMissionPhotos(arr);
+  }catch{return []}
+}
+function writeMissionPhotosSide(p,missionId,photos){
+  try{
+    const clean=cleanMissionPhotos(photos);
+    const key=missionPhotosStorageKey(p,missionId);
+    if(!clean.length){localStorage.removeItem(key);return true}
+    localStorage.setItem(key,JSON.stringify(clean));
+    return true;
+  }catch(e){
+    console.warn('Mission photo side-store failed',e);
+    return false;
+  }
+}
+function missionPhotosOf(p,m){
+  let photos=cleanMissionPhotos(m?.photos);
+  if(!photos.length&&m?.id){
+    const side=readMissionPhotosSide(p,m.id);
+    if(side.length){
+      photos=side;
+      if(m)m.photos=side;
+    }
+  }
+  return photos;
+}
+function renderMissionPhotoThumbs(photos,{editable=false}={}){
+  if(!photos.length)return editable?'<div class="muted" style="font-size:var(--fs-data)">No mission photos yet (max 3).</div>':'';
+  return `<div class="gr-mission-photo-thumbs">${photos.map((ph,i)=>`<div class="gr-mission-photo-thumb" data-photo-id="${E(ph.id||i)}"><img src="${String(ph.dataUrl||'').replace(/"/g,'')}" alt="Mission photo ${i+1}">${editable?`<div class="gr-clubhouse-thumb-actions"><button type="button" class="gr-clubhouse-thumb-del" data-del-mission-photo="${E(ph.id||i)}" title="Remove">✕</button></div>`:''}</div>`).join('')}</div>`;
+}
+function preserveMissionPhotosOnSync(serverP,localP){
+  const localMissions=Array.isArray(localP?.missions)?localP.missions:[];
+  for(const sm of (serverP?.missions||[])){
+    if(!sm||sm.type==='war'||!sm.id)continue;
+    const lm=localMissions.find(x=>String(x.id)===String(sm.id));
+    const localPhotos=cleanMissionPhotos(lm?.photos);
+    const serverPhotos=cleanMissionPhotos(sm.photos);
+    if(!serverPhotos.length&&localPhotos.length)sm.photos=localPhotos;
+    else if(!serverPhotos.length){
+      const side=readMissionPhotosSide(localP||serverP,sm.id);
+      if(side.length)sm.photos=side;
+    }
+  }
+}
 /** Server snapshots do not include clubhousePhotos yet — never let sync wipe them. */
 function preserveClientPlatoonFields(serverP,localP){
   if(!serverP)return localP||serverP;
@@ -542,10 +661,16 @@ function preserveClientPlatoonFields(serverP,localP){
     if(side.length)serverP.clubhousePhotos=side;
   }
   if(!serverP.logoData&&localP?.logoData)serverP.logoData=localP.logoData;
+  preserveMissionPhotosOnSync(serverP,localP);
   return serverP;
 }
 window.grPreserveClientPlatoonFields=preserveClientPlatoonFields;
 window.grWriteClubhousePhotosSide=writeClubhousePhotosSide;
+window.grMissionPhotosMax=MISSION_PHOTOS_MAX;
+window.grMissionPhotosOf=missionPhotosOf;
+window.grWriteMissionPhotosSide=writeMissionPhotosSide;
+window.grCleanMissionPhotos=cleanMissionPhotos;
+window.grRenderMissionPhotoThumbs=renderMissionPhotoThumbs;
 
 function clubhousePhotosOf(p){
   let photos=Array.isArray(p?.clubhousePhotos)?p.clubhousePhotos.filter(x=>x&&x.dataUrl).slice(0,8):[];
@@ -817,9 +942,67 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
       <div class="gr-guest-list" id="grGuests"></div>
     </label>
     <label>Notes<textarea id="grMNotes" rows="2" placeholder="Optional">${E(baseNotes)}</textarea></label>
+    <div class="gr-mission-photos-setup">
+      <div class="eyebrow" style="margin-top:10px">MISSION PHOTOS</div>
+      <p class="muted" style="font-size:var(--fs-data);margin:4px 0 6px">Up to 3 shots for the Mission summary / After Action. HEIC converts on device.</p>
+      <div id="grMPhotoThumbs"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px">
+        <label class="gr-logo-upload" style="margin:0;cursor:pointer"><strong>📷 Add photos</strong><input id="grMPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple></label>
+        <button class="button secondary" id="grMPhotoClear" type="button" hidden>Clear</button>
+      </div>
+      <div id="grMPhotoStatus" class="muted" style="font-size:var(--fs-data);margin-top:4px"></div>
+    </div>
     <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grMSave">Save Mission</button></div>`);
 
   let guests=[...gs].map(g=>String(g||'').trim()).filter(Boolean);
+  let missionPhotos=missionPhotosOf(p,m||{id:id||'',photos:opts.photos}).map(x=>({...x}));
+  const photoThumbs=d.querySelector('#grMPhotoThumbs');
+  const photoClear=d.querySelector('#grMPhotoClear');
+  const photoStatus=d.querySelector('#grMPhotoStatus');
+  const refreshMissionPhotos=()=>{
+    if(photoThumbs)photoThumbs.innerHTML=renderMissionPhotoThumbs(missionPhotos,{editable:true});
+    if(photoClear)photoClear.hidden=!missionPhotos.length;
+  };
+  refreshMissionPhotos();
+  d.querySelector('#grMPhotos')?.addEventListener('change',async e=>{
+    const files=[...(e.target.files||[])];
+    e.target.value='';
+    if(!files.length)return;
+    let added=0,failed=0,hitMax=false;
+    if(photoStatus)photoStatus.textContent='Adding photos…';
+    for(const f of files){
+      if(missionPhotos.length>=MISSION_PHOTOS_MAX){hitMax=true;break}
+      try{
+        const dataUrl=await compressImageFile(f,{max:960,quality:.62});
+        missionPhotos.push({id:`mph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,dataUrl,createdAt:new Date().toISOString()});
+        added++;
+        refreshMissionPhotos();
+      }catch(err){
+        failed++;
+        console.warn('Mission photo skipped',f?.name,err);
+      }
+    }
+    if(photoStatus){
+      if(hitMax&&!added)photoStatus.textContent=`Max ${MISSION_PHOTOS_MAX} mission photos.`;
+      else if(added&&failed)photoStatus.textContent=`Added ${added}. Skipped ${failed}.`;
+      else if(failed&&!added)photoStatus.textContent=`Couldn't read ${failed} photo${failed===1?'':'s'}. Try JPG.`;
+      else if(added)photoStatus.textContent=`Added ${added} photo${added===1?'':'s'}.`;
+      else photoStatus.textContent='';
+    }
+  });
+  photoClear?.addEventListener('click',()=>{
+    if(!missionPhotos.length)return;
+    if(!confirm(`Remove all ${missionPhotos.length} mission photo${missionPhotos.length===1?'':'s'}?`))return;
+    missionPhotos=[];
+    refreshMissionPhotos();
+    if(photoStatus)photoStatus.textContent='';
+  });
+  photoThumbs?.addEventListener('click',e=>{
+    const del=e.target.closest('[data-del-mission-photo]');
+    if(!del)return;
+    missionPhotos=missionPhotos.filter(x=>String(x.id)!==String(del.getAttribute('data-del-mission-photo')));
+    refreshMissionPhotos();
+  });
   const poolOf=()=>typeof window.grGuestPoolOf==='function'?window.grGuestPoolOf(p):[];
   const drawGuests=()=>{
     d.querySelector('#grGuests').innerHTML=guests.map((g,i)=>`<span class="gr-guest-pill">${E(g)} <button type="button" data-rmguest="${i}">✕</button></span>`).join('');
@@ -991,7 +1174,9 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
       if(keep.length)obj.notes+=`${obj.notes?'\n':''}${keep.join('\n')}`;
     }else obj.notes=composed;
     obj.courseId=resolved.courseId||obj.courseId||'';
+    obj.photos=cleanMissionPhotos(missionPhotos);
     if(typeof window.grUpsertMission==='function')window.grUpsertMission(p,obj);else if(!m)p.missions.push(obj);else Object.assign(m,obj);
+    writeMissionPhotosSide(p,obj.id,obj.photos);
     savePlatoonLocal(p);closeModal();
   };
 };
