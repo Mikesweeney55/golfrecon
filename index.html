@@ -4038,7 +4038,7 @@ function myGame(){
  <div class="section-head"><div><div class="eyebrow">CLUB MEMORY</div><h2>On-course distances</h2></div></div>
  <div class="card">${db.clubStats.map(x=>`<div class="round-row"><div><strong>${x.club}</strong></div><div class="score-big">${x.distance}</div><div class="muted">yds</div></div>`).join('')}</div>`;
 }
-function selectRoundFromBar(id,{toggle=true}={}){
+function selectRoundFromBar(id,{toggle=true,scrollTo=false}={}){
  // Accordion: one open scorecard at a time. Same-row click collapses.
  const next=toggle&&String(state.selectedRoundId)===String(id)?null:id;
  if(String(state.selectedRoundId)===String(next))return;
@@ -4047,7 +4047,13 @@ function selectRoundFromBar(id,{toggle=true}={}){
  if(state.view!=='rounds')return;
  render();
  requestAnimationFrame(()=>{
-   window.scrollTo(0,keepY);
+   if(scrollTo&&next){
+     const row=document.querySelector(`[data-round-row="${next}"]`);
+     const expand=document.querySelector(`[data-round-expand="${next}"]`);
+     (expand||row)?.scrollIntoView({behavior:'smooth',block:'center'});
+   }else{
+     window.scrollTo(0,keepY);
+   }
    if(typeof window.grSyncScorecardScrollHints==='function')window.grSyncScorecardScrollHints();
  });
 }
@@ -4079,7 +4085,10 @@ function render(){
 
  document.querySelectorAll('[data-round-stat]').forEach(b=>b.addEventListener('click',()=>{state.roundStat=b.dataset.roundStat;render()}));
  document.querySelectorAll('[data-round-filter]').forEach(b=>b.addEventListener('click',()=>{state.roundFilter=b.dataset.roundFilter;state.selectedRoundId=null;render()}));
- document.querySelectorAll('[data-round-bar]').forEach(b=>{b.addEventListener('click',()=>selectRoundFromBar(b.dataset.roundBar,{toggle:true}));b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectRoundFromBar(b.dataset.roundBar,{toggle:true})}})});
+ document.querySelectorAll('[data-round-bar]').forEach(b=>{
+   b.addEventListener('click',()=>selectRoundFromBar(b.dataset.roundBar,{toggle:true,scrollTo:true}));
+   b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectRoundFromBar(b.dataset.roundBar,{toggle:true,scrollTo:true})}});
+ });
  const roundList=document.querySelector('[data-round-list]');
  if(roundList){
    roundList.addEventListener('click',e=>{
