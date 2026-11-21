@@ -37,7 +37,7 @@ function matchSelectHtml(p,roster,r){
   const gHit=findGuest(p,r.player_name);
   const memberOpts=roster.map(x=>`<option value="member:${esc(x.id)}" ${m?.id===x.id?'selected':''}>${esc(x.name)}</option>`).join('');
   const pool=guestPool(p);
-  const guestOpts=pool.map(g=>`<option value="guest:${esc(g.id)}" ${(!m&&gHit&&gHit.id===g.id)?'selected':''}>${esc(g.name)} (guest)</option>`).join('');
+  const guestOpts=pool.map(g=>`<option value="guest:${esc(g.id)}" ${(!m&&gHit&&gHit.id===g.id)?'selected':''}>${esc(g.name)} (Guest)</option>`).join('');
   return `<select data-match>
     <option value="">Choose player…</option>
     <optgroup label="Members">${memberOpts||'<option value="" disabled>No members</option>'}</optgroup>
@@ -65,7 +65,7 @@ function refreshGuestOptions(root,p){
     for(const g of pool){
       const o=document.createElement('option');
       o.value=`guest:${g.id}`;
-      o.textContent=`${g.name} (guest)`;
+      o.textContent=`${g.name} (Guest)`;
       og.appendChild(o);
     }
   });
@@ -138,9 +138,55 @@ async function openImport(){
       const teeMarkup=typeof window.grTeeTimeWheelMarkup==='function'
         ? window.grTeeTimeWheelMarkup('grPastTime',(ev.tee_time||'').slice(0,5))
         : `<input id="grPastTime" class="gr-datetime gr-time-picker" type="time" step="600" value="${esc((ev.tee_time||'').slice(0,5))}" inputmode="none" autocomplete="off">`;
-      out.innerHTML=`<div class="platoon-notice" style="margin-top:12px"><strong>Confirm before creating.</strong><br>Edit anything the screenshots did not capture correctly. Use <strong>Add as guest</strong> for non-members — they go in the guest pool.</div><div class="grid two"><label>Mission name<input id="grPastTitle" value="${esc(ev.title||'Past Mission')}"></label><label>Date<input id="grPastDate" class="gr-datetime gr-date-picker" type="date" value="${esc(ev.date||'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sun">Next Sun</button></div></label><label>Tee time <span class="muted" style="font-weight:600">(10 min)</span>${teeMarkup}</label><label>Format<input id="grPastFormat" value="${esc(ev.format||'Stroke Play')}"></label></div><label>Course<input id="grPastCourse" value="${esc(cleanCourseName(ev.course_name||''))}"></label><div style="margin-top:14px"><div class="eyebrow">PLAYERS & RESULTS</div>${results.map((r,i)=>{const hc=finite(r.handicap)?`HCP ${Number(r.handicap)}`:'';const holeN=Array.isArray(r.holes)?r.holes.filter(h=>finite(h?.score)).length:0;const holeBit=holeN?`${holeN} holes`:'no holes yet';return `<div class="gr-past-result" data-i="${i}" style="border:1px solid var(--line);border-radius:12px;padding:9px;margin-top:7px"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><strong>${esc(r.player_name||'Player')}${hc?` <span class="muted" style="font-weight:600">· ${hc}</span>`:''}</strong><span>${finite(r.net)?`Net ${Number(r.net)}`:'Net —'} · ${finite(r.gross)?`Gross ${Number(r.gross)}`:'Gross —'}${finite(r.raw_points)?` · ${Number(r.raw_points)} pts`:''} · ${holeBit}</span></div><label style="margin-top:7px">Match to Platoon player${matchSelectHtml(p,roster,r)}</label></div>`}).join('')}</div>${Array.isArray(parsed?.warnings)&&parsed.warnings.length?`<div class="platoon-notice" style="margin-top:10px">${parsed.warnings.map(x=>esc(x)).join('<br>')}</div>`:''}<div class="dialog-actions"><button class="button secondary" id="grPastBack" type="button">Back</button><button class="button primary" id="grPastCreate" type="button">Create Completed Mission</button></div>`;
+      const formatIds={pickId:'grPastFormatPick',otherId:'grPastFormatOther'};
+      const formatMarkup=typeof window.grFormatSelectMarkup==='function'
+        ? window.grFormatSelectMarkup(ev.format||'Stroke Play',formatIds)
+        : `<input id="grPastFormat" value="${esc(ev.format||'Stroke Play')}">`;
+      let missionPhotos=[];
+      const photoMax=Number(window.grMissionPhotosMax)||3;
+      out.innerHTML=`<div class="platoon-notice" style="margin-top:12px"><strong>Confirm before creating.</strong><br>Edit anything the screenshots did not capture correctly. Use <strong>Add as guest</strong> for non-members — they go in the guest pool.</div><div class="grid two"><label>Mission name<input id="grPastTitle" value="${esc(ev.title||'Past Mission')}"></label><label>Date<input id="grPastDate" class="gr-datetime gr-date-picker" type="date" value="${esc(ev.date||'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sun">Next Sun</button></div></label><label>Tee time <span class="muted" style="font-weight:600">(10 min)</span>${teeMarkup}</label><label>Format${formatMarkup}</label></div><label>Course<input id="grPastCourse" value="${esc(cleanCourseName(ev.course_name||''))}"></label><div class="gr-mission-photos-setup" style="margin-top:12px"><div class="eyebrow">MISSION PHOTOS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 6px">Optional — up to ${photoMax} for the Mission summary.</p><div id="grPastPhotoThumbs"></div><label class="gr-logo-upload" style="margin:6px 0 0;cursor:pointer;display:inline-block"><strong>📷 Add photos</strong><input id="grPastPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple></label><div id="grPastPhotoStatus" class="muted" style="font-size:var(--fs-data);margin-top:4px"></div></div><div style="margin-top:14px"><div class="eyebrow">PLAYERS & RESULTS</div>${results.map((r,i)=>{const hc=finite(r.handicap)?`HCP ${Number(r.handicap)}`:'';const holeN=Array.isArray(r.holes)?r.holes.filter(h=>finite(h?.score)).length:0;const holeBit=holeN?`${holeN} holes`:'no holes yet';return `<div class="gr-past-result" data-i="${i}" style="border:1px solid var(--line);border-radius:12px;padding:9px;margin-top:7px"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><strong>${esc(r.player_name||'Player')}${hc?` <span class="muted" style="font-weight:600">· ${hc}</span>`:''}</strong><span>${finite(r.net)?`Net ${Number(r.net)}`:'Net —'} · ${finite(r.gross)?`Gross ${Number(r.gross)}`:'Gross —'}${finite(r.raw_points)?` · ${Number(r.raw_points)} pts`:''} · ${holeBit}</span></div><label style="margin-top:7px">Match to Platoon player${matchSelectHtml(p,roster,r)}</label></div>`}).join('')}</div>${Array.isArray(parsed?.warnings)&&parsed.warnings.length?`<div class="platoon-notice" style="margin-top:10px">${parsed.warnings.map(x=>esc(x)).join('<br>')}</div>`:''}<div class="dialog-actions"><button class="button secondary" id="grPastBack" type="button">Back</button><button class="button primary" id="grPastCreate" type="button">Create Completed Mission</button></div>`;
       btn.style.display='none';
       if(typeof window.grWireTeeTimeWheel==='function')window.grWireTeeTimeWheel(out,'grPastTime');
+      if(typeof window.grWireFormatSelect==='function')window.grWireFormatSelect(out,formatIds);
+      const photoThumbs=out.querySelector('#grPastPhotoThumbs');
+      const photoStatus=out.querySelector('#grPastPhotoStatus');
+      const refreshPastPhotos=()=>{
+        if(photoThumbs)photoThumbs.innerHTML=typeof window.grRenderMissionPhotoThumbs==='function'
+          ? window.grRenderMissionPhotoThumbs(missionPhotos,{editable:true})
+          : '';
+      };
+      refreshPastPhotos();
+      out.querySelector('#grPastPhotos')?.addEventListener('change',async e=>{
+        const files=[...(e.target.files||[])];
+        e.target.value='';
+        if(!files.length)return;
+        const compress=typeof window.grCompressImageFile==='function'?window.grCompressImageFile:null;
+        if(!compress){if(photoStatus)photoStatus.textContent='Photo upload unavailable.';return}
+        let added=0,failed=0,hitMax=false;
+        if(photoStatus)photoStatus.textContent='Adding photos…';
+        for(const f of files){
+          if(missionPhotos.length>=photoMax){hitMax=true;break}
+          try{
+            const dataUrl=await compress(f,{max:960,quality:.62});
+            missionPhotos.push({id:`mph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,dataUrl,createdAt:new Date().toISOString()});
+            added++;
+            refreshPastPhotos();
+          }catch(err){failed++;console.warn('Past import photo skipped',f?.name,err)}
+        }
+        if(photoStatus){
+          if(hitMax&&!added)photoStatus.textContent=`Max ${photoMax} mission photos.`;
+          else if(added&&failed)photoStatus.textContent=`Added ${added}. Skipped ${failed}.`;
+          else if(failed&&!added)photoStatus.textContent=`Couldn't read ${failed} photo${failed===1?'':'s'}. Try JPG.`;
+          else if(added)photoStatus.textContent=`Added ${added} photo${added===1?'':'s'}.`;
+          else photoStatus.textContent='';
+        }
+      });
+      photoThumbs?.addEventListener('click',e=>{
+        const del=e.target.closest('[data-del-mission-photo]');
+        if(!del)return;
+        missionPhotos=missionPhotos.filter(x=>String(x.id)!==String(del.getAttribute('data-del-mission-photo')));
+        refreshPastPhotos();
+      });
       out.querySelectorAll('[data-match]').forEach(sel=>{
         sel.addEventListener('change',()=>{
           if(sel.value!=='__add_guest__')return;
@@ -169,7 +215,9 @@ async function openImport(){
         const date=out.querySelector('#grPastDate').value;
         const teeTime=out.querySelector('#grPastTime').value;
         const locationName=out.querySelector('#grPastCourse').value.trim()||'Course TBD';
-        const format=out.querySelector('#grPastFormat').value.trim()||'Stroke Play';
+        const format=typeof window.grReadMissionFormat==='function'
+          ? (window.grReadMissionFormat(out,formatIds)||'Stroke play (net)')
+          : (out.querySelector('#grPastFormat')?.value.trim()||'Stroke Play');
         if(!date)return alert('Confirm the round date before creating the Mission.');
         const participants=[],guests=[],saved=[];
         const pool=guestPool(p);
@@ -200,9 +248,10 @@ async function openImport(){
         }
         const story=d.querySelector('#grPastStory')?.value.trim()||'';
         const guestList=[...new Set(guests.map(g=>String(g||'').trim()).filter(Boolean))];
+        const photos=(typeof window.grCleanMissionPhotos==='function'?window.grCleanMissionPhotos(missionPhotos):missionPhotos.slice(0,photoMax));
         const built=typeof window.grBuildCompletedMissionFromImport==='function'
-          ? window.grBuildCompletedMissionFromImport({id:uid(),date,teeTime,locationName,title,format,notes:story,recap_note:story,participants,guests:guestList,results:saved})
-          : {ok:true,mission:{id:uid(),date,teeTime,type:'battle',courseId:'',locationName,title,format,notes:story,status:'completed',participants:[...new Set(participants)],guests:guestList,results:saved,recap_note:story||undefined}};
+          ? window.grBuildCompletedMissionFromImport({id:uid(),date,teeTime,locationName,title,format,notes:story,recap_note:story,participants,guests:guestList,results:saved,photos})
+          : {ok:true,mission:{id:uid(),date,teeTime,type:'battle',courseId:'',locationName,title,format,notes:story,status:'completed',participants:[...new Set(participants)],guests:guestList,results:saved,photos,recap_note:story||undefined}};
         if(!built.ok){alert(built.error||'Could not create Mission.');return}
         const mission=built.mission;
         if(guestList.length){
@@ -211,8 +260,10 @@ async function openImport(){
             mission.notes=`${mission.notes||''}${mission.notes?'\n':''}[[GR_GUESTS:${JSON.stringify(guestList)}]]`;
           }
         }
+        mission.photos=photos;
         if(typeof window.grUpsertMission==='function')window.grUpsertMission(p,mission);
         else{p.missions=p.missions||[];p.missions.push(mission)}
+        if(typeof window.grWriteMissionPhotosSide==='function')window.grWriteMissionPhotosSide(p,mission.id,photos);
         // Hole seeds → After Action / birdie-eagle tracking + personal claim (blank fields only).
         if(typeof window.grAttachScorecardSeeds==='function')window.grAttachScorecardSeeds(mission,p);
         let claimed=0;

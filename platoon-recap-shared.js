@@ -52,6 +52,35 @@ function detailDisplayName(p,r){
   return memberById(p,r?.hole_detail_canonical_id)?.name||displayName(p,r?.player_name);
 }
 
+function guestsOfMission(m){
+  if(typeof window.grGuestsOf==='function')return window.grGuestsOf(m)||[];
+  if(Array.isArray(m?.guests)&&m.guests.length)return m.guests.map(g=>String(g||'').trim()).filter(Boolean);
+  const hit=String(m?.notes||'').match(/\[\[GR_GUESTS:([\s\S]*?)\]\]/);
+  if(!hit)return[];
+  try{return (JSON.parse(hit[1])||[]).map(g=>String(g||'').trim()).filter(Boolean)}catch{return[]}
+}
+
+function isGuestName(p,m,raw){
+  if(typeof window.grIsGuestPlayer==='function')return window.grIsGuestPlayer(p,m,raw);
+  const rawName=String(raw||'').trim();
+  if(!rawName)return false;
+  if(canonicalMember(p,rawName))return false;
+  const n=norm(rawName);
+  return guestsOfMission(m).some(g=>norm(g)===n);
+}
+
+function labeledName(p,m,raw){
+  if(typeof window.grFormatPlayerLabel==='function')return window.grFormatPlayerLabel(p,m,raw);
+  const base=displayName(p,raw);
+  return isGuestName(p,m,raw)?`${base} (Guest)`:base;
+}
+
+function labeledDetailName(p,m,r){
+  const base=detailDisplayName(p,r);
+  const raw=r?.player_name||base;
+  return isGuestName(p,m,raw)?`${base} (Guest)`:base;
+}
+
 function cleanCourseName(v){
   let s=String(v||'').replace(/\s+/g,' ').trim();
   if(!s)return'Course TBD';
@@ -128,8 +157,12 @@ function detailLow(detail,getter){
   return detail.filter(x=>getter(x)===best);
 }
 
-function namesOf(p,rows,useDetail=false){
-  return rows.map(x=>useDetail?detailDisplayName(p,x.r||x):displayName(p,(x.r||x).player_name)).join(' & ');
+function namesOf(p,rows,useDetail=false,m=null){
+  return rows.map(x=>{
+    if(useDetail)return m?labeledDetailName(p,m,x.r||x):detailDisplayName(p,x.r||x);
+    const raw=(x.r||x).player_name;
+    return m?labeledName(p,m,raw):displayName(p,raw);
+  }).join(' & ');
 }
 
 function missionHighlights(p,m,rows,detail){
@@ -151,22 +184,22 @@ function afterActionLines(p,m,rows,detail,hi){
   if(hi.net.length){
     const score=Number(hi.net[0].net);
     if(hi.net.length>1){
-      lines.push(`${namesOf(p,hi.net)} finished dead even at net ${score}. Nobody gets to talk too much.`);
+      lines.push(`${namesOf(p,hi.net,false,m)} finished dead even at net ${score}. Nobody gets to talk too much.`);
     }else{
       const runner=rows.filter(r=>finite(r.net)&&r!==hi.net[0]).sort((a,b)=>Number(a.net)-Number(b.net))[0];
       const margin=runner?Number(runner.net)-score:null;
-      lines.push(`${displayName(p,hi.net[0].player_name)} grabbed low net at ${score}${margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${displayName(p,runner.player_name)}`:''}. Mission accomplished; complaints can wait until the parking lot.`);
+      lines.push(`${labeledName(p,m,hi.net[0].player_name)} grabbed low net at ${score}${margin>0?`, ${margin} shot${margin===1?'':'s'} clear of ${labeledName(p,m,runner.player_name)}`:''}. Mission accomplished; complaints can wait until the parking lot.`);
     }
   }
   if(hi.birds.length){
-    const birdBits=hi.birds.map(x=>`${detailDisplayName(p,x.r)} struck on ${x.s.birds.map(h=>`#${h.hole}`).join(', ')}`).join('; ');
+    const birdBits=hi.birds.map(x=>`${labeledDetailName(p,m,x.r)} struck on ${x.s.birds.map(h=>`#${h.hole}`).join(', ')}`).join('; ');
     lines.push(`${birdBits}.${hi.birds.length>1?' Birdie belt stays in the case — nobody gets it outright.':''}`);
   }
   if(hi.back.length){
-    lines.push(`${namesOf(p,hi.back,true)} closed the strongest with a ${hi.back[0].s.back} on the back. Somebody finally read the mission brief.`);
+    lines.push(`${namesOf(p,hi.back,true,m)} closed the strongest with a ${hi.back[0].s.back} on the back. Somebody finally read the mission brief.`);
   }
   if(hi.clean.length){
-    lines.push(`${namesOf(p,hi.clean,true)} kept the card most civilized with ${hi.clean[0].s.doubles.length} double-or-worse hole${hi.clean[0].s.doubles.length===1?'':'s'}.`);
+    lines.push(`${namesOf(p,hi.clean,true,m)} kept the card most civilized with ${hi.clean[0].s.doubles.length} double-or-worse hole${hi.clean[0].s.doubles.length===1?'':'s'}.`);
   }
   if(!detail.some(x=>x.s.holes.length)){
     lines.push('Hole-by-hole detail is still limited, so this recap stays with the official results.');
@@ -181,20 +214,28 @@ function standingsTableMarkup(p,m){
     const net=finite(r.net)?Number(r.net):'—';
     const gross=finite(r.gross)?Number(r.gross):'—';
     const pts=finite(r.raw_points)?Number(r.raw_points):0;
-    return `<div class="grstd-row"><div class="grstd-name"><b>${pos}</b><span>${esc(displayName(p,r.player_name))}</span></div><div>${net}</div><div>${gross}</div><div>${pts}</div></div>`;
+    return `<div class="grstd-row"><div class="grstd-name"><b>${pos}</b><span>${esc(labeledName(p,m,r.player_name))}</span></div><div>${net}</div><div>${gross}</div><div>${pts}</div></div>`;
   }).join('')||'<div class="grstd-empty">No results yet.</div>';
   return `<div class="grstd-table"><div class="grstd-head"><div>NAME</div><div>NET</div><div>GROSS</div><div>POINTS</div></div>${body}</div>`;
 }
 
-function highlightsMarkup(p,hi){
+function highlightsMarkup(p,hi,m=null){
   const items=[];
-  if(hi.net.length)items.push(`<div class="gr155-recap-hi"><span>Low Net</span><strong>${esc(namesOf(p,hi.net))} · ${Number(hi.net[0].net)}</strong></div>`);
-  if(hi.gross.length)items.push(`<div class="gr155-recap-hi"><span>Low Gross</span><strong>${esc(namesOf(p,hi.gross))} · ${Number(hi.gross[0].gross)}</strong></div>`);
-  if(hi.birds.length)items.push(`<div class="gr155-recap-hi"><span>Birdies</span><strong>${esc(namesOf(p,hi.birds,true))} · ${hi.birds[0].s.birds.length}</strong></div>`);
-  if(hi.back.length)items.push(`<div class="gr155-recap-hi"><span>Best Back 9</span><strong>${esc(namesOf(p,hi.back,true))} · ${hi.back[0].s.back}</strong></div>`);
-  if(hi.topPoints.length)items.push(`<div class="gr155-recap-hi"><span>Points</span><strong>${esc(displayName(p,hi.topPoints[0].player_name))} · ${Number(hi.topPoints[0].raw_points)}</strong></div>`);
-  if(hi.eagles.length)items.push(`<div class="gr155-recap-hi"><span>Eagles</span><strong>${esc(displayName(p,hi.eagles[0].player_name))} · ${Number(hi.eagles[0].eagle_count)}</strong></div>`);
+  if(hi.net.length)items.push(`<div class="gr155-recap-hi"><span>Low Net</span><strong>${esc(namesOf(p,hi.net,false,m))} · ${Number(hi.net[0].net)}</strong></div>`);
+  if(hi.gross.length)items.push(`<div class="gr155-recap-hi"><span>Low Gross</span><strong>${esc(namesOf(p,hi.gross,false,m))} · ${Number(hi.gross[0].gross)}</strong></div>`);
+  if(hi.birds.length)items.push(`<div class="gr155-recap-hi"><span>Birdies</span><strong>${esc(namesOf(p,hi.birds,true,m))} · ${hi.birds[0].s.birds.length}</strong></div>`);
+  if(hi.back.length)items.push(`<div class="gr155-recap-hi"><span>Best Back 9</span><strong>${esc(namesOf(p,hi.back,true,m))} · ${hi.back[0].s.back}</strong></div>`);
+  if(hi.topPoints.length)items.push(`<div class="gr155-recap-hi"><span>Points</span><strong>${esc(labeledName(p,m||{},hi.topPoints[0].player_name))} · ${Number(hi.topPoints[0].raw_points)}</strong></div>`);
+  if(hi.eagles.length)items.push(`<div class="gr155-recap-hi"><span>Eagles</span><strong>${esc(labeledName(p,m||{},hi.eagles[0].player_name))} · ${Number(hi.eagles[0].eagle_count)}</strong></div>`);
   return items.join('')||'<div class="gr155-empty">No confirmed highlights yet.</div>';
+}
+
+function missionPhotosMarkup(p,m){
+  const photos=typeof window.grMissionPhotosOf==='function'
+    ? window.grMissionPhotosOf(p,m)
+    : (Array.isArray(m?.photos)?m.photos:[]).filter(x=>x&&x.dataUrl).slice(0,3);
+  if(!photos.length)return '';
+  return `<section class="gr155-recap-block gr155-recap-photos"><div class="gr155-recap-title">MISSION PHOTOS</div><div class="gr-mission-photo-strip">${photos.map((ph,i)=>`<div class="gr-mission-photo-thumb"><img src="${String(ph.dataUrl||'').replace(/"/g,'')}" alt="Mission photo ${i+1}"></div>`).join('')}</div></section>`;
 }
 
 function afterActionMarkup(lines){
@@ -213,7 +254,7 @@ function missionRecapMarkup(p,m){
   const detail=rows.map(r=>({r,s:detailStats(r)}));
   const hi=missionHighlights(p,source,rows,detail);
   const intel=afterActionLines(p,source,rows,detail,hi);
-  return `<div class="gr155-recap-grid" data-gr-shared-recap="1"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsTableMarkup(p,source)}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${highlightsMarkup(p,hi)}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${afterActionMarkup(intel)}</section></div>`;
+  return `${missionPhotosMarkup(p,source)}<div class="gr155-recap-grid" data-gr-shared-recap="1"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsTableMarkup(p,source)}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${highlightsMarkup(p,hi,source)}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${afterActionMarkup(intel)}</section></div>`;
 }
 
 function installStyles(){
@@ -239,12 +280,18 @@ function installStyles(){
 .gr155-recap-hi strong{display:block;font-size:var(--fs-data);margin-top:2px}
 .gr155-recap-copy p{font-size:var(--fs-data);line-height:1.4;margin:0 0 8px;color:#dce6e1}
 .gr155-recap-copy p:last-child{margin-bottom:0}
+.gr155-recap-photos{margin-top:10px}
+.gr-mission-photo-strip,.gr-mission-photo-thumbs{display:flex;flex-wrap:wrap;gap:8px}
+.gr-mission-photo-thumb{position:relative;width:92px;height:92px;border-radius:12px;overflow:hidden;border:1px solid rgba(212,175,106,.28);background:#14110e}
+.gr-mission-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.gr-mission-photo-thumbs .gr-clubhouse-thumb-actions{position:absolute;inset:auto 0 0 0;display:flex;justify-content:flex-end;padding:5px;background:linear-gradient(transparent,rgba(0,0,0,.78))}
 @media(max-width:700px){
   .gr155-recap-grid{grid-template-columns:1fr}
   .gr155-recap-block{padding:11px}
   .gr155-recap-copy p{font-size:var(--fs-data)}
   .grstd-head,.grstd-row{grid-template-columns:minmax(0,1fr) 44px 54px 56px;column-gap:6px}
   .grstd-row{font-size:var(--fs-data)}
+  .gr-mission-photo-thumb{width:78px;height:78px}
 }
 `;
   document.head.appendChild(s);

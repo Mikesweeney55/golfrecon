@@ -133,6 +133,10 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
 .gr-clubhouse-thumb-actions{position:absolute;inset:auto 0 0 0;display:flex;gap:4px;padding:5px;background:linear-gradient(transparent,rgba(0,0,0,.78))}
 .gr-clubhouse-thumb-replace{flex:1;border:0;border-radius:7px;background:rgba(212,175,106,.92);color:#1a140c;font-size:var(--fs-data);font-weight:800;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;padding:5px 4px;line-height:1}
 .gr-clubhouse-thumb-del{flex:0 0 24px;border:0;border-radius:7px;background:rgba(255,255,255,.14);color:#fff;font-size:var(--fs-data);cursor:pointer;line-height:1}
+.gr-mission-photo-thumbs,.gr-mission-photo-strip{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.gr-mission-photo-thumb{position:relative;width:88px;height:88px;border-radius:12px;overflow:hidden;border:1px solid rgba(212,175,106,.28);background:#14110e}
+.gr-mission-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.gr-mission-photos-setup .gr-logo-upload input{display:none}
 @media(max-width:700px){
   .gr-clubhouse-hero{
     grid-template-columns:1fr auto;
