@@ -325,10 +325,19 @@ function renderClubhousePhotoThumbs(photos){
   if(!photos.length)return '<div class="muted" style="font-size:11px">No platoon photos yet — stock course shots still rotate.</div>';
   return `<div class="gr-clubhouse-thumbs">${photos.map(ph=>`<div class="gr-clubhouse-thumb" data-photo-id="${E(ph.id)}"><img src="${E(ph.dataUrl)}" alt=""><button type="button" class="gr-clubhouse-thumb-del" data-del-photo="${E(ph.id)}" title="Remove">✕</button></div>`).join('')}</div>`;
 }
+function setupAliasesOf(m){
+  if(typeof window.grAliasesOf==='function')return window.grAliasesOf(m);
+  let a=[];
+  if(Array.isArray(m?.aliases))a=m.aliases;
+  else if(typeof m?.aliases==='string')a=m.aliases.split(/[,|]/);
+  else if(typeof m?.nickname==='string')a=m.nickname.split(/[,|]/);
+  return [...new Set(a.map(x=>String(x||'').trim()).filter(Boolean))];
+}
 
 window.grOpenSetup=()=>{
   const p=loadPlatoonLocal();
   let photos=clubhousePhotosOf(p).map(x=>({...x}));
+  p.members=Array.isArray(p.members)?p.members:[];
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <label>Name<input id="grPName" value="${E(p.name||'')}"></label>
     <label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label>
@@ -343,9 +352,23 @@ window.grOpenSetup=()=>{
       <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
       <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin-top:8px;cursor:pointer"><strong>📷 Add clubhouse photos</strong><span class="muted" style="display:block;font-size:10px;margin-top:4px;font-weight:600">Tap to choose from camera roll · JPG/PNG</span><input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
     </div>
-    <div class="dialog-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);
+    <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
+      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:10px">Names used for screenshot recognition. Recognition names can be comma-separated.</div></div>
+      <button class="button secondary" id="grAddRoster" type="button">+ Player</button>
+    </div>
+    <div id="grRosterRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
+    <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);
   const thumbs=d.querySelector('#grClubhouseThumbs');
+  const roster=d.querySelector('#grRosterRows');
   const refreshThumbs=()=>{thumbs.innerHTML=renderClubhousePhotoThumbs(photos)};
+  const drawRoster=()=>{
+    roster.innerHTML=(p.members||[]).map((m,i)=>`<div class="gr155-roster-row" data-i="${i}" style="display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px"><label style="margin-top:0">Name<input data-name value="${E(m.name||'')}"></label><label style="margin-top:0">Recognize as<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label></div>`).join('');
+  };
+  drawRoster();
+  d.querySelector('#grAddRoster').onclick=()=>{
+    p.members.push({id:'cadet-'+Date.now(),name:'New Player',role:'cadet',linked:false,aliases:[]});
+    drawRoster();
+  };
   d.querySelector('#grPLogo').onchange=async e=>{
     const f=e.target.files?.[0];if(!f)return;
     try{d.dataset.logo=await compressImageFile(f,{max:256,quality:.82})}catch(err){alert(err.message||'Logo upload failed')}
@@ -375,11 +398,18 @@ window.grOpenSetup=()=>{
     p.visibility=d.querySelector('#grPVis').value;
     if(d.dataset.logo)p.logoData=d.dataset.logo;
     p.clubhousePhotos=photos.slice(0,8);
+    [...roster.querySelectorAll('.gr155-roster-row')].forEach(row=>{
+      const m=p.members[Number(row.dataset.i)];if(!m)return;
+      m.name=row.querySelector('[data-name]').value.trim()||m.name;
+      m.aliases=row.querySelector('[data-alias]').value.split(',').map(x=>x.trim()).filter(Boolean);
+      m.nickname=m.aliases.join(', ');
+    });
     savePlatoonLocal(p);
     if(typeof window.grRefreshAtmos==='function')window.grRefreshAtmos();
     closeModal();
   };
 };
+window.grCompressImageFile=compressImageFile;
 
 window.grOpenMissionEditor=(id='',warId='',opts={})=>{
   const p=loadPlatoonLocal();
