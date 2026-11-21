@@ -609,7 +609,7 @@ function recordRowHtml(p,r){
     <label>Notes<input data-f="notes" value="${esc(r.notes||'')}"></label>
     <label class="gr-hq-check"><input data-f="overrideAuto" type="checkbox" ${r.overrideAuto?'checked':''}> Override automatic display for this category</label>
     ${r.reviewFlag?'<div class="gr-hq-flag-line">⚑ Possible duplicate of an automatic result — review before saving.</div>':''}
-    <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-rec="${esc(r.id)}">Delete</button><span class="muted" style="font-size:10px">Manual</span></div>
+    <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-rec="${esc(r.id)}">Delete</button><span class="muted" style="font-size:var(--fs-data)">Manual</span></div>
   </div>`;
 }
 
@@ -625,10 +625,10 @@ function eagleHistoryHtml(p,meta){
     const who=resolvePlayer(p,e.memberId,e.playerName).playerName||e.playerName||'Player';
     const where=[e.course,e.hole!=null?`Hole ${e.hole}`:'',e.date?fmtDate(e.date):''].filter(Boolean).join(' · ');
     return `<div class="gr-eagle-hist" data-eg-id="${esc(e.id)}">
-      <div><strong>${esc(who)}</strong><div class="muted" style="font-size:11px">${esc(where||'Details TBD')}</div></div>
+      <div><strong>${esc(who)}</strong><div class="muted" style="font-size:var(--fs-data)">${esc(where||'Details TBD')}</div></div>
       <div class="gr-eagle-hist-actions">
-        <button type="button" class="button secondary" data-edit-eg="${esc(e.id)}" style="padding:6px 8px;font-size:10px">Edit</button>
-        <button type="button" class="button secondary" data-del-eg="${esc(e.id)}" style="padding:6px 8px;font-size:10px">Delete</button>
+        <button type="button" class="button secondary" data-edit-eg="${esc(e.id)}" style="padding:6px 8px;font-size:var(--fs-data)">Edit</button>
+        <button type="button" class="button secondary" data-del-eg="${esc(e.id)}" style="padding:6px 8px;font-size:var(--fs-data)">Delete</button>
       </div>
     </div>`;
   }).join('');
@@ -668,7 +668,7 @@ function openEaglesEditor(opts={}){
   const dlgFn=typeof platoonDialog==='function'?platoonDialog:null;
   if(!dlgFn){alert('Editor unavailable.');return}
   const d=dlgFn(`<div class="dialog-head"><div><div class="eyebrow">CLUB EAGLE</div><h2 style="margin:5px 0 0">Player eagle totals</h2></div><button class="icon-button" type="button" onclick="closePlatoonDialog()">✕</button></div>
-    <p class="muted" style="font-size:12px;margin:8px 0 0">Each cadet keeps their own running total. Log a new eagle below — previous ones stay in History, not in the form.</p>
+    <p class="muted" style="font-size:var(--fs-data);margin:8px 0 0">Each cadet keeps their own running total. Log a new eagle below — previous ones stay in History, not in the form.</p>
     <div class="eyebrow" style="margin-top:14px">RUNNING TOTALS</div>
     <div id="grEgTotals">${eagleTotalsStripHtml(p)}</div>
     <div id="grEgFormWrap" style="margin-top:14px">${blankEagleFormHtml(p)}</div>
@@ -676,7 +676,7 @@ function openEaglesEditor(opts={}){
     <div id="grEgHistory" class="gr-eagle-history">${eagleHistoryHtml(p,meta)}</div>
     <details class="gr-eagle-advanced" style="margin-top:16px">
       <summary>Starting balances (optional)</summary>
-      <p class="muted" style="font-size:11px">Use this for historical eagles before Golf Recon — not for logging a new one.</p>
+      <p class="muted" style="font-size:var(--fs-data)">Use this for historical eagles before Golf Recon — not for logging a new one.</p>
       <div id="grHqBalList" class="gr-hq-editor-list">${(meta.eagleBalances||[]).map(b=>balanceRowHtml(p,b)).join('')||'<div class="gr155-empty">None yet.</div>'}</div>
       <button class="button secondary" type="button" id="grHqBalAdd">+ Starting balance</button>
       <button class="button secondary" type="button" id="grHqBalSave" style="margin-left:6px">Save balances</button>
@@ -817,7 +817,7 @@ function balanceRowHtml(p,b){
       ${dateFieldHtml('asOfDate',b.asOfDate,'As-of date')}
     </div>
     <label>Notes<input data-f="notes" value="${esc(b.notes||'')}"></label>
-    <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-bal="${esc(b.id)}">Remove</button><span class="muted" style="font-size:10px">Starting balance</span></div>
+    <div class="gr-hq-row-actions"><button type="button" class="button secondary" data-del-bal="${esc(b.id)}">Remove</button><span class="muted" style="font-size:var(--fs-data)">Starting balance</span></div>
   </div>`;
 }
 
@@ -826,10 +826,10 @@ function installStyles(){
   if(!s){s=document.createElement('style');s.id='grHqRecStyles';document.head.appendChild(s)}
   s.textContent=`
   .gr-hq-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .gr-hq-edit{border:1px solid rgba(212,175,106,.4);background:rgba(212,175,106,.1);color:var(--accent,#d4af6a);border-radius:8px;width:28px;height:28px;padding:0;cursor:pointer;font-size:14px;line-height:1}
+  .gr-hq-edit{border:1px solid rgba(212,175,106,.4);background:rgba(212,175,106,.1);color:var(--accent,#d4af6a);border-radius:8px;width:28px;height:28px;padding:0;cursor:pointer;font-size:var(--fs-data);line-height:1}
   .gr-hq-edit:hover{background:rgba(212,175,106,.2)}
-  .gr-hq-add-eg{padding:6px 9px!important;font-size:var(--fs-data,13px)!important;font-weight:700!important}
-  .gr-hq-mode-tag{margin-top:8px;font-size:var(--fs-subtitle,15px);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;font-family:var(--font-stencil,Oswald,sans-serif)}
+  .gr-hq-add-eg{padding:6px 9px!important;font-size:var(--fs-data)!important;font-weight:700!important}
+  .gr-hq-mode-tag{margin-top:8px;font-size:var(--fs-subtitle);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;font-family:var(--font-stencil,Oswald,sans-serif)}
   .gr-hq-src{font-style:normal;font-weight:700;opacity:.75;margin-left:4px;text-transform:none;letter-spacing:0}
   .gr-hq-flag{color:#ffcf68;font-style:normal}
   .gr-hq-flag-line,.gr-hq-review small{color:#ffcf68}
@@ -838,12 +838,12 @@ function installStyles(){
   #platoonDynamicDialog .dialog-card{overflow-y:auto;-webkit-overflow-scrolling:touch}
   #platoonDynamicDialog .sticky-actions{position:sticky;bottom:0;z-index:6}
   .gr-hq-edit-row label{margin-top:6px}
-  .gr-hq-check{display:flex!important;align-items:center;gap:8px;flex-direction:row!important;font-size:var(--fs-data,13px)}
+  .gr-hq-check{display:flex!important;align-items:center;gap:8px;flex-direction:row!important;font-size:var(--fs-data)}
   .gr-hq-check input{width:auto}
   .gr-hq-row-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-  .gr-hq-msg{margin-top:10px;padding:8px 10px;border-radius:10px;font-size:var(--fs-data,13px)}
+  .gr-hq-msg{margin-top:10px;padding:8px 10px;border-radius:10px;font-size:var(--fs-data)}
   .gr-hq-msg.err{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.25);color:#ff9b96}
-  .gr-hq-modes label{font-size:var(--fs-data,13px)}
+  .gr-hq-modes label{font-size:var(--fs-data)}
   .gr-honor-card{position:relative;overflow:hidden;border-color:rgba(212,175,106,.28)!important;background:linear-gradient(160deg,rgba(48,40,24,.5),rgba(14,12,10,.55))!important;box-shadow:0 16px 36px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,248,235,.1)!important}
   .gr-clubhouse-board{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px!important;margin-top:12px;align-items:start}
   .gr-eagle-stack{display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -852,42 +852,42 @@ function installStyles(){
   .gr-honor-birdies-card{background:radial-gradient(circle at 92% -10%,rgba(111,143,90,.22),transparent 42%),linear-gradient(160deg,rgba(28,40,24,.55),rgba(12,12,10,.58))!important}
   .gr-honor-ace-card{background:radial-gradient(circle at 90% -10%,rgba(212,175,106,.14),transparent 40%),linear-gradient(160deg,rgba(36,32,20,.5),rgba(12,12,10,.55))!important}
   .gr-honor-ace-compact{padding:10px 12px!important}
-  .gr-honor-ace-compact .gr-honor-mark{width:36px;height:36px;font-size:18px}
-  .gr-honor-ace-compact .gr-honor-sub{font-size:var(--fs-data,13px)}
+  .gr-honor-ace-compact .gr-honor-mark{width:36px;height:36px;font-size:var(--fs-subtitle)}
+  .gr-honor-ace-compact .gr-honor-sub{font-size:var(--fs-data)}
   .gr-honor-records-card{background:radial-gradient(circle at 92% -10%,rgba(111,143,90,.18),transparent 42%),linear-gradient(160deg,rgba(36,40,24,.52),rgba(12,12,10,.58))!important}
   .gr-honor-lockup{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-  .gr-honor-mark{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:24px;border:1px solid rgba(212,175,106,.4);background:radial-gradient(circle at 35% 30%,rgba(255,248,235,.16),rgba(212,175,106,.08) 45%,rgba(14,12,10,.55));box-shadow:0 0 18px rgba(212,175,106,.18),inset 0 1px 0 rgba(255,248,235,.2);flex:0 0 auto}
+  .gr-honor-mark{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:var(--fs-title);border:1px solid rgba(212,175,106,.4);background:radial-gradient(circle at 35% 30%,rgba(255,248,235,.16),rgba(212,175,106,.08) 45%,rgba(14,12,10,.55));box-shadow:0 0 18px rgba(212,175,106,.18),inset 0 1px 0 rgba(255,248,235,.2);flex:0 0 auto}
   .gr-honor-mark.gr-honor-eagle,.gr-honor-mark.gr-honor-standings{animation:grHonorPulse 2.8s ease-in-out infinite}
   .gr-honor-copy{flex:1 1 auto;min-width:0}
-  .gr-honor-sub{font-size:var(--fs-data,13px);font-weight:600;color:#e8dcc4;margin-top:2px}
+  .gr-honor-sub{font-size:var(--fs-data);font-weight:600;color:#e8dcc4;margin-top:2px}
   .gr-honor-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}
   .gr-eagle-spotlight{display:grid;gap:1px;padding:10px 10px 9px;margin:2px 0 8px;border-radius:12px;border:1px solid rgba(212,175,106,.35);background:linear-gradient(135deg,rgba(212,175,106,.18),rgba(20,16,10,.35));box-shadow:inset 0 1px 0 rgba(255,248,235,.12),0 10px 24px rgba(0,0,0,.2)}
   .gr-birdies-spotlight{border-color:rgba(111,143,90,.4);background:linear-gradient(135deg,rgba(111,143,90,.2),rgba(16,20,14,.35))}
   .gr-standings-spotlight{border-color:rgba(212,175,106,.45)}
-  .gr-eagle-spotlight-label{font-size:var(--fs-subtitle,15px);letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-family:var(--font-stencil,Oswald,sans-serif);color:var(--accent,#d4af6a)}
-  .gr-eagle-spotlight-name{font-size:var(--fs-title,22px);font-weight:600;font-family:var(--font-display,Cormorant Garamond,serif);line-height:1.15;color:#fff6e8;text-shadow:0 1px 10px rgba(0,0,0,.35)}
-  .gr-eagle-spotlight-count{font-size:var(--fs-title,22px);font-weight:600;font-family:var(--font-display,Cormorant Garamond,serif);color:var(--accent,#d4af6a);line-height:1;margin-top:3px;text-shadow:0 0 18px rgba(212,175,106,.25)}
-  .gr-eagle-spotlight-count span{font-size:var(--fs-subtitle,15px);font-weight:700;margin-left:5px;color:#dce6e1;letter-spacing:0;font-family:var(--font-body,Source Sans 3,sans-serif)}
-  .gr-eagle-board-label{font-size:var(--fs-subtitle,15px);letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-family:var(--font-stencil,Oswald,sans-serif);color:var(--muted);margin:8px 0 4px}
-  .gr-eagle-total,.gr-birdie-total,.gr-standings-pts{font-size:var(--fs-title,22px)!important;font-weight:600!important;font-family:var(--font-display,Cormorant Garamond,serif)!important;color:var(--accent,#d4af6a)!important;text-shadow:0 0 12px rgba(212,175,106,.25)}
+  .gr-eagle-spotlight-label{font-size:var(--fs-subtitle);letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-family:var(--font-stencil,Oswald,sans-serif);color:var(--accent,#d4af6a)}
+  .gr-eagle-spotlight-name{font-size:var(--fs-title);font-weight:600;font-family:var(--font-display,Cormorant Garamond,serif);line-height:1.15;color:#fff6e8;text-shadow:0 1px 10px rgba(0,0,0,.35)}
+  .gr-eagle-spotlight-count{font-size:var(--fs-title);font-weight:600;font-family:var(--font-display,Cormorant Garamond,serif);color:var(--accent,#d4af6a);line-height:1;margin-top:3px;text-shadow:0 0 18px rgba(212,175,106,.25)}
+  .gr-eagle-spotlight-count span{font-size:var(--fs-subtitle);font-weight:700;margin-left:5px;color:#dce6e1;letter-spacing:0;font-family:var(--font-body,Source Sans 3,sans-serif)}
+  .gr-eagle-board-label{font-size:var(--fs-subtitle);letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-family:var(--font-stencil,Oswald,sans-serif);color:var(--muted);margin:8px 0 4px}
+  .gr-eagle-total,.gr-birdie-total,.gr-standings-pts{font-size:var(--fs-title)!important;font-weight:600!important;font-family:var(--font-display,Cormorant Garamond,serif)!important;color:var(--accent,#d4af6a)!important;text-shadow:0 0 12px rgba(212,175,106,.25)}
   .gr-birdie-total{color:#c5e6a8!important;text-shadow:0 0 12px rgba(111,143,90,.3)}
-  .gr-eagle-meta{display:block;font-size:var(--fs-data,13px);font-weight:600;color:#c5d4cd;margin-top:2px;letter-spacing:0;text-transform:none}
-  .gr-eagle-pip{font-size:14px;opacity:.9}
+  .gr-eagle-meta{display:block;font-size:var(--fs-data);font-weight:600;color:#c5d4cd;margin-top:2px;letter-spacing:0;text-transform:none}
+  .gr-eagle-pip{font-size:var(--fs-data);opacity:.9}
   .gr155-eagle-row.is-lead,.gr-birdie-row.is-lead,.gr-standings-row.is-lead{background:rgba(212,175,106,.08);border-radius:8px;padding-left:6px;padding-right:6px;margin:0 -6px}
   .gr-eagle-live{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
   .gr-eagle-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid rgba(212,175,106,.3);background:rgba(212,175,106,.1)}
-  .gr-eagle-chip strong{color:var(--accent);font-size:var(--fs-subtitle,15px)}
+  .gr-eagle-chip strong{color:var(--accent);font-size:var(--fs-subtitle)}
   .gr-eagle-history{display:grid;gap:8px;margin-top:8px}
   .gr-eagle-hist{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(16,20,16,.45)}
   .gr-eagle-hist-actions{display:flex;gap:6px}
   .gr-eagle-advanced{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;background:rgba(10,12,10,.35)}
-  .gr-eagle-advanced summary{cursor:pointer;font-weight:700;font-size:var(--fs-data,13px);color:var(--accent)}
-  .gr-record-flash strong{font-size:var(--fs-subtitle,15px)!important;color:#fff6e8}
+  .gr-eagle-advanced summary{cursor:pointer;font-weight:700;font-size:var(--fs-data);color:var(--accent)}
+  .gr-record-flash strong{font-size:var(--fs-subtitle)!important;color:#fff6e8}
   .gr-ace-row{padding:6px 0!important}
   .gr-honor-intel{grid-column:1/-1}
   .gr-clubhouse-board .gr-honor-lockup{margin-bottom:8px;gap:8px}
-  .gr-clubhouse-board .gr-honor-mark{width:40px;height:40px;font-size:20px}
-  .gr-clubhouse-board .gr-honor-sub{font-size:var(--fs-data,13px)}
+  .gr-clubhouse-board .gr-honor-mark{width:40px;height:40px;font-size:var(--fs-title)}
+  .gr-clubhouse-board .gr-honor-sub{font-size:var(--fs-data)}
   @keyframes grHonorPulse{0%,100%{box-shadow:0 0 14px rgba(212,175,106,.14),inset 0 1px 0 rgba(255,248,235,.18)}50%{box-shadow:0 0 22px rgba(212,175,106,.28),inset 0 1px 0 rgba(255,248,235,.28)}}
   @media(max-width:900px){.gr-clubhouse-board{grid-template-columns:1fr 1fr!important}}
   @media(max-width:700px){.gr-clubhouse-board{grid-template-columns:1fr!important}}
