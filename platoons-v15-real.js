@@ -332,56 +332,87 @@ function canvasFromSize(w,h,draw,quality){
   draw(c.getContext('2d'),c.width,c.height);
   return c.toDataURL('image/jpeg',quality);
 }
-let heicLoader=null;
-function loadHeic2Any(){
-  if(typeof window.heic2any==='function')return Promise.resolve(window.heic2any);
-  if(heicLoader)return heicLoader;
-  heicLoader=new Promise((resolve,reject)=>{
-    const existing=document.querySelector('script[data-gr-heic2any]');
-    const done=()=>typeof window.heic2any==='function'?resolve(window.heic2any):reject(new Error('HEIC converter unavailable'));
+let heicToLoader=null,heic2anyLoader=null;
+function loadScriptOnce(src,flag){
+  return new Promise((resolve,reject)=>{
+    const existing=document.querySelector(`script[${flag}]`);
     if(existing){
-      if(typeof window.heic2any==='function'){done();return}
-      existing.addEventListener('load',done);
-      existing.addEventListener('error',()=>reject(new Error('HEIC converter failed to load')));
+      if(existing.dataset.loaded==='1'){resolve();return}
+      existing.addEventListener('load',()=>resolve());
+      existing.addEventListener('error',()=>reject(new Error('Failed to load '+src)));
       return;
     }
     const s=document.createElement('script');
-    s.src='heic2any.min.js?v=3';
+    s.src=src;
     s.async=true;
-    s.dataset.grHeic2any='1';
-    s.onload=done;
-    s.onerror=()=>reject(new Error('HEIC converter failed to load'));
+    s.setAttribute(flag,'1');
+    s.onload=()=>{s.dataset.loaded='1';resolve()};
+    s.onerror=()=>reject(new Error('Failed to load '+src));
     document.head.appendChild(s);
-  }).catch(err=>{heicLoader=null;throw err});
-  return heicLoader;
+  });
 }
-async function convertHeicToJpegFile(file){
+function loadHeicTo(){
+  if(typeof window.HeicTo==='function')return Promise.resolve(window.HeicTo);
+  if(heicToLoader)return heicToLoader;
+  heicToLoader=loadScriptOnce('heic-to.js?v=1','data-gr-heic-to').then(()=>{
+    if(typeof window.HeicTo!=='function')throw new Error('heic-to unavailable');
+    return window.HeicTo;
+  }).catch(err=>{heicToLoader=null;throw err});
+  return heicToLoader;
+}
+function loadHeic2Any(){
+  if(typeof window.heic2any==='function')return Promise.resolve(window.heic2any);
+  if(heic2anyLoader)return heic2anyLoader;
+  heic2anyLoader=loadScriptOnce('heic2any.min.js?v=3','data-gr-heic2any').then(()=>{
+    if(typeof window.heic2any!=='function')throw new Error('heic2any unavailable');
+    return window.heic2any;
+  }).catch(err=>{heic2anyLoader=null;throw err});
+  return heic2anyLoader;
+}
+function jpegFileFromBlob(blob,file){
+  const base=String(file?.name||'photo').replace(/\.(heic|heif)$/i,'')||'photo';
+  return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file?.lastModified||Date.now()});
+}
+async function convertWithHeicTo(file){
+  const heicTo=await loadHeicTo();
+  // Newer libheif — handles many iOS 18 / Live Photo stills that heic2any misses.
+  const out=await heicTo({blob:file,type:'image/jpeg',quality:0.82});
+  const blob=Array.isArray(out)?out[0]:out;
+  if(!blob)throw new Error('heic-to returned empty');
+  return jpegFileFromBlob(blob,file);
+}
+async function convertWithHeic2Any(file){
   const heic2any=await loadHeic2Any();
-  const buf=await file.arrayBuffer();
-  const typed=new Blob([buf],{type:file.type&&/heic|heif|sequence/i.test(file.type)?file.type:'image/heic'});
   let lastErr=null;
-  // heic2any REQUIRES boolean `multiple` — omitting it throws and breaks Live Photos.
   for(const multiple of [true,false]){
     for(const quality of [0.85,0.65]){
       try{
-        const converted=await heic2any({blob:typed,toType:'image/jpeg',quality,multiple});
+        const converted=await heic2any({blob:file,toType:'image/jpeg',quality,multiple});
         const blobs=(Array.isArray(converted)?converted:[converted]).filter(Boolean);
         if(!blobs.length)continue;
-        // Live Photo / burst containers can return multiple stills — keep the largest.
         blobs.sort((a,b)=>(b.size||0)-(a.size||0));
-        const blob=blobs[0];
-        const base=String(file?.name||'photo').replace(/\.(heic|heif)$/i,'')||'photo';
-        return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+        return jpegFileFromBlob(blobs[0],file);
       }catch(err){
         lastErr=err;
-        const msg=String(err?.message||err||'');
-        // Already a normal JPEG/PNG — let caller decode the original file.
-        if(/already browser readable/i.test(msg))throw err;
+        if(/already browser readable/i.test(String(err?.message||err||'')))throw err;
       }
     }
   }
   throw lastErr||new Error('HEIC conversion failed');
 }
+async function convertHeicToJpegFile(file){
+  const errors=[];
+  for(const step of [convertWithHeicTo,convertWithHeic2Any]){
+    try{return await step(file)}
+    catch(err){
+      errors.push(err);
+      if(/already browser readable/i.test(String(err?.message||err||'')))throw err;
+    }
+  }
+  console.warn('All HEIC converters failed', errors);
+  throw errors[errors.length-1]||new Error('HEIC conversion failed');
+}
+
 async function decodeImageToDataUrl(file,{max=1280,quality=.72,preferImg=false}={}){
   const paint=(srcW,srcH,draw)=>{
     const scale=Math.min(1,max/Math.max(srcW||1,srcH||1));
@@ -521,16 +552,16 @@ window.grOpenSetup=()=>{
       <label>Co-Chief<select id="grPCoChief">${coOptions}</select></label>
     </div>
     <div class="gr-logo-setup-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
-      <label class="gr-logo-upload" style="margin:0">${pendingLogo?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/*"></label>
+      <label class="gr-logo-upload" style="margin:0">${pendingLogo?'Change Platoon Logo':'Upload Platoon Logo'}<input id="grPLogo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"></label>
       <button class="button secondary" id="grPLogoRemove" type="button" ${pendingLogo?'':'hidden'}>Remove Logo</button>
     </div>
     <div class="gr-clubhouse-photos-setup">
       <div class="eyebrow" style="margin-top:14px">CLUBHOUSE PHOTOS</div>
-      <p class="muted" style="font-size:11px;margin:6px 0 8px">Add group shots for the background rotation (up to 8). Use <strong>Replace</strong> on a thumb to swap one, ✕ to remove, or Clear all. iPhone HEIC photos convert automatically.</p>
+      <p class="muted" style="font-size:11px;margin:6px 0 8px">Add group shots for the background rotation (up to 8). Use <strong>Replace</strong> on a thumb to swap one, ✕ to remove, or Clear all. iPhone Live Photos / HEIC convert to JPG on this device (still frame only).</p>
       <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
-      <input id="grPClubReplace" type="file" accept="image/*" hidden>
+      <input id="grPClubReplace" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" hidden>
       <div class="gr-clubhouse-photo-actions" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">
-        <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin:0;cursor:pointer"><strong>📷 Add photos</strong><input id="grPClubPhotos" type="file" accept="image/*" multiple></label>
+        <label class="gr-logo-upload gr-clubhouse-photo-upload" style="margin:0;cursor:pointer"><strong>📷 Add photos</strong><input id="grPClubPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple></label>
         <button class="button secondary" id="grPClubClear" type="button" ${photos.length?'':'hidden'}>Clear all</button>
       </div>
     </div>
