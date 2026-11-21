@@ -113,10 +113,28 @@ const completedMissionSchema={
         type:"object",
         additionalProperties:false,
         properties:{
-          player_name:{type:"string"},gross:{type:["integer","null"]},net:{type:["integer","null"]},
-          finish_position:{type:["integer","null"]},raw_points:{type:["number","null"]},eagle_count:{type:["integer","null"]}
+          player_name:{type:"string"},
+          handicap:{type:["integer","null"]},
+          gross:{type:["integer","null"]},
+          net:{type:["integer","null"]},
+          finish_position:{type:["integer","null"]},
+          raw_points:{type:["number","null"]},
+          eagle_count:{type:["integer","null"]},
+          holes:{
+            type:"array",
+            items:{
+              type:"object",
+              additionalProperties:false,
+              properties:{
+                hole:{type:"integer"},
+                par:{type:["integer","null"]},
+                score:{type:["integer","null"]}
+              },
+              required:["hole","par","score"]
+            }
+          }
         },
-        required:["player_name","gross","net","finish_position","raw_points","eagle_count"]
+        required:["player_name","handicap","gross","net","finish_position","raw_points","eagle_count","holes"]
       }
     }
   },
@@ -207,7 +225,10 @@ async function parseCompletedMission(body:any){
   const content:any[]=[{
     type:"input_text",
     text:`You are the Golf Recon historical completed-Mission parser.
-The user is uploading screenshots from ONE completed 18Birdies tournament/event. The screenshots may include an event overview, a gross leaderboard, and a net/points leaderboard.
+The user is uploading screenshots from ONE completed 18Birdies tournament/event. Screenshots may include:
+1) event overview (title/date/tee/course/format/participants)
+2) net / points leaderboard (Individual Stroke (N))
+3) gross leaderboard (Individual Stroke (G)) with EXPANDED hole-by-hole scorecards (front 9 Out and/or back 9 In)
 
 Build one event and merge the player rows across all screenshots. Never guess values that are not visible.
 
@@ -219,21 +240,24 @@ Event fields:
 - format: e.g. Stroke Play when visible
 
 For each player return:
-- player_name exactly as shown
+- player_name exactly as shown (keep truncated forms like "Kevi..." if that is all that is visible; do not invent a full name)
+- handicap: tournament handicap (T-HCP) when visible, else null. CRITICAL when two players share the same truncated first name — use handicap + photo/context to keep them as SEPARATE players
 - gross: from the gross leaderboard or clearly labeled gross score
 - net: from the net leaderboard or clearly labeled net score
 - raw_points: points from the net/points leaderboard when visible
 - finish_position: use the handicap/net/points competition ranking when visible. If gross and net rankings differ, DO NOT use gross rank for finish_position; gross is only the gross score source.
-- eagle_count: only when explicitly established by the screenshots; otherwise null
+- eagle_count: count of eagles visible from hole scores (score <= par-2) when hole data exists; else only when explicitly labeled; otherwise null
+- holes: array of {hole, par, score} from expanded scorecard grids when visible. Merge front-nine (1-9 / Out) and back-nine (10-18 / In) for the SAME player into one holes array. If only one nine is visible, return those holes only. Empty array if no hole grid is visible.
 
 Important merging rules:
 - Screenshots are all from the same event.
-- Merge abbreviations of the same visible player only when the identity is clear from name/photo/context.
-- A score like +10(81) means 81 gross on a gross leaderboard; on a net leaderboard a display like -3(68) means 68 net.
+- Merge abbreviations of the same visible player only when identity is clear from name + handicap + photo/context. Two "Kevi..." / "Kevin C." rows with DIFFERENT T-HCP values are DIFFERENT people — never merge them.
+- A score like +13(84) means 84 gross on a gross leaderboard; on a net leaderboard +2(73) means 73 net.
 - Do not calculate missing net/gross from handicap unless the screenshot explicitly gives the score.
 - Preserve points exactly as shown.
-- If anything conflicts or is ambiguous, prefer null plus a warning rather than guessing.
-- Do not create hole-by-hole data.`
+- Ignore "Out" / "In" total columns as hole numbers — only holes 1-18.
+- Circles around scores usually mean birdie/eagle; squares usually mean bogey — still read the numeric score from the cell.
+- If anything conflicts or is ambiguous, prefer null / empty holes plus a warning rather than guessing.`
   }];
   for(const img of body.images){if(img?.type&&img?.data)content.push({type:"input_image",image_url:`data:${img.type};base64,${img.data}`,detail:"high"})}
   const ai=await fetch("https://api.openai.com/v1/responses",{

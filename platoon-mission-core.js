@@ -66,16 +66,24 @@ function resultMatchKey(r,p){
 
 /** Normalize one official result row. Never invents missing scores. */
 function normalizeOfficialResultRow(r){
+  const holes=Array.isArray(r?.holes)?cleanHoles(r.holes):[];
+  let eagleCount=finite(r?.eagle_count)?Number(r.eagle_count):null;
+  // Prefer explicit eagle_count; otherwise derive from hole scores when available.
+  if(eagleCount==null&&holes.length){
+    const derived=holes.filter(h=>finite(h.par)&&finite(h.score)&&h.score<=h.par-2).length;
+    if(derived>0)eagleCount=derived;
+  }
   const row={
     player_name:String(r?.player_name||'').trim()||'Player',
+    handicap:finite(r?.handicap)?Number(r.handicap):null,
     gross:finite(r?.gross)?Number(r.gross):null,
     net:finite(r?.net)?Number(r.net):null,
     finish_position:finite(r?.finish_position)?Number(r.finish_position):null,
     raw_points:finite(r?.raw_points)?Number(r.raw_points):null,
-    eagle_count:finite(r?.eagle_count)?Number(r.eagle_count):null
+    eagle_count:eagleCount
   };
   // Preserve supplemental hole detail if already attached to an official row.
-  if(Array.isArray(r?.holes)&&r.holes.length)row.holes=cleanHoles(r.holes);
+  if(holes.length)row.holes=holes;
   if(r?.hole_detail_saved_at)row.hole_detail_saved_at=r.hole_detail_saved_at;
   if(r?.hole_detail_source_name)row.hole_detail_source_name=r.hole_detail_source_name;
   if(r?.hole_detail_canonical_id)row.hole_detail_canonical_id=r.hole_detail_canonical_id;
