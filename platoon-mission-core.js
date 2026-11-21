@@ -25,13 +25,43 @@ function cleanHoles(holes){
   for(const h of (Array.isArray(holes)?holes:[])){
     const hole=Number(h?.hole);
     if(!Number.isInteger(hole)||hole<1||hole>18)continue;
-    map.set(hole,{
+    const row={
       hole,
       par:finite(h?.par)?Number(h.par):null,
       score:finite(h?.score)?Number(h.score):null
-    });
+    };
+    // Preserve richer scorecard fields when present (personal merge / later OCR).
+    for(const key of ['putts','fairway_hit','gir','chips','sand','penalties','fairway_direction','gir_direction','first_putt_distance_ft']){
+      if(h?.[key]!=null&&h[key]!=='')row[key]=h[key];
+    }
+    map.set(hole,row);
   }
   return [...map.values()].sort((a,b)=>a.hole-b.hole);
+}
+
+/** Union holes by number; keep existing non-empty values, fill blanks from incoming. */
+function mergeHolesRich(existing,incoming){
+  const map=new Map();
+  for(const h of cleanHoles(existing))map.set(h.hole,{...h});
+  for(const h of cleanHoles(incoming)){
+    const prev=map.get(h.hole)||{hole:h.hole};
+    const next={...prev};
+    for(const [k,v] of Object.entries(h)){
+      if(k==='hole')continue;
+      if(v==null||v==='')continue;
+      if(next[k]==null||next[k]==='')next[k]=v;
+    }
+    map.set(h.hole,next);
+  }
+  return [...map.values()].sort((a,b)=>a.hole-b.hole);
+}
+
+function resultMatchKey(r,p){
+  const member=r?.hole_detail_canonical_id
+    ? (p?.members||[]).find(m=>String(m.id)===String(r.hole_detail_canonical_id))
+    : canon(p,r?.player_name);
+  if(member?.id)return `id:${member.id}`;
+  return `name:${String(r?.player_name||'').trim().toLowerCase()}`;
 }
 
 /** Normalize one official result row. Never invents missing scores. */
@@ -120,10 +150,25 @@ function upsertMission(p,mission){
 /**
  * Set official Mission results. This is the only path that replaces standings inputs.
  * Does not recompute finish/points from holes.
+ * Preserves previously attached hole detail when the same player is still present.
  */
-function setOfficialResults(mission,rows,{markCompleted=true}={}){
+function setOfficialResults(mission,rows,{markCompleted=true,platoon=null}={}){
   if(!mission)return {ok:false,error:'Mission not found.'};
-  const normalized=normalizeOfficialResults(rows);
+  const prev=Array.isArray(mission.results)?mission.results:[];
+  const prevByKey=new Map(prev.map(r=>[resultMatchKey(r,platoon),r]));
+  const normalized=normalizeOfficialResults(rows).map(row=>{
+    const prior=prevByKey.get(resultMatchKey(row,platoon));
+    if(!prior)return row;
+    if(Array.isArray(prior.holes)&&prior.holes.length){
+      row.holes=mergeHolesRich(prior.holes,row.holes||[]);
+      if(prior.hole_detail_saved_at)row.hole_detail_saved_at=prior.hole_detail_saved_at;
+      if(prior.hole_detail_source_name)row.hole_detail_source_name=prior.hole_detail_source_name;
+      if(prior.hole_detail_canonical_id)row.hole_detail_canonical_id=prior.hole_detail_canonical_id;
+    }
+    if(prior.scorecard_seed&&typeof prior.scorecard_seed==='object')row.scorecard_seed=clone(prior.scorecard_seed);
+    if(prior.personal_round_id)row.personal_round_id=prior.personal_round_id;
+    return row;
+  });
   mission.results=normalized;
   if(markCompleted)mission.status='completed';
   return {ok:true,mission,results:normalized};
@@ -156,7 +201,7 @@ function mergeHoleDetailsOntoOfficial(lockedResults,groups,p){
     }
     // Official scoring fields stay as they were on the locked snapshot.
     const gross=target.gross,net=target.net,finish=target.finish_position,pts=target.raw_points,eagles=target.eagle_count,name=target.player_name;
-    target.holes=holes;
+    target.holes=mergeHolesRich(target.holes||[],holes);
     target.hole_detail_saved_at=new Date().toISOString();
     target.hole_detail_source_name=[...new Set((g.raw||[]).filter(Boolean))].join(' + ');
     target.hole_detail_canonical_id=member.id;
@@ -169,6 +214,80 @@ function mergeHoleDetailsOntoOfficial(lockedResults,groups,p){
     saved++;
   }
   return {ok:saved>0,saved,results:locked};
+}
+
+function missionRoundFingerprint(mission,memberId,gross){
+  return [
+    String(mission?.id||''),
+    String(memberId||''),
+    String(mission?.date||''),
+    String(mission?.locationName||'').trim().toLowerCase(),
+    gross??''
+  ].join('|');
+}
+
+/** Attach claimable scorecard seeds onto mission result rows (for personal DB merge). */
+function attachScorecardSeeds(mission,p){
+  if(!mission||!Array.isArray(mission.results))return mission;
+  for(const r of mission.results){
+    const member=r.hole_detail_canonical_id
+      ? (p?.members||[]).find(m=>String(m.id)===String(r.hole_detail_canonical_id))
+      : canon(p,r.player_name);
+    if(!member?.id||!Array.isArray(r.holes)||!r.holes.length)continue;
+    r.scorecard_seed={
+      member_id:member.id,
+      member_name:member.name||r.player_name,
+      mission_id:mission.id,
+      date:mission.date||'',
+      course_name:cleanCourse(mission.locationName||''),
+      course_id:mission.courseId||'',
+      gross:r.gross,
+      net:r.net,
+      holes:cleanHoles(r.holes),
+      source:'mission_import',
+      fingerprint:missionRoundFingerprint(mission,member.id,r.gross),
+      updated_at:new Date().toISOString()
+    };
+  }
+  return mission;
+}
+
+/**
+ * Claim matching mission scorecard seeds into the signed-in user's personal db.rounds.
+ * Never overwrites richer personal data — fills blanks only.
+ */
+function resolveCurrentPlatoonMemberId(p){
+  if(typeof window.grResolveCurrentPlatoonMemberId==='function'){
+    try{const id=window.grResolveCurrentPlatoonMemberId(p);if(id)return id}catch{}
+  }
+  const members=p?.members||[];
+  const chief=members.find(m=>m.role==='chief');
+  return chief?.id||null;
+}
+
+/**
+ * Claim matching mission scorecard seeds into the signed-in user's personal db.rounds.
+ * Only the current member's seeds are claimed — never the whole league into one phone.
+ * Never overwrites richer personal data — fills blanks only.
+ */
+function claimMissionScorecardsIntoPersonalDb(p,{currentMemberId=null}={}){
+  if(typeof window.grMergeMissionSeedIntoPersonal!=='function')return {claimed:0};
+  const selfId=currentMemberId||resolveCurrentPlatoonMemberId(p);
+  if(!selfId)return {claimed:0,skipped:'no-member'};
+  let claimed=0;
+  for(const m of (p?.missions||[])){
+    if(m?.type==='war')continue;
+    for(const r of (m.results||[])){
+      const seed=r.scorecard_seed;if(!seed?.fingerprint)continue;
+      if(String(seed.member_id)!==String(selfId))continue;
+      const out=window.grMergeMissionSeedIntoPersonal(seed,r);
+      if(out?.claimed||out?.merged){
+        claimed++;
+        if(out.roundId)r.personal_round_id=String(out.roundId);
+      }
+    }
+  }
+  return {claimed,memberId:selfId};
 }
 
 /**
@@ -470,8 +589,8 @@ function wouldDuplicateOfficialImport(mission,rows){
   return !!(prev&&prev===next);
 }
 
-function stampOfficialImport(mission,rows){
-  const set=setOfficialResults(mission,rows,{markCompleted:true});
+function stampOfficialImport(mission,rows,opts={}){
+  const set=setOfficialResults(mission,rows,{markCompleted:true,platoon:opts.platoon||null});
   if(!set.ok)return set;
   mission.notes=setImportFpNotes(mission.notes||'',resultsFingerprint(rows));
   mission.notes=setLiveNotes(mission.notes,false);
@@ -481,6 +600,7 @@ function stampOfficialImport(mission,rows){
 window.grMissionUid=uid;
 window.grFindMission=findMission;
 window.grCleanHoles=cleanHoles;
+window.grMergeHolesRich=mergeHolesRich;
 window.grNormalizeOfficialResultRow=normalizeOfficialResultRow;
 window.grNormalizeOfficialResults=normalizeOfficialResults;
 window.grPrepareMissionDraft=prepareMissionDraft;
@@ -488,6 +608,9 @@ window.grUpsertMission=upsertMission;
 window.grSetOfficialResults=setOfficialResults;
 window.grLockOfficialResults=lockOfficialResults;
 window.grMergeHoleDetailsOntoOfficial=mergeHoleDetailsOntoOfficial;
+window.grAttachScorecardSeeds=attachScorecardSeeds;
+window.grClaimMissionScorecardsIntoPersonalDb=claimMissionScorecardsIntoPersonalDb;
+window.grMissionRoundFingerprint=missionRoundFingerprint;
 window.grBuildCompletedMissionFromImport=buildCompletedMissionFromImport;
 window.grReadOnlyMission=readOnlyMission;
 window.grOfficialResultsForRecap=officialResultsForRecap;

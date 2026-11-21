@@ -144,9 +144,22 @@ function openHoleImport(id){
           ? window.grMergeHoleDetailsOntoOfficial(locked,[...grouped.values()],p)
           : {ok:false,saved:0,results:locked};
         if(!merged.ok){alert('Choose the correct player before saving.');return}
+        const unresolved=[...out.querySelectorAll('[data-gr155-match]')].filter(sel=>{
+          const i=Number(sel.getAttribute('data-gr155-match'));
+          return details[i]?.holes?.length&&!sel.value;
+        });
+        if(unresolved.length){alert(`Link every scorecard to a roster player (${unresolved.length} still unmatched).`);return}
         // Official gross/net/finish/points remain from locked snapshot; only hole detail attaches.
         m.results=merged.results;m.recap_note=String(d.querySelector('#gr155RecapNote')?.value||'').trim();
-        try{await Promise.resolve(savePlatoonLocal(p));d.close();setTimeout(()=>{if(typeof render==='function')render();else enhanceAll()},0);alert(`Saved hole-by-hole detail for ${merged.saved} player${merged.saved===1?'':'s'}.`)}catch{}
+        if(typeof window.grAttachScorecardSeeds==='function')window.grAttachScorecardSeeds(m,p);
+        let claimNote='';
+        try{
+          if(typeof window.grClaimMissionScorecardsIntoPersonalDb==='function'){
+            const claim=window.grClaimMissionScorecardsIntoPersonalDb(p);
+            if(claim?.claimed)claimNote=` Your matching scorecard was merged into personal Golf Recon rounds on this device (blanks only).`;
+          }
+        }catch{}
+        try{await Promise.resolve(savePlatoonLocal(p));d.close();setTimeout(()=>{if(typeof render==='function')render();else enhanceAll()},0);alert(`Saved hole-by-hole detail for ${merged.saved} player${merged.saved===1?'':'s'}.${claimNote}`)}catch{}
       };
     }catch(e){out.innerHTML=`<div class="platoon-notice">${esc(e?.message||String(e))}</div>`}
     finally{btn.disabled=false;btn.textContent='Read Scorecards'}
