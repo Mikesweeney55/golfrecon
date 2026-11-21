@@ -159,12 +159,13 @@ function holeNetValue(h,hcp,parByHole){
 
 function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true}={}){
   if(!holeNums.length)return'';
-  const totalLabel=holeNums[0]<=9?'Out':'In';
-  const cols=`42px repeat(${holeNums.length},minmax(26px,1fr)) 36px`;
+  const totalLabel=holeNums[0]<=9?'OUT':'IN';
+  const cols=`44px repeat(${holeNums.length},minmax(24px,1fr)) 38px`;
   const row=(cls,label,cells,tot)=>`<div class="gr-hsc-row ${cls}" style="grid-template-columns:${cols}"><div class="gr-hsc-label">${label}</div>${cells}<div class="gr-hsc-cell gr-hsc-tot">${tot}</div></div>`;
   const holeCells=holeNums.map(n=>`<div class="gr-hsc-cell gr-hsc-num">${n}</div>`).join('');
   const parCells=holeNums.map(n=>`<div class="gr-hsc-cell gr-hsc-par">${parByHole.has(n)?parByHole.get(n):'—'}</div>`).join('');
   const parSum=holeNums.reduce((s,n)=>s+(parByHole.has(n)?parByHole.get(n):0),0);
+  const hasPar=holeNums.some(n=>parByHole.has(n));
   const grossCells=holeNums.map(n=>{
     const h=playerHoleMap.get(n);
     if(!h||!finite(h.score))return`<div class="gr-hsc-cell gr-hsc-empty">·</div>`;
@@ -183,12 +184,12 @@ function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true
     }).join('');
     const netVals=holeNums.map(n=>holeNetValue(playerHoleMap.get(n),hcp,parByHole));
     const netSum=netVals.every(finite)?netVals.reduce((s,v)=>s+Number(v),0):null;
-    netRow=row('gr-hsc-nets','Net',netCells,netSum!=null?netSum:'·');
+    netRow=row('gr-hsc-nets','NET',netCells,netSum!=null?netSum:'·');
   }
   return `<div class="gr-hsc-nine" aria-label="${totalLabel} nine">
-    ${row('gr-hsc-holes','Hole',holeCells,totalLabel)}
-    ${row('gr-hsc-pars','Par',parCells,parSum||'·')}
-    ${row('gr-hsc-scores','Gross',grossCells,grossSum!=null?grossSum:'·')}
+    ${row('gr-hsc-holes','HOLE',holeCells,totalLabel)}
+    ${row('gr-hsc-pars','PAR',parCells,hasPar?parSum:'·')}
+    ${row('gr-hsc-scores','GROSS',grossCells,grossSum!=null?grossSum:'·')}
     ${netRow}
   </div>`;
 }
@@ -196,6 +197,9 @@ function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true
 function holeScoreboardMarkup(p,m,detail){
   const frame=missionHoleFrame(detail);
   if(!frame)return'';
+  // Always mount a full 18-hole plaque; missing holes stay blank (·).
+  const front=[1,2,3,4,5,6,7,8,9];
+  const back=[10,11,12,13,14,15,16,17,18];
   const cards=frame.players.map(x=>{
     const name=labeledDetailName(p,m,x.r);
     const map=new Map(x.s.holes.map(h=>[h.hole,h]));
@@ -209,12 +213,14 @@ function holeScoreboardMarkup(p,m,detail){
       hcp!=null?`<span class="gr-hsc-chip"><em>H</em>${hcp}</span>`:''
     ].filter(Boolean).join('');
     const strips=[
-      nineStripMarkup(frame.front,frame.parByHole,map,{hcp,showNet}),
-      nineStripMarkup(frame.back,frame.parByHole,map,{hcp,showNet})
-    ].filter(Boolean).join('');
+      nineStripMarkup(front,frame.parByHole,map,{hcp,showNet}),
+      nineStripMarkup(back,frame.parByHole,map,{hcp,showNet})
+    ].join('');
     return `<article class="gr-hsc-card">
-      <header class="gr-hsc-nameplate"><strong>${esc(name)}</strong><div class="gr-hsc-chips">${chips}</div></header>
-      <div class="gr-hsc-paper"><div class="gr-hsc-scroll">${strips}</div></div>
+      <div class="gr-hsc-plate">
+        <header class="gr-hsc-nameplate"><strong>${esc(name)}</strong><div class="gr-hsc-chips">${chips}</div></header>
+        <div class="gr-hsc-plate-face"><div class="gr-hsc-scroll">${strips}</div></div>
+      </div>
     </article>`;
   }).join('');
   return `<section class="gr-hsc-board"><div class="gr-hsc-board-head"><div class="gr155-recap-title">SCORECARD</div><span class="gr-hsc-legend">○ birdie · □ bogey</span></div>${cards}</section>`;
@@ -393,72 +399,116 @@ function installStyles(){
 .gr-mission-photo-thumb{position:relative;width:92px;height:92px;border-radius:12px;overflow:hidden;border:1px solid rgba(212,175,106,.28);background:#14110e}
 .gr-mission-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .gr-mission-photo-thumbs .gr-clubhouse-thumb-actions{position:absolute;inset:auto 0 0 0;display:flex;justify-content:flex-end;padding:5px;background:linear-gradient(transparent,rgba(0,0,0,.78))}
-.gr-hsc-board{margin-top:12px;display:grid;gap:10px}
+.gr-hsc-board{margin-top:12px;display:grid;gap:12px}
 .gr-hsc-board-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:0 2px}
 .gr-hsc-board-head .gr155-recap-title{margin:0}
 .gr-hsc-legend{font-size:var(--fs-data);color:#c4b49a;font-weight:700;letter-spacing:.04em}
+/* Commemorative plaque — wood + brass plate + black name bar (ref match) */
 .gr-hsc-card{
-  border-radius:14px;padding:10px 10px 11px;overflow:hidden;
-  border:1px solid rgba(92,64,36,.65);
+  position:relative;border-radius:6px;padding:14px 12px 12px;overflow:hidden;
+  border:1px solid #5a3c22;
   background:
-    linear-gradient(180deg,rgba(255,236,200,.07),transparent 28%),
-    repeating-linear-gradient(90deg,rgba(60,38,20,.18) 0 1px,transparent 1px 7px),
-    linear-gradient(145deg,#5a3d24 0%,#3d2816 42%,#2a1a0f 100%);
-  box-shadow:inset 0 1px 0 rgba(255,220,170,.18),inset 0 -1px 0 rgba(0,0,0,.35),0 10px 22px rgba(0,0,0,.28);
+    linear-gradient(180deg,rgba(255,220,160,.08),transparent 20%),
+    repeating-linear-gradient(90deg,rgba(255,200,130,.05) 0 1px,transparent 1px 8px),
+    repeating-linear-gradient(0deg,rgba(20,10,4,.18) 0 1px,transparent 1px 7px),
+    linear-gradient(165deg,#5a3a22 0%,#3a2414 38%,#24160c 72%,#160e08 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(200,160,90,.25),
+    inset 0 0 0 4px #2a1a0e,
+    inset 0 1px 0 rgba(255,230,180,.1),
+    0 14px 28px rgba(0,0,0,.42);
 }
-.gr-hsc-nameplate{display:flex;align-items:center;gap:8px;min-width:0;margin-bottom:8px;padding:0 2px}
+.gr-hsc-plate{
+  --screw:radial-gradient(circle at 32% 28%,#f6e8c0 0 20%,#c9a050 45%,#7a5828 72%,#2a1808 100%);
+  position:relative;border-radius:3px;padding:11px 11px 10px;
+  border:1px solid #a88848;
+  background:
+    var(--screw) 7px 7px / 7px 7px no-repeat,
+    var(--screw) calc(100% - 7px) 7px / 7px 7px no-repeat,
+    var(--screw) 7px calc(100% - 7px) / 7px 7px no-repeat,
+    var(--screw) calc(100% - 7px) calc(100% - 7px) / 7px 7px no-repeat,
+    linear-gradient(180deg,rgba(255,255,255,.2),transparent 40%),
+    linear-gradient(125deg,#e0c878 0%,#c9a850 26%,#b89040 55%,#9a7430 80%,#b88838 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.45),
+    inset 0 -1px 0 rgba(70,45,10,.3),
+    0 3px 0 #120c06,
+    0 7px 16px rgba(0,0,0,.36);
+}
+.gr-hsc-nameplate{
+  display:flex;align-items:center;gap:8px;min-width:0;
+  margin:2px 8px 9px;padding:8px 10px;
+  border-radius:2px;
+  background:
+    radial-gradient(circle at 20% 30%,rgba(80,80,80,.35) 0 1px,transparent 1.5px),
+    radial-gradient(circle at 70% 60%,rgba(80,80,80,.28) 0 1px,transparent 1.5px),
+    linear-gradient(180deg,#1a1a1a,#0a0a0a 55%,#050505);
+  background-size:6px 6px,7px 7px,auto;
+  border:1px solid #c9a850;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 -1px 0 rgba(0,0,0,.6),0 1px 0 rgba(255,220,150,.12);
+}
 .gr-hsc-nameplate strong{
   flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-family:var(--font-display,Cormorant Garamond,Georgia,serif);font-size:var(--fs-subtitle);font-weight:700;
-  color:#f3e2c4;text-shadow:0 1px 0 rgba(0,0,0,.45);letter-spacing:.01em;
+  color:#e8c868;letter-spacing:.12em;text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(0,0,0,.7);
 }
 .gr-hsc-chips{display:flex;flex-wrap:nowrap;gap:5px;margin-left:auto;flex:0 0 auto}
 .gr-hsc-chip{
-  display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:999px;
-  background:rgba(20,12,6,.45);border:1px solid rgba(212,175,106,.35);color:#f0e0c4;
+  display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:3px;
+  background:rgba(0,0,0,.45);border:1px solid #c9a850;color:#e8c868;
   font-size:var(--fs-data);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;
+  font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
 }
 .gr-hsc-chip em{font-style:normal;color:#d4af6a;font-size:10px;letter-spacing:.06em;font-weight:900}
-.gr-hsc-paper{
-  border-radius:8px;overflow:hidden;
-  border:1px solid rgba(70,48,28,.55);
-  background:
-    linear-gradient(180deg,rgba(255,248,230,.92),rgba(236,220,188,.9)),
-    repeating-linear-gradient(0deg,transparent,transparent 27px,rgba(120,90,50,.08) 28px);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 1px 0 rgba(0,0,0,.2);
+.gr-hsc-plate-face{
+  border-radius:2px;overflow:hidden;
+  border:1px solid rgba(90,62,28,.45);
+  background:linear-gradient(180deg,#f7efd8,#efe4c4 70%,#e8dcb8);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);
 }
-.gr-hsc-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 6px 7px}
-.gr-hsc-nine{display:inline-block;min-width:min(100%,440px);margin-right:10px;vertical-align:top}
-.gr-hsc-nine:last-child{margin-right:0}
-.gr-hsc-row{display:grid;gap:0;align-items:stretch;font-variant-numeric:tabular-nums;border-bottom:1px solid rgba(90,62,34,.22)}
+.gr-hsc-scroll{
+  display:flex;flex-direction:column;gap:8px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px;
+}
+.gr-hsc-nine{display:block;width:100%;min-width:480px}
+.gr-hsc-row{
+  display:grid;gap:0;align-items:stretch;font-variant-numeric:tabular-nums;
+  border-bottom:1px solid rgba(140,110,50,.28);
+  font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
+}
 .gr-hsc-row:last-child{border-bottom:0}
-.gr-hsc-holes{background:linear-gradient(180deg,#6b4a2c,#4a311c);border-bottom-color:rgba(40,24,12,.5)}
-.gr-hsc-holes .gr-hsc-label,.gr-hsc-holes .gr-hsc-cell{color:#f0ddb8;font-weight:900}
-.gr-hsc-pars{background:rgba(120,90,50,.1)}
-.gr-hsc-nets{background:rgba(80,110,90,.08)}
+.gr-hsc-holes{
+  background:linear-gradient(180deg,#2e2210,#1a1408);
+  border-bottom-color:rgba(40,24,12,.45);
+}
+.gr-hsc-holes .gr-hsc-label,.gr-hsc-holes .gr-hsc-cell{color:#e8c868;font-weight:800}
+.gr-hsc-pars{background:rgba(180,140,60,.08)}
+.gr-hsc-nets{background:rgba(40,90,60,.05)}
 .gr-hsc-label{
   display:flex;align-items:center;padding:0 5px;font-size:10px;text-transform:uppercase;
-  letter-spacing:.05em;font-weight:800;color:#6a4e32;border-right:1px solid rgba(90,62,34,.22);
+  letter-spacing:.08em;font-weight:800;color:#8a6a28;border-right:1px solid rgba(140,110,50,.28);
 }
-.gr-hsc-holes .gr-hsc-label{border-right-color:rgba(255,220,170,.12);color:#e8d3a8}
+.gr-hsc-holes .gr-hsc-label{border-right-color:rgba(232,200,104,.15);color:#e8c868}
 .gr-hsc-cell{
   min-height:24px;display:grid;place-items:center;text-align:center;
-  font-size:var(--fs-data);font-weight:800;line-height:1;color:#2a1c10;
-  border-right:1px solid rgba(90,62,34,.14);padding:2px 1px;
+  font-size:calc(var(--fs-data) + 1px);font-weight:700;line-height:1;color:#2a1c10;
+  border-right:1px solid rgba(140,110,50,.22);padding:2px 1px;
 }
 .gr-hsc-cell:last-child{border-right:0}
-.gr-hsc-num{font-weight:900}
-.gr-hsc-par{color:#6a5538;font-weight:700}
-.gr-hsc-tot{color:#5a4028;font-weight:900;background:rgba(120,90,50,.08)}
-.gr-hsc-holes .gr-hsc-tot{background:rgba(0,0,0,.12);color:#f0ddb8}
+.gr-hsc-num{font-weight:800}
+.gr-hsc-par{color:#7a5e28;font-weight:700}
+.gr-hsc-tot{color:#5a4018;font-weight:800;background:rgba(140,110,50,.1)}
+.gr-hsc-holes .gr-hsc-tot{background:rgba(0,0,0,.25);color:#e8c868}
 .gr-hsc-score{position:relative;color:#1c140c}
-.gr-hsc-score.birdie{box-shadow:inset 0 0 0 1.5px #2a1c10;border-radius:50%;margin:1px}
-.gr-hsc-score.eagle{box-shadow:inset 0 0 0 1.5px #2a1c10,0 0 0 2px #efe2c4,0 0 0 3.5px #2a1c10;border-radius:50%;margin:1px}
-.gr-hsc-score.bogey{box-shadow:inset 0 0 0 1.5px #2a1c10;border-radius:0;margin:1px}
-.gr-hsc-score.double{box-shadow:inset 0 0 0 1.5px #2a1c10,0 0 0 2px #efe2c4,0 0 0 3.5px #2a1c10;border-radius:0;margin:1px}
-.gr-hsc-score.worse{box-shadow:inset 0 0 0 1.5px #8a3020,0 0 0 2px #efe2c4,0 0 0 3.5px #8a3020;border-radius:0;margin:1px;color:#7a2818}
+.gr-hsc-score.birdie{box-shadow:inset 0 0 0 1.5px #1c140c;border-radius:50%;margin:1px}
+.gr-hsc-score.eagle{box-shadow:inset 0 0 0 1.5px #1c140c,0 0 0 2px #f0e6c8,0 0 0 3.5px #1c140c;border-radius:50%;margin:1px}
+.gr-hsc-score.bogey{box-shadow:inset 0 0 0 1.5px #1c140c;border-radius:0;margin:1px}
+.gr-hsc-score.double{box-shadow:inset 0 0 0 1.5px #1c140c,0 0 0 2px #f0e6c8,0 0 0 3.5px #1c140c;border-radius:0;margin:1px}
+.gr-hsc-score.worse{box-shadow:inset 0 0 0 1.5px #8a3020,0 0 0 2px #f0e6c8,0 0 0 3.5px #8a3020;border-radius:0;margin:1px;color:#7a2818}
 .gr-hsc-gross{display:block}
-.gr-hsc-netcell{color:#3d5a48;font-weight:800}
+.gr-hsc-netcell{color:#1f5a3a;font-weight:800}
+.gr-hsc-nets .gr-hsc-tot{color:#1f5a3a}
 .gr-hsc-empty{color:rgba(60,40,20,.28);font-weight:700}
 @media(max-width:700px){
   .gr155-recap-grid{grid-template-columns:1fr}
@@ -467,9 +517,11 @@ function installStyles(){
   .grstd-head,.grstd-row{grid-template-columns:minmax(0,1fr) 44px 54px 56px;column-gap:6px}
   .grstd-row{font-size:var(--fs-data)}
   .gr-mission-photo-thumb{width:78px;height:78px}
-  .gr-hsc-card{padding:8px}
-  .gr-hsc-cell{min-height:22px;font-size:var(--fs-data)}
-  .gr-hsc-nameplate{gap:6px}
+  .gr-hsc-card{padding:10px 8px 8px}
+  .gr-hsc-plate{padding:8px}
+  .gr-hsc-nine{min-width:420px}
+  .gr-hsc-cell{min-height:22px}
+  .gr-hsc-nameplate{gap:6px;margin:2px 4px 8px;padding:6px 8px}
   .gr-hsc-chip{padding:2px 6px}
 }
 `;
