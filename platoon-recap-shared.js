@@ -498,9 +498,8 @@ function missionRecapMarkup(p,m){
 }
 
 function installStyles(){
-  if(document.getElementById('grSharedRecapStyles'))return;
-  const s=document.createElement('style');
-  s.id='grSharedRecapStyles';
+  let s=document.getElementById('grSharedRecapStyles');
+  if(!s){s=document.createElement('style');s.id='grSharedRecapStyles';document.head.appendChild(s)}
   s.textContent=`
 .grstd-table{width:100%;font-variant-numeric:tabular-nums}
 .grstd-head,.grstd-row{display:grid;grid-template-columns:minmax(0,1fr) 52px 62px 62px;align-items:center;column-gap:8px}
@@ -528,121 +527,176 @@ function installStyles(){
 .gr-hsc-board{margin-top:12px;display:grid;gap:12px}
 .gr-hsc-board-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:0 2px}
 .gr-hsc-board-head .gr155-recap-title{margin:0}
-.gr-hsc-legend{font-size:var(--fs-data);color:#c4b49a;font-weight:700;letter-spacing:.04em}
-/* Commemorative plaque — wood + brass plate + black name bar (ref match) */
+.gr-hsc-legend{font-size:var(--fs-data);color:#b8a78a;font-weight:700;letter-spacing:.04em}
+
+/* Clubhouse trophy plaque — thin walnut frame, antique brass, parchment card */
 .gr-hsc-card{
-  position:relative;border-radius:6px;padding:14px 12px 12px;overflow:hidden;
-  border:1px solid #5a3c22;
+  --walnut-hi:#6b4a2e;
+  --walnut-mid:#3d2718;
+  --walnut-lo:#1c110a;
+  --brass:#9a7a45;
+  --brass-hi:#c4a66a;
+  --brass-lo:#6e552c;
+  --ink:#2a1c12;
+  --parchment:#f3ecdd;
+  --mark:#3a2a18;
+  position:relative;border-radius:5px;padding:9px 8px 8px;overflow:hidden;
+  border:1px solid #2a1a10;
   background:
-    linear-gradient(180deg,rgba(255,220,160,.08),transparent 20%),
-    repeating-linear-gradient(90deg,rgba(255,200,130,.05) 0 1px,transparent 1px 8px),
-    repeating-linear-gradient(0deg,rgba(20,10,4,.18) 0 1px,transparent 1px 7px),
-    linear-gradient(165deg,#5a3a22 0%,#3a2414 38%,#24160c 72%,#160e08 100%);
+    radial-gradient(circle at 18% 12%,rgba(120,80,45,.22),transparent 28%),
+    radial-gradient(circle at 82% 88%,rgba(20,10,4,.35),transparent 32%),
+    repeating-linear-gradient(92deg,rgba(255,220,170,.045) 0 1px,transparent 1px 7px),
+    repeating-linear-gradient(0deg,rgba(12,6,2,.16) 0 1px,transparent 1px 6px),
+    linear-gradient(145deg,var(--walnut-hi) 0%,var(--walnut-mid) 42%,#2a1a10 78%,var(--walnut-lo) 100%);
   box-shadow:
-    inset 0 0 0 1px rgba(200,160,90,.25),
-    inset 0 0 0 4px #2a1a0e,
-    inset 0 1px 0 rgba(255,230,180,.1),
-    0 14px 28px rgba(0,0,0,.42);
+    inset 0 1px 0 rgba(255,230,190,.14),
+    inset 0 -1px 0 rgba(0,0,0,.45),
+    inset 0 0 0 1px rgba(160,120,70,.18),
+    0 1px 0 rgba(255,220,170,.06),
+    0 10px 22px rgba(0,0,0,.38);
+}
+/* Beveled walnut lip */
+.gr-hsc-card::before{
+  content:"";position:absolute;inset:3px;border-radius:3px;pointer-events:none;z-index:0;
+  border:1px solid rgba(0,0,0,.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255,220,170,.1),
+    inset 0 -1px 0 rgba(0,0,0,.35),
+    inset 1px 0 0 rgba(255,220,170,.05),
+    inset -1px 0 0 rgba(0,0,0,.25);
+}
+/* Antique-brass corner screws on the wood frame */
+.gr-hsc-card::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:
+    radial-gradient(circle at 32% 28%,#e8d6a8 0 18%,#b08a48 42%,#6a4e28 70%,#2a1a0c 100%) 5px 5px / 6px 6px no-repeat,
+    radial-gradient(circle at 32% 28%,#e8d6a8 0 18%,#b08a48 42%,#6a4e28 70%,#2a1a0c 100%) calc(100% - 5px) 5px / 6px 6px no-repeat,
+    radial-gradient(circle at 32% 28%,#e8d6a8 0 18%,#b08a48 42%,#6a4e28 70%,#2a1a0c 100%) 5px calc(100% - 5px) / 6px 6px no-repeat,
+    radial-gradient(circle at 32% 28%,#e8d6a8 0 18%,#b08a48 42%,#6a4e28 70%,#2a1a0c 100%) calc(100% - 5px) calc(100% - 5px) / 6px 6px no-repeat;
+  opacity:.95;
 }
 .gr-hsc-plate{
-  --screw:radial-gradient(circle at 32% 28%,#f6e8c0 0 20%,#c9a050 45%,#7a5828 72%,#2a1808 100%);
-  position:relative;border-radius:3px;padding:11px 11px 10px;
-  border:1px solid #a88848;
+  position:relative;z-index:1;border-radius:2px;padding:8px 8px 7px;
+  border:1px solid var(--brass-lo);
   background:
-    var(--screw) 7px 7px / 7px 7px no-repeat,
-    var(--screw) calc(100% - 7px) 7px / 7px 7px no-repeat,
-    var(--screw) 7px calc(100% - 7px) / 7px 7px no-repeat,
-    var(--screw) calc(100% - 7px) calc(100% - 7px) / 7px 7px no-repeat,
-    linear-gradient(180deg,rgba(255,255,255,.2),transparent 40%),
-    linear-gradient(125deg,#e0c878 0%,#c9a850 26%,#b89040 55%,#9a7430 80%,#b88838 100%);
+    linear-gradient(180deg,rgba(255,245,210,.16),transparent 38%),
+    linear-gradient(125deg,#b89658 0%,#9a7a45 28%,#7d6235 58%,#6a522c 82%,#8a6e3c 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.45),
-    inset 0 -1px 0 rgba(70,45,10,.3),
-    0 3px 0 #120c06,
-    0 7px 16px rgba(0,0,0,.36);
+    inset 0 1px 0 rgba(255,235,190,.28),
+    inset 0 -1px 0 rgba(50,35,12,.35),
+    0 1px 0 rgba(20,12,6,.55),
+    0 3px 8px rgba(0,0,0,.28);
 }
 .gr-hsc-nameplate{
   display:flex;align-items:center;gap:8px;min-width:0;
-  margin:2px 8px 9px;padding:8px 10px;
+  margin:1px 4px 7px;padding:7px 9px;
   border-radius:2px;
   background:
-    radial-gradient(circle at 20% 30%,rgba(80,80,80,.35) 0 1px,transparent 1.5px),
-    radial-gradient(circle at 70% 60%,rgba(80,80,80,.28) 0 1px,transparent 1.5px),
-    linear-gradient(180deg,#1a1a1a,#0a0a0a 55%,#050505);
-  background-size:6px 6px,7px 7px,auto;
-  border:1px solid #c9a850;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 -1px 0 rgba(0,0,0,.6),0 1px 0 rgba(255,220,150,.12);
+    radial-gradient(circle at 22% 28%,rgba(90,90,90,.4) 0 1px,transparent 1.4px),
+    radial-gradient(circle at 68% 62%,rgba(70,70,70,.32) 0 1px,transparent 1.4px),
+    linear-gradient(180deg,#1c1814,#0d0b09 52%,#060504);
+  background-size:5px 5px,6px 6px,auto;
+  border:1px solid var(--brass);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    inset 0 -1px 0 rgba(0,0,0,.65),
+    0 1px 0 rgba(196,166,106,.12);
 }
 .gr-hsc-nameplate strong{
   flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-family:var(--font-display,Cormorant Garamond,Georgia,serif);font-size:var(--fs-subtitle);font-weight:700;
-  color:#e8c868;letter-spacing:.12em;text-transform:uppercase;
-  text-shadow:0 1px 0 rgba(0,0,0,.7);
+  color:#d4b878;letter-spacing:.12em;text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(0,0,0,.85),0 0 1px rgba(212,184,120,.25);
 }
-.gr-hsc-chips{display:flex;flex-wrap:nowrap;gap:5px;margin-left:auto;flex:0 0 auto}
+.gr-hsc-chips{display:flex;flex-wrap:nowrap;gap:4px;margin-left:auto;flex:0 0 auto}
 .gr-hsc-chip{
-  display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:3px;
-  background:rgba(0,0,0,.45);border:1px solid #c9a850;color:#e8c868;
+  display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:2px;
+  background:rgba(0,0,0,.42);border:1px solid rgba(154,122,69,.85);color:#d4b878;
   font-size:var(--fs-data);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;
   font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
 }
-.gr-hsc-chip em{font-style:normal;color:#d4af6a;font-size:10px;letter-spacing:.06em;font-weight:900}
+.gr-hsc-chip em{font-style:normal;color:#b08a48;font-size:10px;letter-spacing:.06em;font-weight:900}
+.gr-hsc-sub{
+  margin:-2px 6px 7px;padding:0 2px;
+  font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
+  font-size:var(--fs-data);color:#5c4630;font-weight:700;letter-spacing:.03em;opacity:.9;
+}
 .gr-hsc-plate-face{
-  border-radius:2px;overflow:hidden;
-  border:1px solid rgba(90,62,28,.45);
-  background:linear-gradient(180deg,#f7efd8,#efe4c4 70%,#e8dcb8);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);
+  border-radius:1px;overflow:hidden;
+  border:1px solid rgba(60,42,22,.5);
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.35),transparent 18%),
+    linear-gradient(180deg,#f7f1e4,#f0e8d4 55%,#e8deca);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,252,245,.55),
+    inset 0 2px 6px rgba(80,55,25,.12),
+    0 0 0 1px rgba(154,122,69,.35);
 }
 .gr-hsc-scroll{
-  display:flex;flex-direction:column;gap:8px;
-  overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px;
+  display:flex;flex-direction:column;gap:7px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;padding:5px;
 }
-.gr-hsc-nine{display:block;width:100%;min-width:480px}
+.gr-hsc-nine{display:block;width:100%;min-width:460px}
 .gr-hsc-row{
   display:grid;gap:0;align-items:stretch;font-variant-numeric:tabular-nums;
-  border-bottom:1px solid rgba(140,110,50,.28);
+  border-bottom:1px solid rgba(58,42,24,.28);
   font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
 }
 .gr-hsc-row:last-child{border-bottom:0}
 .gr-hsc-holes{
-  background:linear-gradient(180deg,#2e2210,#1a1408);
-  border-bottom-color:rgba(40,24,12,.45);
+  background:linear-gradient(180deg,#2a2116,#18140e);
+  border-bottom-color:rgba(30,20,12,.5);
 }
-.gr-hsc-holes .gr-hsc-label,.gr-hsc-holes .gr-hsc-cell{color:#e8c868;font-weight:800}
-.gr-hsc-pars{background:rgba(180,140,60,.08)}
-.gr-hsc-nets{background:rgba(40,90,60,.05)}
+.gr-hsc-holes .gr-hsc-label,.gr-hsc-holes .gr-hsc-cell{color:#d4b878;font-weight:800}
+.gr-hsc-pars{background:rgba(90,70,40,.06)}
+.gr-hsc-nets{background:rgba(30,70,45,.05)}
 .gr-hsc-label{
   display:flex;align-items:center;padding:0 5px;font-size:10px;text-transform:uppercase;
-  letter-spacing:.08em;font-weight:800;color:#8a6a28;border-right:1px solid rgba(140,110,50,.28);
+  letter-spacing:.08em;font-weight:800;color:#6a5230;border-right:1px solid rgba(58,42,24,.28);
 }
-.gr-hsc-holes .gr-hsc-label{border-right-color:rgba(232,200,104,.15);color:#e8c868}
+.gr-hsc-holes .gr-hsc-label{border-right-color:rgba(212,184,120,.14);color:#d4b878}
 .gr-hsc-cell{
   min-height:24px;display:grid;place-items:center;text-align:center;
-  font-size:calc(var(--fs-data) + 1px);font-weight:700;line-height:1;color:#2a1c10;
-  border-right:1px solid rgba(140,110,50,.22);padding:2px 1px;
+  font-size:calc(var(--fs-data) + 1px);font-weight:700;line-height:1;color:var(--ink);
+  border-right:1px solid rgba(58,42,24,.22);padding:2px 1px;
 }
 .gr-hsc-cell:last-child{border-right:0}
 .gr-hsc-num{font-weight:800}
-.gr-hsc-par{color:#7a5e28;font-weight:700}
-.gr-hsc-tot{color:#5a4018;font-weight:800;background:rgba(140,110,50,.1)}
-.gr-hsc-holes .gr-hsc-tot{background:rgba(0,0,0,.25);color:#e8c868}
-.gr-hsc-score{position:relative;color:#1c140c}
-.gr-hsc-score.birdie{box-shadow:inset 0 0 0 1.5px #1c140c;border-radius:50%;margin:1px}
-.gr-hsc-score.eagle{box-shadow:inset 0 0 0 1.5px #1c140c,0 0 0 2px #f0e6c8,0 0 0 3.5px #1c140c;border-radius:50%;margin:1px}
-.gr-hsc-score.bogey{box-shadow:inset 0 0 0 1.5px #1c140c;border-radius:0;margin:1px}
-.gr-hsc-score.double{box-shadow:inset 0 0 0 1.5px #1c140c,0 0 0 2px #f0e6c8,0 0 0 3.5px #1c140c;border-radius:0;margin:1px}
-.gr-hsc-score.worse{box-shadow:inset 0 0 0 1.5px #8a3020,0 0 0 2px #f0e6c8,0 0 0 3.5px #8a3020;border-radius:0;margin:1px;color:#7a2818}
-.gr-hsc-gross{display:block}
-.gr-hsc-netcell{color:#1f5a3a;font-weight:800}
-.gr-hsc-nets .gr-hsc-tot{color:#1f5a3a}
+.gr-hsc-par{color:#3a2a18;font-weight:900}
+.gr-hsc-tot{color:#4a3820;font-weight:800;background:rgba(90,70,40,.08)}
+.gr-hsc-holes .gr-hsc-tot{background:rgba(0,0,0,.28);color:#d4b878}
+.gr-hsc-score{position:relative;color:var(--ink);background:transparent;box-shadow:none;border-radius:0;margin:0}
+/* Traditional paper-card marks tightly around the gross numeral */
+.gr-hsc-gross{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:1.2em;min-height:1.2em;padding:0 .05em;
+  font-size:calc(var(--fs-data) + 2px);font-weight:900;line-height:1;color:var(--ink);
+  box-sizing:border-box;
+}
+.gr-hsc-score.birdie .gr-hsc-gross{
+  border:1.15px solid var(--mark);border-radius:50%;
+}
+.gr-hsc-score.eagle .gr-hsc-gross{
+  border:1.15px solid var(--mark);border-radius:50%;
+  box-shadow:0 0 0 1.6px var(--parchment),0 0 0 2.75px var(--mark);
+}
+.gr-hsc-score.bogey .gr-hsc-gross{
+  border:1.15px solid var(--mark);border-radius:0;
+}
+.gr-hsc-score.double .gr-hsc-gross,
+.gr-hsc-score.worse .gr-hsc-gross{
+  border:1.15px solid var(--mark);border-radius:0;
+  box-shadow:0 0 0 1.6px var(--parchment),0 0 0 2.75px var(--mark);
+}
+.gr-hsc-netcell{color:#1a4f34;font-weight:800}
+.gr-hsc-nets .gr-hsc-tot{color:#1a4f34}
 .gr-hsc-empty{color:rgba(60,40,20,.28);font-weight:700}
-.gr-hsc-sub{margin:-2px 8px 8px;padding:0 2px;font-size:var(--fs-data);color:#5a4018;font-weight:700;letter-spacing:.02em;opacity:.85}
-.gr-hsc-stats{background:rgba(90,70,30,.04)}
+.gr-hsc-stats{background:rgba(70,55,30,.035)}
 .gr-hsc-stats .gr-hsc-label{font-size:9px;letter-spacing:.06em}
 .gr-hsc-mark{display:inline-block;font-size:11px;line-height:1;font-weight:900}
-.gr-hsc-mark.hit{color:#1f5a3a}
-.gr-hsc-mark.miss{color:#8a6a28;opacity:.75}
-.gr-hsc-putt{color:#2a1c10;font-weight:800}
+.gr-hsc-mark.hit{color:#1a4f34}
+.gr-hsc-mark.miss{color:#6a5230;opacity:.75}
+.gr-hsc-putt{color:var(--ink);font-weight:800}
 .gr-hsc-personal{margin-top:0}
 @media(max-width:700px){
   .gr155-recap-grid{grid-template-columns:1fr}
@@ -651,17 +705,16 @@ function installStyles(){
   .grstd-head,.grstd-row{grid-template-columns:minmax(0,1fr) 44px 54px 56px;column-gap:6px}
   .grstd-row{font-size:var(--fs-data)}
   .gr-mission-photo-thumb{width:78px;height:78px}
-  .gr-hsc-card{padding:10px 8px 8px}
-  .gr-hsc-plate{padding:8px}
-  .gr-hsc-nine{min-width:420px}
+  .gr-hsc-card{padding:8px 7px 7px}
+  .gr-hsc-plate{padding:7px}
+  .gr-hsc-nine{min-width:400px}
   .gr-hsc-cell{min-height:22px}
-  .gr-hsc-nameplate{gap:6px;margin:2px 4px 8px;padding:6px 8px}
-  .gr-hsc-chip{padding:2px 6px}
+  .gr-hsc-nameplate{gap:5px;margin:1px 2px 6px;padding:6px 7px}
+  .gr-hsc-chip{padding:2px 5px}
+  .gr-hsc-gross{font-size:calc(var(--fs-data) + 1px);min-width:1.15em;min-height:1.15em}
 }
 `;
-  document.head.appendChild(s);
 }
-
 installStyles();
 
 window.grEsc=esc;
