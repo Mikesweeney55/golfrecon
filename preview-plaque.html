@@ -11,23 +11,25 @@
       --fs-data:12px;--fs-subtitle:16px;
       --accent:#d4af6a;--line:rgba(255,255,255,.12);--muted:#9aa89f;
     }
-    body{margin:0;padding:20px;background:#0e1512;color:#e8eee9;font-family:system-ui,sans-serif}
+    body{margin:0;padding:16px;background:#0e1512;color:#e8eee9;font-family:system-ui,sans-serif}
     .wrap{max-width:720px;margin:0 auto}
     h1{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#b8a78a;font-weight:700}
     p{color:#9aa89f;font-size:13px;line-height:1.4}
+    .widths{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 16px}
+    .widths a{color:#d4b878;font-size:12px}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Clubhouse plaque preview</h1>
-    <p>Sample personal round — same shared scorecard used in Round Database and Missions.</p>
+    <p>Refined walnut / antique-brass scorecard. Resize to ~375px to check mobile nines.</p>
     <div id="out"></div>
   </div>
-  <script src="./platoon-recap-shared.js?v=202"></script>
+  <script src="./platoon-recap-shared.js?v=203"></script>
   <script>
     document.getElementById('out').innerHTML = window.grPersonalRoundScorecardMarkup({
-      playerName: 'Four Oaks',
-      courseName: 'Four Oaks Country Club',
+      playerName: 'Four Oaks Country Club',
+      courseName: 'White tees',
       date: 'Nov 21, 2026',
       tees: 'White',
       gross: 84,

@@ -186,8 +186,7 @@ function statHitRate(vals){
 function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true,showStats=true}={}){
   if(!holeNums.length)return'';
   const totalLabel=holeNums[0]<=9?'OUT':'IN';
-  const cols=`44px repeat(${holeNums.length},minmax(24px,1fr)) 38px`;
-  const row=(cls,label,cells,tot)=>`<div class="gr-hsc-row ${cls}" style="grid-template-columns:${cols}"><div class="gr-hsc-label">${label}</div>${cells}<div class="gr-hsc-cell gr-hsc-tot">${tot}</div></div>`;
+  const row=(cls,label,cells,tot)=>`<div class="gr-hsc-row ${cls}"><div class="gr-hsc-label">${label}</div>${cells}<div class="gr-hsc-cell gr-hsc-tot">${tot}</div></div>`;
   const holeCells=holeNums.map(n=>`<div class="gr-hsc-cell gr-hsc-num">${n}</div>`).join('');
   const parCells=holeNums.map(n=>`<div class="gr-hsc-cell gr-hsc-par">${parByHole.has(n)?parByHole.get(n):'—'}</div>`).join('');
   const parSum=holeNums.reduce((s,n)=>s+(parByHole.has(n)?parByHole.get(n):0),0);
@@ -249,7 +248,7 @@ function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true
       statsRows+=row('gr-hsc-stats gr-hsc-putts','PUTTS',cells,puttSum!=null?puttSum:'·');
     }
   }
-  return `<div class="gr-hsc-nine" aria-label="${totalLabel} nine">
+  return `<div class="gr-hsc-nine" style="--hsc-cols:${holeNums.length}" aria-label="${totalLabel} nine">
     ${row('gr-hsc-holes','HOLE',holeCells,totalLabel)}
     ${row('gr-hsc-pars','PAR',parCells,hasPar?parSum:'·')}
     ${row('gr-hsc-scores','GROSS',grossCells,grossSum!=null?grossSum:'·')}
@@ -540,6 +539,7 @@ function installStyles(){
   --ink:#2a1c12;
   --parchment:#f3ecdd;
   --mark:#3a2a18;
+  --hsc-serif:Georgia,'Times New Roman',Times,serif;
   position:relative;border-radius:5px;padding:9px 8px 8px;overflow:hidden;
   border:1px solid #2a1a10;
   background:
@@ -575,40 +575,48 @@ function installStyles(){
     radial-gradient(circle at 32% 28%,#e8d6a8 0 18%,#b08a48 42%,#6a4e28 70%,#2a1a0c 100%) calc(100% - 5px) calc(100% - 5px) / 6px 6px no-repeat;
   opacity:.95;
 }
+/* Dark walnut well + thin antique-brass accent (not a wide gold plate) */
 .gr-hsc-plate{
-  position:relative;z-index:1;border-radius:2px;padding:8px 8px 7px;
+  position:relative;z-index:1;border-radius:2px;padding:6px 5px 5px;
   border:1px solid var(--brass-lo);
   background:
-    linear-gradient(180deg,rgba(255,245,210,.16),transparent 38%),
-    linear-gradient(125deg,#b89658 0%,#9a7a45 28%,#7d6235 58%,#6a522c 82%,#8a6e3c 100%);
+    linear-gradient(180deg,rgba(255,220,170,.05),transparent 35%),
+    linear-gradient(145deg,#4a3220 0%,#2c1a10 48%,#160e08 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255,235,190,.28),
-    inset 0 -1px 0 rgba(50,35,12,.35),
-    0 1px 0 rgba(20,12,6,.55),
-    0 3px 8px rgba(0,0,0,.28);
+    inset 0 0 0 1px rgba(154,122,69,.4),
+    inset 0 1px 0 rgba(255,220,170,.08),
+    inset 0 -1px 0 rgba(0,0,0,.4),
+    0 1px 0 rgba(0,0,0,.35);
 }
+/* Smooth blackened brass / dark bronze header — no dotted texture */
 .gr-hsc-nameplate{
-  display:flex;align-items:center;gap:8px;min-width:0;
-  margin:1px 4px 7px;padding:7px 9px;
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0;
+  margin:0 1px 6px;padding:7px 8px;
   border-radius:2px;
   background:
-    radial-gradient(circle at 22% 28%,rgba(90,90,90,.4) 0 1px,transparent 1.4px),
-    radial-gradient(circle at 68% 62%,rgba(70,70,70,.32) 0 1px,transparent 1.4px),
-    linear-gradient(180deg,#1c1814,#0d0b09 52%,#060504);
-  background-size:5px 5px,6px 6px,auto;
+    linear-gradient(180deg,rgba(196,166,106,.1),transparent 42%),
+    linear-gradient(180deg,#2a2218 0%,#16120e 48%,#0a0806 100%);
   border:1px solid var(--brass);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.05),
-    inset 0 -1px 0 rgba(0,0,0,.65),
-    0 1px 0 rgba(196,166,106,.12);
+    inset 0 1px 0 rgba(212,184,120,.12),
+    inset 0 -1px 0 rgba(0,0,0,.55),
+    0 1px 0 rgba(0,0,0,.25);
 }
 .gr-hsc-nameplate strong{
-  flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-family:var(--font-display,Cormorant Garamond,Georgia,serif);font-size:var(--fs-subtitle);font-weight:700;
-  color:#d4b878;letter-spacing:.12em;text-transform:uppercase;
-  text-shadow:0 1px 0 rgba(0,0,0,.85),0 0 1px rgba(212,184,120,.25);
+  flex:1 1 12rem;min-width:0;
+  overflow:visible;text-overflow:unset;white-space:normal;
+  font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
+  font-size:var(--fs-subtitle);font-weight:700;line-height:1.2;
+  color:#d4b878;letter-spacing:.1em;text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(0,0,0,.85);
 }
-.gr-hsc-chips{display:flex;flex-wrap:nowrap;gap:4px;margin-left:auto;flex:0 0 auto}
+.gr-hsc-chips{
+  display:flex;flex-wrap:wrap;gap:4px;
+  margin-left:0;flex:1 1 auto;justify-content:flex-start;
+}
+@media(min-width:701px){
+  .gr-hsc-chips{margin-left:auto;flex:0 1 auto;justify-content:flex-end}
+}
 .gr-hsc-chip{
   display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:2px;
   background:rgba(0,0,0,.42);border:1px solid rgba(154,122,69,.85);color:#d4b878;
@@ -617,60 +625,82 @@ function installStyles(){
 }
 .gr-hsc-chip em{font-style:normal;color:#b08a48;font-size:10px;letter-spacing:.06em;font-weight:900}
 .gr-hsc-sub{
-  margin:-2px 6px 7px;padding:0 2px;
-  font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
-  font-size:var(--fs-data);color:#5c4630;font-weight:700;letter-spacing:.03em;opacity:.9;
+  margin:-1px 4px 6px;padding:0 2px;
+  font-family:var(--hsc-serif);
+  font-size:var(--fs-data);color:#c4b49a;font-weight:600;letter-spacing:.02em;opacity:.92;
 }
 .gr-hsc-plate-face{
-  border-radius:1px;overflow:hidden;
-  border:1px solid rgba(60,42,22,.5);
+  position:relative;border-radius:1px;overflow:hidden;
+  border:1px solid rgba(154,122,69,.55);
   background:
-    linear-gradient(180deg,rgba(255,255,255,.35),transparent 18%),
-    linear-gradient(180deg,#f7f1e4,#f0e8d4 55%,#e8deca);
+    linear-gradient(180deg,rgba(255,255,255,.28),transparent 22%),
+    repeating-linear-gradient(0deg,rgba(90,70,40,.025) 0 1px,transparent 1px 3px),
+    linear-gradient(180deg,#f6f0e3,#efe6d2 58%,#e7dcc6);
   box-shadow:
-    inset 0 0 0 1px rgba(255,252,245,.55),
-    inset 0 2px 6px rgba(80,55,25,.12),
-    0 0 0 1px rgba(154,122,69,.35);
+    inset 0 0 0 1px rgba(255,252,245,.45),
+    inset 0 3px 8px rgba(40,25,10,.16),
+    inset 0 -1px 0 rgba(255,255,255,.2),
+    0 0 0 1px rgba(80,55,25,.25);
 }
 .gr-hsc-scroll{
-  display:flex;flex-direction:column;gap:7px;
-  overflow-x:auto;-webkit-overflow-scrolling:touch;padding:5px;
+  position:relative;
+  display:flex;flex-direction:column;gap:6px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;padding:4px 3px 5px;
+  scrollbar-width:thin;
 }
-.gr-hsc-nine{display:block;width:100%;min-width:460px}
+/* Subtle cue when a nine strip still overflows */
+.gr-hsc-plate-face::after{
+  content:"";position:absolute;top:0;right:0;bottom:0;width:18px;pointer-events:none;z-index:2;
+  background:linear-gradient(90deg,transparent,rgba(243,236,221,.92));
+  opacity:0;transition:opacity .15s ease;
+}
+.gr-hsc-plate-face.is-scrollable::after{opacity:1}
+.gr-hsc-nine{
+  display:block;width:100%;
+  min-width:0;
+  --hsc-label:34px;
+  --hsc-tot:30px;
+  --hsc-cols:9;
+}
 .gr-hsc-row{
-  display:grid;gap:0;align-items:stretch;font-variant-numeric:tabular-nums;
+  display:grid;
+  grid-template-columns:var(--hsc-label) repeat(var(--hsc-cols),minmax(0,1fr)) var(--hsc-tot);
+  gap:0;align-items:stretch;font-variant-numeric:tabular-nums;
   border-bottom:1px solid rgba(58,42,24,.28);
-  font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
+  font-family:var(--hsc-serif);
 }
 .gr-hsc-row:last-child{border-bottom:0}
 .gr-hsc-holes{
   background:linear-gradient(180deg,#2a2116,#18140e);
   border-bottom-color:rgba(30,20,12,.5);
 }
-.gr-hsc-holes .gr-hsc-label,.gr-hsc-holes .gr-hsc-cell{color:#d4b878;font-weight:800}
+.gr-hsc-holes .gr-hsc-label,.gr-hsc-holes .gr-hsc-cell{color:#d4b878;font-weight:700}
 .gr-hsc-pars{background:rgba(90,70,40,.06)}
 .gr-hsc-nets{background:rgba(30,70,45,.05)}
 .gr-hsc-label{
-  display:flex;align-items:center;padding:0 5px;font-size:10px;text-transform:uppercase;
-  letter-spacing:.08em;font-weight:800;color:#6a5230;border-right:1px solid rgba(58,42,24,.28);
+  display:flex;align-items:center;padding:0 3px;font-size:9px;text-transform:uppercase;
+  letter-spacing:.06em;font-weight:700;color:#6a5230;border-right:1px solid rgba(58,42,24,.28);
+  font-family:var(--hsc-serif);
 }
 .gr-hsc-holes .gr-hsc-label{border-right-color:rgba(212,184,120,.14);color:#d4b878}
 .gr-hsc-cell{
-  min-height:24px;display:grid;place-items:center;text-align:center;
-  font-size:calc(var(--fs-data) + 1px);font-weight:700;line-height:1;color:var(--ink);
-  border-right:1px solid rgba(58,42,24,.22);padding:2px 1px;
+  min-height:22px;display:grid;place-items:center;text-align:center;
+  font-size:var(--fs-data);font-weight:600;line-height:1;color:var(--ink);
+  border-right:1px solid rgba(58,42,24,.22);padding:1px 0;
+  font-family:var(--hsc-serif);
 }
 .gr-hsc-cell:last-child{border-right:0}
-.gr-hsc-num{font-weight:800}
-.gr-hsc-par{color:#3a2a18;font-weight:900}
-.gr-hsc-tot{color:#4a3820;font-weight:800;background:rgba(90,70,40,.08)}
+.gr-hsc-num{font-weight:700}
+.gr-hsc-par{color:#3a2a18;font-weight:700}
+.gr-hsc-tot{color:#4a3820;font-weight:700;background:rgba(90,70,40,.08)}
 .gr-hsc-holes .gr-hsc-tot{background:rgba(0,0,0,.28);color:#d4b878}
 .gr-hsc-score{position:relative;color:var(--ink);background:transparent;box-shadow:none;border-radius:0;margin:0}
 /* Traditional paper-card marks tightly around the gross numeral */
 .gr-hsc-gross{
   display:inline-flex;align-items:center;justify-content:center;
-  min-width:1.2em;min-height:1.2em;padding:0 .05em;
-  font-size:calc(var(--fs-data) + 2px);font-weight:900;line-height:1;color:var(--ink);
+  min-width:1.15em;min-height:1.15em;padding:0 .04em;
+  font-family:var(--hsc-serif);
+  font-size:calc(var(--fs-data) + 2px);font-weight:700;line-height:1;color:var(--ink);
   box-sizing:border-box;
 }
 .gr-hsc-score.birdie .gr-hsc-gross{
@@ -688,15 +718,15 @@ function installStyles(){
   border:1.15px solid var(--mark);border-radius:0;
   box-shadow:0 0 0 1.6px var(--parchment),0 0 0 2.75px var(--mark);
 }
-.gr-hsc-netcell{color:#1a4f34;font-weight:800}
+.gr-hsc-netcell{color:#1a4f34;font-weight:700;font-family:var(--hsc-serif)}
 .gr-hsc-nets .gr-hsc-tot{color:#1a4f34}
 .gr-hsc-empty{color:rgba(60,40,20,.28);font-weight:700}
 .gr-hsc-stats{background:rgba(70,55,30,.035)}
-.gr-hsc-stats .gr-hsc-label{font-size:9px;letter-spacing:.06em}
-.gr-hsc-mark{display:inline-block;font-size:11px;line-height:1;font-weight:900}
+.gr-hsc-stats .gr-hsc-label{font-size:8px;letter-spacing:.05em}
+.gr-hsc-mark{display:inline-block;font-size:10px;line-height:1;font-weight:900}
 .gr-hsc-mark.hit{color:#1a4f34}
 .gr-hsc-mark.miss{color:#6a5230;opacity:.75}
-.gr-hsc-putt{color:var(--ink);font-weight:800}
+.gr-hsc-putt{color:var(--ink);font-weight:700;font-family:var(--hsc-serif)}
 .gr-hsc-personal{margin-top:0}
 @media(max-width:700px){
   .gr155-recap-grid{grid-template-columns:1fr}
@@ -705,17 +735,61 @@ function installStyles(){
   .grstd-head,.grstd-row{grid-template-columns:minmax(0,1fr) 44px 54px 56px;column-gap:6px}
   .grstd-row{font-size:var(--fs-data)}
   .gr-mission-photo-thumb{width:78px;height:78px}
-  .gr-hsc-card{padding:8px 7px 7px}
-  .gr-hsc-plate{padding:7px}
-  .gr-hsc-nine{min-width:400px}
-  .gr-hsc-cell{min-height:22px}
-  .gr-hsc-nameplate{gap:5px;margin:1px 2px 6px;padding:6px 7px}
+  .gr-hsc-card{padding:7px 6px 6px}
+  .gr-hsc-plate{padding:5px 4px 4px}
+  .gr-hsc-nine{--hsc-label:28px;--hsc-tot:26px}
+  .gr-hsc-cell{min-height:20px;font-size:11px}
+  .gr-hsc-label{font-size:8px;padding:0 2px}
+  .gr-hsc-nameplate{gap:5px;margin:0 0 5px;padding:6px 7px}
+  .gr-hsc-nameplate strong{flex-basis:100%;letter-spacing:.08em;font-size:calc(var(--fs-subtitle) - 1px)}
+  .gr-hsc-chips{flex-basis:100%;margin-left:0}
   .gr-hsc-chip{padding:2px 5px}
-  .gr-hsc-gross{font-size:calc(var(--fs-data) + 1px);min-width:1.15em;min-height:1.15em}
+  .gr-hsc-gross{font-size:calc(var(--fs-data) + 1px);min-width:1.1em;min-height:1.1em}
+  .gr-hsc-scroll{padding:3px 2px 4px}
+}
+@media(max-width:400px){
+  .gr-hsc-nine{--hsc-label:24px;--hsc-tot:22px}
+  .gr-hsc-cell{font-size:10px;min-height:19px}
+  .gr-hsc-gross{font-size:11px}
 }
 `;
 }
 installStyles();
+
+/** Fade cue when a scorecard strip still has columns off-screen. */
+function syncScorecardScrollHints(root){
+  const scope=root||(typeof document!=='undefined'?document:null);
+  if(!scope||typeof scope.querySelectorAll!=='function')return;
+  scope.querySelectorAll('.gr-hsc-scroll').forEach(el=>{
+    const face=el.closest('.gr-hsc-plate-face');
+    if(!face)return;
+    const sync=()=>{
+      const overflow=el.scrollWidth>el.clientWidth+1;
+      const moreRight=overflow&&(el.scrollLeft+el.clientWidth<el.scrollWidth-2);
+      face.classList.toggle('is-scrollable',moreRight);
+    };
+    if(!el.dataset.grHscBound){
+      el.dataset.grHscBound='1';
+      el.addEventListener('scroll',sync,{passive:true});
+    }
+    sync();
+  });
+}
+function watchScorecardScroll(){
+  if(typeof window==='undefined'||typeof document==='undefined')return;
+  if(window.__grHscScrollWatch)return;
+  window.__grHscScrollWatch=true;
+  const run=()=>syncScorecardScrollHints();
+  if(typeof MutationObserver==='function'&&document.documentElement){
+    new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true});
+  }
+  if(typeof window.addEventListener==='function')window.addEventListener('resize',run,{passive:true});
+  run();
+}
+if(typeof document!=='undefined'){
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',watchScorecardScroll);
+  else watchScorecardScroll();
+}
 
 window.grEsc=esc;
 window.grFinite=finite;
@@ -729,5 +803,6 @@ window.grMissionRecapMarkup=missionRecapMarkup;
 window.grNorm=typeof norm==='function'?norm:s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 window.grCleanHoles=cleanHoles;
 window.grPersonalRoundScorecardMarkup=personalRoundScorecardMarkup;
+window.grSyncScorecardScrollHints=syncScorecardScrollHints;
 window.grSharedRecapReady=true;
 })();

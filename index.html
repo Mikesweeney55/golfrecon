@@ -3832,8 +3832,8 @@ function personalRoundScorecardHtml(r){
   }
   const holeNumbers=c?.holeNumbers?.length?c.holeNumbers.slice(0,r.holes||18):Array.from({length:r.holes||18},(_,i)=>i+1);
   return window.grPersonalRoundScorecardMarkup({
-    playerName:c?.baseName||c?.name||'Round',
-    courseName:c?.name||'',
+    playerName:c?.name||c?.baseName||'Round',
+    courseName:c?.baseName&&c?.name&&c.baseName!==c.name?c.name:'',
     date:fmtDate(r.date),
     tees:c?.tees||'',
     gross:r.gross,
@@ -5225,7 +5225,7 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=202"></script>
+  <script src="platoon-recap-shared.js?v=203"></script>
   <script src="platoon-mission-core.js?v=196"></script>
   <script src="platoon-hq-records.js?v=195"></script>
   <script src="platoons-v15-real.js?v=196"></script>
