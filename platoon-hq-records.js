@@ -441,15 +441,16 @@ function birdieBoardModel(p){
 
 function renderStandingsBubble(p,standingRows){
   const season=p?.season||new Date().getFullYear();
+  const active=standingRows.filter(x=>Number(x.played||0)>0);
   const lockup=`<div class="eagle-lockup gr-honor-lockup">
-    <div class="eagle-mark gr-honor-mark gr-honor-standings" aria-hidden="true">🏆</div>
-    <div class="gr-honor-copy"><div class="eyebrow">MY TIME POINTS</div><div class="gr-honor-sub">${esc(String(season))} season cup</div></div>
+    <div class="eagle-mark gr-honor-mark gr-honor-standings" aria-hidden="true">⛳</div>
+    <div class="gr-honor-copy"><div class="eyebrow">MY TIME ⛳ POINTS</div><div class="gr-honor-sub">${esc(String(season))} · 18Birdies pts ÷ rounds</div></div>
   </div>`;
-  const lead=standingRows[0];
-  const hero=lead?`<div class="gr-eagle-spotlight gr-standings-spotlight"><div class="gr-eagle-spotlight-label">Cup lead</div><div class="gr-eagle-spotlight-name">${esc(lead.member.name)}</div><div class="gr-eagle-spotlight-count">${lead.points}<span> pt${lead.points===1?'':'s'}</span></div></div>`:'';
-  const rows=standingRows.length
-    ? standingRows.map((x,i)=>`<div class="gr155-recap-row gr-standings-row ${i===0?'is-lead':''}"><span><b>${i+1}</b> ${esc(x.member.name)}</span><span class="gr-standings-pts">${x.points}</span></div>`).join('')
-    : '<div class="gr155-empty">No My Time Points yet — finish a Mission to open the cup.</div>';
+  const lead=active[0];
+  const hero=lead?`<div class="gr-eagle-spotlight gr-standings-spotlight"><div class="gr-eagle-spotlight-label">Cup lead</div><div class="gr-eagle-spotlight-name">${esc(lead.member?.name||lead.name)}</div><div class="gr-eagle-spotlight-count">${lead.points}<span> /rnd</span></div><div class="gr-standings-hero-meta">${Number(lead.totalPoints||0)} 18Birdies · ${Number(lead.played||0)} round${Number(lead.played)===1?'':'s'}</div></div>`:'';
+  const rows=active.length
+    ? active.map((x,i)=>`<div class="gr155-recap-row gr-standings-row ${i===0?'is-lead':''}"><span><b>${i+1}</b> ${esc(x.member?.name||x.name)}<small class="gr-standings-meta">${Number(x.totalPoints||0)} pts · ${Number(x.played||0)} rnd</small></span><span class="gr-standings-pts">${x.points}</span></div>`).join('')
+    : '<div class="gr155-empty">No My Time ⛳ Points yet — finish a Mission to open the cup.</div>';
   return `<section class="gr155-recap-block gr-honor-card gr-honor-standings-card" data-gr-hq="standings">${lockup}${hero}${rows}</section>`;
 }
 
@@ -941,6 +942,8 @@ function installStyles(){
   .gr-eagle-spotlight{display:grid;gap:1px;padding:10px 10px 9px;margin:2px 0 8px;border-radius:12px;border:1px solid rgba(212,175,106,.35);background:linear-gradient(135deg,rgba(212,175,106,.18),rgba(20,16,10,.35));box-shadow:inset 0 1px 0 rgba(255,248,235,.12),0 10px 24px rgba(0,0,0,.2)}
   .gr-birdies-spotlight{border-color:rgba(111,143,90,.4);background:linear-gradient(135deg,rgba(111,143,90,.2),rgba(16,20,14,.35))}
   .gr-standings-spotlight{border-color:rgba(212,175,106,.45)}
+  .gr-standings-hero-meta{font-size:var(--fs-data);font-weight:700;color:#c5d4cd;margin-top:4px}
+  .gr-standings-meta{display:block;font-size:var(--fs-data);font-weight:600;color:#a8b8b0;margin-top:2px;letter-spacing:0;text-transform:none}
   .gr-eagle-spotlight-label{font-size:var(--fs-subtitle);letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-family:var(--font-stencil,Oswald,sans-serif);color:var(--accent,#d4af6a)}
   .gr-eagle-spotlight-name{font-size:var(--fs-title);font-weight:600;font-family:var(--font-display,Cormorant Garamond,serif);line-height:1.15;color:#fff6e8;text-shadow:0 1px 10px rgba(0,0,0,.35)}
   .gr-eagle-spotlight-count{font-size:var(--fs-title);font-weight:600;font-family:var(--font-display,Cormorant Garamond,serif);color:var(--accent,#d4af6a);line-height:1;margin-top:3px;text-shadow:0 0 18px rgba(212,175,106,.25)}
@@ -1002,17 +1005,24 @@ function detailStatsLocal(r){
 }
 function platoonRecapMarkup(p){
   const complete=(p.missions||[]).filter(m=>m.type!=='war'&&m.status==='completed');
-  const map=new Map((p.members||[]).map(m=>[m.id,{member:m,points:0,birds:0,eagles:0,wins:0}]));
+  const cup=typeof window.grMyTimePointsStandings==='function'?window.grMyTimePointsStandings(p):{rows:[]};
+  const map=new Map((p.members||[]).map(m=>[m.id,{member:m,points:0,played:0,totalPoints:0,birds:0,eagles:0,wins:0}]));
+  for(const c of (cup.rows||[])){
+    if(!map.has(c.id))continue;
+    const x=map.get(c.id);
+    x.points=c.points;
+    x.played=c.played;
+    x.totalPoints=c.totalPoints;
+  }
   for(const m of complete)for(const r of (m.results||[])){
     const mm=canon(p,r.player_name)||memberById(p,r.hole_detail_canonical_id);
     if(!mm||!map.has(mm.id))continue;
     const x=map.get(mm.id),st=detailStatsLocal(r);
-    x.points+=Number(r.raw_points||0);
     if(Number(r.finish_position)===1)x.wins++;
     if(st.holes.length){x.birds+=st.birds.length;x.eagles+=st.eagles.length}
     else if(finite(r.eagle_count)&&Number(r.eagle_count)>0)x.eagles+=Number(r.eagle_count);
   }
-  const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
+  const rows=[...map.values()].sort((a,b)=>b.points-a.points||b.played-a.played||b.totalPoints-a.totalPoints||b.wins-a.wins||b.birds-a.birds||String(a.member.name).localeCompare(String(b.member.name)));
   const standings=renderStandingsBubble(p,rows);
   const birdies=renderBirdiesBubble(p);
   const eagle=renderClubEagleBubble(p);
@@ -1024,12 +1034,15 @@ function platoonRecapMarkup(p){
     const r=ranked[0];
     if(r)intel.push(`${displayName(p,r.player_name)} finished the latest Mission on top${finite(r.net)?` at net ${Number(r.net)}`:''}.`);
   }
-  if(rows.length){
-    const best=rows[0].points,leaders=rows.filter(x=>x.points===best);
-    intel.push(leaders.length>1?`${leaders.map(x=>x.member.name).join(' & ')} are tied atop My Time Points at ${best}.`:`${leaders[0].member.name} leads My Time Points with ${best}.`);
-    const birdVals=rows.map(x=>x.birds).filter(n=>n>0);
-    if(birdVals.length){const b=Math.max(...birdVals);const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
+  const rankedCup=rows.filter(x=>Number(x.played||0)>0);
+  if(rankedCup.length){
+    const best=rankedCup[0].points,leaders=rankedCup.filter(x=>x.points===best);
+    intel.push(leaders.length>1
+      ? `${leaders.map(x=>x.member.name).join(' & ')} are tied atop My Time ⛳ Points at ${best} per round.`
+      : `${leaders[0].member.name} leads My Time ⛳ Points at ${best} per round (${leaders[0].totalPoints} 18Birdies across ${leaders[0].played} round${leaders[0].played===1?'':'s'}).`);
   }
+  const birdVals=rows.map(x=>x.birds).filter(n=>n>0);
+  if(birdVals.length){const b=Math.max(...birdVals);const bl=rows.filter(x=>x.birds===b);intel.push(`${bl.map(x=>x.member.name).join(' & ')} ${bl.length>1?'share':'holds'} the birdie lead with ${b}.`)}
   if(!intel.length)intel.push('No completed Missions yet. The season story is still waiting to be written.');
   // Clubhouse board: standings + birdies up top, eagle stack (eagle + compact HIO), intel below.
   return `<div class="gr155-recap-grid gr155-platoon-recap gr-clubhouse-board">

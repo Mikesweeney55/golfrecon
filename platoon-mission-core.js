@@ -604,6 +604,45 @@ function warStandings(p,war){
   return {kids,completed:kids.length,total:warChildMissions(p,war).length,mode,rows};
 }
 
+/**
+ * Season My Time ⛳ Points = total 18Birdies raw_points / rounds played.
+ * Tracks totalPoints + played in the background; cup score is the average.
+ * Members only (guests do not enter the season cup).
+ */
+function fmtMyTimePoints(n){
+  if(!Number.isFinite(n))return 0;
+  const r=Math.round(n*10)/10;
+  return Number.isInteger(r)?r:r;
+}
+function myTimePointsStandings(p){
+  const complete=(p?.missions||[]).filter(m=>m&&m.type!=='war'&&m.status==='completed');
+  const map=new Map((p?.members||[]).filter(m=>m&&m.status!=='inactive').map(m=>[m.id,{
+    id:m.id,
+    member:m,
+    name:m.name,
+    played:0,
+    totalPoints:0,
+    points:0
+  }]));
+  for(const m of complete){
+    for(const r of normalizeOfficialResults(m.results||[])){
+      const mem=canon(p,r.player_name)||(r.hole_detail_canonical_id
+        ? (p?.members||[]).find(x=>String(x.id)===String(r.hole_detail_canonical_id))
+        : null);
+      if(!mem||!map.has(mem.id))continue;
+      const row=map.get(mem.id);
+      row.played+=1;
+      row.totalPoints+=Number(r.raw_points||0);
+    }
+  }
+  const rows=[...map.values()].map(r=>{
+    const points=r.played>0?fmtMyTimePoints(r.totalPoints/r.played):0;
+    return {...r,points,myTimePoints:points};
+  });
+  rows.sort((a,b)=>b.points-a.points||b.played-a.played||b.totalPoints-a.totalPoints||String(a.name).localeCompare(String(b.name)));
+  return {complete:complete.length,rows};
+}
+
 function wouldDuplicateOfficialImport(mission,rows){
   const next=resultsFingerprint(rows);
   if(!next)return false;
@@ -645,6 +684,8 @@ window.grReopenMissionDraft=reopenMissionDraft;
 window.grPreviewFromMission=previewJsonOf;
 window.grWarChildMissions=warChildMissions;
 window.grWarStandings=warStandings;
+window.grFmtMyTimePoints=fmtMyTimePoints;
+window.grMyTimePointsStandings=myTimePointsStandings;
 window.grResultsFingerprint=resultsFingerprint;
 window.grWouldDuplicateOfficialImport=wouldDuplicateOfficialImport;
 window.grStampOfficialImport=stampOfficialImport;
