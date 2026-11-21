@@ -305,11 +305,14 @@ function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=
 function closeModal(){document.getElementById('grPlatoonDialog')?.close()}
 window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW MISSION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-choice-grid"><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenMissionEditor()"><strong>Single Mission</strong><span class="muted">One competitive round — league night, Saturday game, outing</span></button><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenWarEditor()"><strong>War</strong><span class="muted">Multiple Missions under one season / league series</span></button></div>`)};
 window.grCloseModal=closeModal;
-function unsupportedImageHint(file){
+function looksLikeHeic(file){
   const name=String(file?.name||'').toLowerCase();
   const type=String(file?.type||'').toLowerCase();
-  if(type.includes('heic')||type.includes('heif')||/\.heic$|\.heif$/i.test(name)){
-    return 'This photo is HEIC/HEIF, which this browser cannot decode. On iPhone: Settings → Camera → Formats → Most Compatible, or share/export as JPG first.';
+  return type.includes('heic')||type.includes('heif')||/\.heic$|\.heif$/i.test(name);
+}
+function unsupportedImageHint(file){
+  if(looksLikeHeic(file)){
+    return 'Could not convert this HEIC photo. Try exporting as JPG from Photos, or set iPhone Camera → Formats → Most Compatible.';
   }
   return 'Could not read that image. Try JPG or PNG.';
 }
@@ -320,13 +323,40 @@ function canvasFromSize(w,h,draw,quality){
   draw(c.getContext('2d'),c.width,c.height);
   return c.toDataURL('image/jpeg',quality);
 }
-async function compressImageFile(file,{max=1280,quality=.72}={}){
-  if(!file)throw new Error('No image selected');
+let heicLoader=null;
+function loadHeic2Any(){
+  if(typeof window.heic2any==='function')return Promise.resolve(window.heic2any);
+  if(heicLoader)return heicLoader;
+  heicLoader=new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-gr-heic2any]');
+    if(existing){
+      existing.addEventListener('load',()=>typeof window.heic2any==='function'?resolve(window.heic2any):reject(new Error('HEIC converter unavailable')));
+      existing.addEventListener('error',()=>reject(new Error('HEIC converter failed to load')));
+      return;
+    }
+    const s=document.createElement('script');
+    s.src='heic2any.min.js?v=1';
+    s.async=true;
+    s.dataset.grHeic2any='1';
+    s.onload=()=>typeof window.heic2any==='function'?resolve(window.heic2any):reject(new Error('HEIC converter unavailable'));
+    s.onerror=()=>reject(new Error('HEIC converter failed to load'));
+    document.head.appendChild(s);
+  }).catch(err=>{heicLoader=null;throw err});
+  return heicLoader;
+}
+async function convertHeicToJpegFile(file){
+  const heic2any=await loadHeic2Any();
+  const converted=await heic2any({blob:file,toType:'image/jpeg',quality:0.92});
+  const blob=Array.isArray(converted)?converted[0]:converted;
+  if(!blob)throw new Error('HEIC conversion returned empty image');
+  const base=String(file?.name||'photo').replace(/\.(heic|heif)$/i,'')||'photo';
+  return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+}
+async function decodeImageToDataUrl(file,{max=1280,quality=.72}={}){
   const paint=(srcW,srcH,draw)=>{
     const scale=Math.min(1,max/Math.max(srcW,srcH));
     return canvasFromSize(srcW*scale,srcH*scale,draw,quality);
   };
-  // Prefer createImageBitmap — more reliable than Image()+dataURL for camera-roll photos.
   if(typeof createImageBitmap==='function'){
     try{
       const bmp=await createImageBitmap(file);
@@ -341,7 +371,7 @@ async function compressImageFile(file,{max=1280,quality=.72}={}){
       try{resolve(paint(img.naturalWidth||img.width,img.naturalHeight||img.height,(ctx,w,h)=>ctx.drawImage(img,0,0,w,h)))}
       catch(e){reject(e)}
     };
-    img.onerror=()=>reject(new Error(unsupportedImageHint(file)));
+    img.onerror=()=>reject(new Error('decode-failed'));
     img.src=url;
   });
   try{
@@ -355,8 +385,23 @@ async function compressImageFile(file,{max=1280,quality=.72}={}){
     r.onload=()=>resolve(String(r.result||''));
     r.readAsDataURL(file);
   });
-  try{return await fromUrl(dataUrl)}
-  catch(e){throw e instanceof Error?e:new Error(unsupportedImageHint(file))}
+  return fromUrl(dataUrl);
+}
+async function compressImageFile(file,{max=1280,quality=.72}={}){
+  if(!file)throw new Error('No image selected');
+  // Native decode first (Safari can sometimes read HEIC).
+  try{return await decodeImageToDataUrl(file,{max,quality})}catch{/* convert path */}
+  // iPhone camera-roll HEIC: convert in-browser, then compress as JPEG.
+  if(looksLikeHeic(file)){
+    try{
+      const jpeg=await convertHeicToJpegFile(file);
+      return await decodeImageToDataUrl(jpeg,{max,quality});
+    }catch(err){
+      console.warn('HEIC convert failed',err);
+      throw new Error(unsupportedImageHint(file));
+    }
+  }
+  throw new Error(unsupportedImageHint(file));
 }
 function clubhousePhotosOf(p){
   return Array.isArray(p?.clubhousePhotos)?p.clubhousePhotos.filter(x=>x&&x.dataUrl).slice(0,8):[];
@@ -398,7 +443,7 @@ window.grOpenSetup=()=>{
     </div>
     <div class="gr-clubhouse-photos-setup">
       <div class="eyebrow" style="margin-top:14px">CLUBHOUSE PHOTOS</div>
-      <p class="muted" style="font-size:11px;margin:6px 0 8px">Add group shots for the background rotation (up to 8). Use <strong>Replace</strong> on a thumb to swap one, ✕ to remove, or Clear all. JPG/PNG preferred.</p>
+      <p class="muted" style="font-size:11px;margin:6px 0 8px">Add group shots for the background rotation (up to 8). Use <strong>Replace</strong> on a thumb to swap one, ✕ to remove, or Clear all. iPhone HEIC photos convert automatically.</p>
       <div id="grClubhouseThumbs">${renderClubhousePhotoThumbs(photos)}</div>
       <input id="grPClubReplace" type="file" accept="image/*" hidden>
       <div class="gr-clubhouse-photo-actions" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">
