@@ -157,19 +157,23 @@ function missionHoleFrame(detail){
   return {holes,front,back,parByHole,players:withHoles};
 }
 
-/** Strokes received on a hole when SI is unknown — hole # stands in as rank. */
-function strokesOnHole(hcp,hole){
+/** Strokes received on a hole. Prefer course SI when provided; else hole # as rank. */
+function strokesOnHole(hcp,hole,siByHole=null){
   if(!finite(hcp)||Number(hcp)<=0||!Number.isInteger(hole))return 0;
   const h=Math.max(0,Math.floor(Number(hcp)));
   const full=Math.floor(h/18);
   const rem=h%18;
-  return full+(hole<=rem?1:0);
+  let rank=hole;
+  if(siByHole instanceof Map&&siByHole.has(hole)&&finite(siByHole.get(hole))){
+    rank=Math.max(1,Math.min(18,Math.round(Number(siByHole.get(hole)))));
+  }
+  return full+(rank<=rem?1:0);
 }
-function holeNetValue(h,hcp,parByHole){
+function holeNetValue(h,hcp,parByHole,siByHole=null){
   if(finite(h?.net))return Number(h.net);
   if(!finite(h?.score))return null;
   if(!finite(hcp))return null;
-  return Number(h.score)-strokesOnHole(hcp,h.hole);
+  return Number(h.score)-strokesOnHole(hcp,h.hole,siByHole);
 }
 
 function markCell(hit){
@@ -183,7 +187,7 @@ function statHitRate(vals){
   const hits=known.filter(v=>v===1).length;
   return {hits,n:known.length,pct:Math.round(100*hits/known.length)};
 }
-function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true,showStats=true}={}){
+function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true,showStats=true,siByHole=null}={}){
   if(!holeNums.length)return'';
   const totalLabel=holeNums[0]<=9?'OUT':'IN';
   const row=(cls,label,cells,tot)=>`<div class="gr-hsc-row ${cls}"><div class="gr-hsc-label">${label}</div>${cells}<div class="gr-hsc-cell gr-hsc-tot">${tot}</div></div>`;
@@ -203,12 +207,13 @@ function nineStripMarkup(holeNums,parByHole,playerHoleMap,{hcp=null,showNet=true
   if(showNet){
     const netCells=holeNums.map(n=>{
       const h=playerHoleMap.get(n);
-      const nv=holeNetValue(h,hcp,parByHole);
+      const nv=holeNetValue(h,hcp,parByHole,siByHole);
       if(!finite(nv))return`<div class="gr-hsc-cell gr-hsc-empty">·</div>`;
       return`<div class="gr-hsc-cell gr-hsc-netcell">${Number(nv)}</div>`;
     }).join('');
-    const netVals=holeNums.map(n=>holeNetValue(playerHoleMap.get(n),hcp,parByHole));
-    const netSum=netVals.every(finite)?netVals.reduce((s,v)=>s+Number(v),0):null;
+    const netVals=holeNums.map(n=>holeNetValue(playerHoleMap.get(n),hcp,parByHole,siByHole));
+    const known=netVals.filter(finite);
+    const netSum=known.length===holeNums.length?known.reduce((s,v)=>s+Number(v),0):(known.length?known.reduce((s,v)=>s+Number(v),0):null);
     netRow=row('gr-hsc-nets','NET',netCells,netSum!=null?netSum:'·');
   }
   let statsRows='';
@@ -322,7 +327,13 @@ function personalRoundScorecardMarkup(opts={}){
   const name=String(opts.playerName||opts.name||'Round').trim()||'Round';
   const gross=finite(opts.gross)?Number(opts.gross):null;
   const net=finite(opts.net)?Number(opts.net):null;
-  const hcp=finite(opts.handicap??opts.hcp)?Number(opts.handicap??opts.hcp):null;
+  const hcpExplicit=finite(opts.handicap??opts.hcp)?Number(opts.handicap??opts.hcp):null;
+  // Personal rounds often store round net without course handicap — derive strokes from G−N.
+  const hcp=hcpExplicit!=null?hcpExplicit:(gross!=null&&net!=null?Math.max(0,Math.round(gross-net)):null);
+  const siByHole=new Map();
+  const siList=Array.isArray(opts.handicaps)?opts.handicaps:[];
+  holeNumbers.forEach((n,i)=>{if(finite(siList[i]))siByHole.set(n,Number(siList[i]));});
+  const showNet=net!=null||hcp!=null||[...map.values()].some(h=>finite(h.net));
   const fwRate=statHitRate(holeNumbers.map(n=>map.get(n)?.fairway));
   const girRate=statHitRate(holeNumbers.map(n=>map.get(n)?.gir));
   const puttKnown=holeNumbers.map(n=>map.get(n)?.putts).filter(finite);
@@ -336,9 +347,10 @@ function personalRoundScorecardMarkup(opts={}){
     puttSum!=null?`<span class="gr-hsc-chip"><em>P</em>${puttSum}</span>`:''
   ].filter(Boolean).join('');
   const sub=[opts.courseName,opts.date,opts.tees?`${opts.tees} tees`:''].filter(Boolean).map(esc).join(' · ');
+  const stripOpts={hcp,showNet,showStats:true,siByHole:siByHole.size?siByHole:null};
   const strips=[
-    nineStripMarkup(useFront,parByHole,map,{hcp,showNet:net!=null||hcp!=null,showStats:true}),
-    useBack.length?nineStripMarkup(useBack,parByHole,map,{hcp,showNet:net!=null||hcp!=null,showStats:true}):''
+    nineStripMarkup(useFront,parByHole,map,stripOpts),
+    useBack.length?nineStripMarkup(useBack,parByHole,map,stripOpts):''
   ].join('');
   return `<section class="gr-hsc-board gr-hsc-personal"><div class="gr-hsc-board-head"><div class="gr155-recap-title">SCORECARD</div><span class="gr-hsc-legend">○ birdie · □ bogey · ● hit · ○ miss</span></div>
     <article class="gr-hsc-card">
