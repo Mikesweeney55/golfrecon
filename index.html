@@ -33,7 +33,7 @@
   --font-body:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
 }
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(circle at 18% -8%,#2a2218 0,#0e0c09 42%),var(--bg);color:var(--text);font:15px/1.45 var(--font-body)}
+body{margin:0;background:radial-gradient(circle at 18% -8%,#2a2218 0,#0e0c09 42%),var(--bg);color:var(--text);font:16px/1.45 var(--font-body)}
 button,input,select{font:inherit}
 button{cursor:pointer}
 .app-shell{max-width:920px;margin:0 auto;min-height:100vh;padding:18px 18px 96px}
@@ -1591,7 +1591,7 @@ body::before,body::after{opacity:0!important}
 }
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=181">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=182">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -3542,17 +3542,38 @@ function openMissionImport(id){
     return reviewed;
   };
   const saveReviewed=()=>{
+    const unmatched=[...out.querySelectorAll('tr[data-import-row]')].filter(tr=>{
+      const name=String(tr.querySelector('[data-name]')?.value||'').trim();
+      const match=tr.querySelector('[data-match]')?.value||'';
+      return name&&!match;
+    });
+    if(unmatched.length){
+      alert(`Link every player to the roster before saving (${unmatched.length} still unmatched). If someone is a guest, add them in Setup first or skip that row.`);
+      return;
+    }
     const rows=collectReviewed();
     if(!rows.length){alert('Keep at least one player row before saving.');return}
     if(typeof window.grWouldDuplicateOfficialImport==='function'&&window.grWouldDuplicateOfficialImport(m,rows)){
       if(!confirm('These results match an import already saved for this Mission. Save again anyway?'))return;
     }
     if(typeof window.grStampOfficialImport==='function'){
-      const stamped=window.grStampOfficialImport(m,rows);
+      const stamped=window.grStampOfficialImport(m,rows,{platoon:p});
       if(!stamped.ok){alert(stamped.error||'Could not save results.');return}
     }else if(typeof window.grSetOfficialResults==='function'){
-      window.grSetOfficialResults(m,rows,{markCompleted:true});
+      window.grSetOfficialResults(m,rows,{markCompleted:true,platoon:p});
     }else{m.results=rows;m.status='completed'}
+    // Remember confirmed aliases from Match column when the typed name differs.
+    for(const tr of out.querySelectorAll('tr[data-import-row]')){
+      const memberId=tr.querySelector('[data-match]')?.value||'';
+      const typed=String(tr.querySelector('[data-name]')?.value||'').trim();
+      const member=(p.members||[]).find(x=>x.id===memberId);
+      if(!member||!typed)continue;
+      const aliases=Array.isArray(member.aliases)?member.aliases:[];
+      if(typed.toLowerCase()!==String(member.name||'').toLowerCase()&&!aliases.some(a=>String(a).toLowerCase()===typed.toLowerCase())){
+        member.aliases=[...aliases,typed];
+        member.nickname=member.aliases.join(', ');
+      }
+    }
     savePlatoonLocal(p);d.close();
   };
   btn.onclick=async()=>{
@@ -4654,6 +4675,10 @@ function embeddedRoundSignatures(){
 }
 function findExistingRoundForParsed(pr){
   const r=pr?.round||pr;if(!r)return null;
+  if(r.missionFingerprint){
+    const byFp=db.rounds.find(x=>x.missionFingerprint&&String(x.missionFingerprint)===String(r.missionFingerprint));
+    if(byFp)return byFp;
+  }
   const wantedDate=String(r.date||r.played_on||'');
   const wantedGross=Number(r.gross_score??r.gross);
   const wantedHoles=Number(r.holes||((r.holes_detail||r.hole_details||[]).length)||0);
@@ -4666,6 +4691,118 @@ function findExistingRoundForParsed(pr){
     return dateOk&&grossOk&&holesOk&&courseOk;
   })||null;
 }
+
+function missionSeedSignature(seed){
+  return [
+    String(seed?.date||''),
+    String(seed?.course_name||'').trim().toLowerCase(),
+    seed?.gross??'',
+    Array.isArray(seed?.holes)?seed.holes.length:''
+  ].join('|');
+}
+function findPersonalRoundForMissionSeed(seed){
+  if(!seed||typeof db==='undefined'||!Array.isArray(db?.rounds))return null;
+  if(seed.personal_round_id){
+    const byId=db.rounds.find(r=>String(r.id)===String(seed.personal_round_id));
+    if(byId)return byId;
+  }
+  const wantedDate=String(seed.date||'');
+  const wantedGross=Number(seed.gross);
+  return db.rounds.find(x=>{
+    if(x.missionFingerprint&&seed.fingerprint&&String(x.missionFingerprint)===String(seed.fingerprint))return true;
+    const cc=db.courses.find(c=>c.id===x.courseId);
+    const dateOk=String(x.date||'')===wantedDate;
+    const grossOk=!Number.isFinite(wantedGross)||Number(x.gross)===wantedGross;
+    const courseOk=courseNameScore(seed.course_name,cc?.baseName||cc?.name)>=58;
+    return dateOk&&grossOk&&courseOk;
+  })||null;
+}
+function fillBlankArray(dst,src){
+  if(!Array.isArray(src))return Array.isArray(dst)?dst:null;
+  const out=Array.isArray(dst)?dst.slice():Array.from({length:src.length},()=>null);
+  src.forEach((v,i)=>{if((out[i]==null||out[i]==='')&&v!=null&&v!=='')out[i]=v});
+  return out;
+}
+/** Merge a mission scorecard seed into this device's personal rounds (blanks-only). */
+function mergeMissionSeedIntoPersonal(seed,resultRow){
+  if(!seed||typeof db==='undefined'||!Array.isArray(db.rounds))return {claimed:false};
+  try{
+    const fakeParsed={
+      confidence:1,
+      round:{
+        date:seed.date,
+        course_name:seed.course_name,
+        course_id:seed.course_id,
+        gross_score:seed.gross,
+        net_score:seed.net,
+        holes:Array.isArray(seed.holes)?seed.holes.length:18,
+        holes_detail:(seed.holes||[]).map(h=>({
+          hole:h.hole,par:h.par,score:h.score,
+          putts:h.putts,fairway_hit:h.fairway_hit,gir:h.gir,
+          chips:h.chips,sand:h.sand,penalties:h.penalties,
+          fairway_direction:h.fairway_direction,gir_direction:h.gir_direction,
+          first_putt_distance_ft:h.first_putt_distance_ft
+        })),
+        source_app:'Mission Import'
+      }
+    };
+    let existing=findPersonalRoundForMissionSeed(seed);
+    if(!existing){
+      const created=mergeImportedRound(fakeParsed,null);
+      if(created?.added){
+        existing=db.rounds[db.rounds.length-1];
+        existing.missionFingerprint=seed.fingerprint;
+        existing.missionId=seed.mission_id;
+        existing.source=existing.source||'Mission Import';
+        if(typeof save==='function')save();
+        return {claimed:true,merged:true,roundId:existing.id};
+      }
+      // duplicate path — locate again
+      existing=findExistingRoundForParsed(fakeParsed)||findPersonalRoundForMissionSeed(seed);
+    }
+    if(!existing)return {claimed:false};
+    // Fill blanks only onto the existing personal round.
+    const hd=fakeParsed.round.holes_detail||[];
+    const holes=existing.holes||hd.length||18;
+    const arr=(key)=>Array.from({length:holes},(_,i)=>{
+      const h=hd.find(x=>Number(x.hole)===i+1)||hd[i];
+      return h?.[key]??null;
+    });
+    existing.scores=fillBlankArray(existing.scores,arr('score'));
+    existing.putts=fillBlankArray(existing.putts,arr('putts'));
+    existing.fairways=fillBlankArray(existing.fairways,arr('fairway_hit').map(v=>v===true?1:v===false?0:v));
+    existing.gir=fillBlankArray(existing.gir,arr('gir').map(v=>v===true?1:v===false?0:v));
+    if(existing.net==null&&seed.net!=null)existing.net=seed.net;
+    if(existing.gross==null&&seed.gross!=null)existing.gross=seed.gross;
+    existing.missionFingerprint=seed.fingerprint||existing.missionFingerprint;
+    existing.missionId=seed.mission_id||existing.missionId;
+    if(resultRow)resultRow.personal_round_id=String(existing.id);
+    if(typeof save==='function')save();
+    return {claimed:true,merged:true,roundId:existing.id};
+  }catch(e){
+    console.warn('Mission scorecard claim failed',e);
+    return {claimed:false,error:String(e?.message||e)};
+  }
+}
+function resolveCurrentPlatoonMemberId(p){
+  try{
+    const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const meta=session?.user?.user_metadata||{};
+    const names=[meta.username,meta.display_name,meta.full_name,p?.chief]
+      .map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+    const members=p?.members||[];
+    for(const m of members){
+      const n=String(m.name||'').trim().toLowerCase();
+      if(!n)continue;
+      if(names.some(x=>x===n||n.includes(x)||x.includes(n)))return m.id;
+    }
+    return members.find(m=>m.role==='chief')?.id||null;
+  }catch{return (p?.members||[]).find(m=>m.role==='chief')?.id||null}
+}
+window.grResolveCurrentPlatoonMemberId=resolveCurrentPlatoonMemberId;
+window.grMergeMissionSeedIntoPersonal=mergeMissionSeedIntoPersonal;
+window.grFindPersonalRoundForMissionSeed=findPersonalRoundForMissionSeed;
+
 function mergeImportedRound(parsed, importId){
   const r=parsed?.round;
   if(!r)return false;
@@ -4944,11 +5081,11 @@ initializeAuth();
 
 </script>
   <script src="platoon-recap-shared.js?v=4"></script>
-  <script src="platoon-mission-core.js?v=5"></script>
+  <script src="platoon-mission-core.js?v=6"></script>
   <script src="platoon-hq-records.js?v=177"></script>
-  <script src="platoons-v15-real.js?v=181"></script>
+  <script src="platoons-v15-real.js?v=182"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
-  <script src="dev-v15.5-results.js?v=180"></script>
+  <script src="dev-v15.5-results.js?v=181"></script>
 <script src="past-mission-import.js?v=172"></script>
 <script src="mission-delete.js?v=4"></script>
 </body>

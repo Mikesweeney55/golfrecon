@@ -273,11 +273,6 @@ function groupsV15(){
         <div class="eyebrow">CLUBHOUSE</div>
         <div class="gr-platoon-name">${E(p.name||'My Time')}</div>
         <div class="gr-platoon-motto">${E(p.motto||'The flash board for the group.')}</div>
-        <div class="gr-hq-actions">
-          <button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button>
-          ${pastBtn}
-          <button class="button primary" onclick="grOpenOperation()">+ Mission</button>
-        </div>
       </div>
       <div class="gr-clubhouse-logo-wrap">${p.logoData?`<img class="gr-platoon-logo" src="${E(p.logoData)}" alt="Platoon logo">`:'<div class="gr-logo-placeholder">PLATOON<br>LOGO</div>'}</div>
       <div class="gr-clubhouse-board-wrap">${platoonStandingsMarkup(p)}</div>
@@ -290,6 +285,17 @@ function groupsV15(){
     <section class="gr-section" id="grCompletedMissions">
       <div class="gr-section-head"><div><div class="eyebrow">ARCHIVE</div><h2>Completed Missions</h2></div></div>
       ${completedBody}
+    </section>
+    <section class="gr-section gr-hq-command" id="grHqCommand">
+      <div class="gr-section-head"><div><div class="eyebrow">COMMAND</div><h2>Platoon tools</h2></div></div>
+      <div class="card gr-hq-command-card">
+        <p class="muted gr-hq-command-copy">Setup, imports, and new Missions live down here so the clubhouse board stays front and center.</p>
+        <div class="gr-hq-actions">
+          <button class="button secondary" onclick="grOpenSetup()">⚙ Setup</button>
+          ${pastBtn}
+          <button class="button primary" onclick="grOpenOperation()">+ Mission</button>
+        </div>
+      </div>
     </section>
   </div>`;
   return withSubNav(home);
@@ -825,6 +831,13 @@ if(!document.body.dataset.grPlatoonShellBound){
 
 try{groupsView=groupsV15}catch{window.groupsView=groupsV15}
 window.grGroupsView=groupsV15;
+try{
+  const p=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
+  if(p&&typeof window.grClaimMissionScorecardsIntoPersonalDb==='function'){
+    const claim=window.grClaimMissionScorecardsIntoPersonalDb(p);
+    if(claim?.claimed&&typeof savePlatoonLocal==='function')savePlatoonLocal(p,false);
+  }
+}catch{}
 const refresh=()=>{try{if(typeof state!=='undefined'&&state.view==='groups'&&typeof render==='function')render()}catch{}};
 setTimeout(refresh,0);
 })();
