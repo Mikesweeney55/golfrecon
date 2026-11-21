@@ -2457,7 +2457,11 @@ async function warmNearbyCourseGeocodes(exceptId){
 async function geocodeGolfCourse(c,opts={}){
   const key=`geo:v4:${c.id}`;
   if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
-  if(!opts.skipWarm){try{await warmNearbyCourseGeocodes(c.id)}catch{}}
+  // Do not block the first hole on sibling warm-up — Country Club scoring already
+  // prefers Dracut-style hits cold. Warm nearby courses in the background for later bias.
+  if(!opts.skipWarm){
+    queueMicrotask(()=>{warmNearbyCourseGeocodes(c.id).catch(()=>{})});
+  }
   const storedLat=Number(c.lat??c.mapLat??c.geoLat??c.latitude);
   const storedLon=Number(c.lon??c.mapLon??c.geoLon??c.longitude);
   if(Number.isFinite(storedLat)&&Number.isFinite(storedLon)){
@@ -2937,7 +2941,10 @@ function initInteractiveCourseMap(){
 async function ensureCoursePreviewLoaded(courseId,hole){
   const c=course(courseId); if(!c||!['pregame','coursePreview'].includes(state.view))return;
   const key=`preview:${courseId}:${hole}`;
-  if(coursePreviewCache.has(key))return;
+  const existing=coursePreviewCache.get(key);
+  // Successful (or confirmed empty-geometry) loads stick; network errors can retry.
+  if(existing && !existing.error)return;
+  if(existing?.error)coursePreviewCache.delete(key);
   // Track in-flight loads per course/hole so switching courses is never blocked.
   if(!window.__grPreviewLoading)window.__grPreviewLoading=new Set();
   if(window.__grPreviewLoading.has(key))return;
@@ -2952,13 +2959,11 @@ async function ensureCoursePreviewLoaded(courseId,hole){
   }
   try{
     const courseData=await loadOsmCourse(c);
-    // Guard against late responses from a previously selected course.
-    if(String(state.selectedCourseId)!==String(courseId)&&state.view==='pregame'){
-      coursePreviewCache.set(key,{courseData,geom:selectedHoleGeometry(courseData,hole)});
-      return;
-    }
     const geom=selectedHoleGeometry(courseData,hole);
+    // Always stamp courseId so a late response cannot paint another course's geometry.
     coursePreviewCache.set(key,{courseData,geom,courseId:String(courseId)});
+    // Guard against late responses from a previously selected course.
+    if(String(state.selectedCourseId)!==String(courseId)&&state.view==='pregame')return;
     if(!geom&&String(state.selectedCourseId)===String(courseId)){
       state.coursePreviewError='Map geometry is unavailable for this hole on OpenStreetMap. Scorecard hole # / par / yardage still show above — nothing from another course is used.';
     }
@@ -2971,6 +2976,35 @@ async function ensureCoursePreviewLoaded(courseId,hole){
     if(String(state.selectedCourseId)===String(courseId))state.coursePreviewLoading=false;
     if((state.view==='pregame'||state.view==='coursePreview')&&String(state.selectedCourseId)===String(courseId))render();
   }
+}
+window.retryCoursePreview=()=>{
+  const id=state.selectedCourseId,hole=state.coursePreviewHole;
+  if(!id||!hole)return;
+  coursePreviewCache.delete(`preview:${id}:${hole}`);
+  coursePreviewCache.delete(`osm:v4:${id}`);
+  coursePreviewCache.delete(`geo:v4:${id}`);
+  state.coursePreviewError=null;
+  state.coursePreviewLoading=false;
+  render();
+};
+/** Interactive Mapbox when token+geom exist; otherwise ArcGIS/static satellite tiles with OSM overlay. */
+function holePreviewMapBodyHtml(c,hole,cached){
+  const mb=mapboxToken();
+  const geomOk=Boolean(cached?.geom&&(!cached.courseId||String(cached.courseId)===String(c.id)));
+  const waiting=!cached&&!state.coursePreviewError;
+  const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is loading the golf-course data for this hole.';
+  if(mb&&geomOk&&window.mapboxgl){
+    return `<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`;
+  }
+  if(geomOk){
+    // ArcGIS (or Mapbox-tile) static satellite stack — works without interactive GL.
+    return satelliteHoleMap(cached.geom)||osmHoleSvg(cached.geom)||`<div class="preview-map-empty"><div><strong>Map unavailable</strong><span>Hole geometry loaded but the satellite overlay could not be drawn.</span></div></div>`;
+  }
+  const emptyTitle=state.coursePreviewLoading||waiting
+    ? `Loading Hole ${hole}…`
+    : (cached&&!cached.geom?'Map unavailable — scorecard details still shown':'Hole geometry not available yet');
+  const retry=(!state.coursePreviewLoading&&!waiting)?`<div style="margin-top:12px"><button type="button" class="hole-preview-btn" onclick="retryCoursePreview()">Retry map</button></div>`:'';
+  return `<div class="preview-map-empty"><div><strong>${emptyTitle}</strong><span>${safeText(emptyMsg)}</span>${retry}</div></div>`;
 }
 window.openHolePreview=(hole,courseId=state.selectedCourseId)=>{
   if(!course(courseId))return;
@@ -3126,17 +3160,8 @@ function pregameHoleInsightsHtml(c,priority=[]){
   }
   const avgScore=h?.avgScore;
   const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
-  const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is loading the golf-course data for this hole.';
   const mb=mapboxToken();
-  const mapReady=Boolean(mb&&cached?.geom&&(!cached.courseId||String(cached.courseId)===String(c.id)));
-  const waiting=!cached&&!state.coursePreviewError;
-  const emptyTitle=state.coursePreviewLoading||waiting
-    ? `Loading Hole ${hole}…`
-    : (!mb?'Mapbox token required'
-      :(cached&&!cached.geom?'Map unavailable — scorecard details still shown':'Hole geometry not available yet'));
-  const mapBody=mapReady
-    ? `<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`
-    : `<div class="preview-map-empty"><div><strong>${emptyTitle}</strong><span>${safeText(!mb?'Set your Mapbox token to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
+  const mapBody=holePreviewMapBodyHtml(c,hole,cached);
   const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
   const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
   const holePar=h?.par??c.pars?.[holeIdx]??'—';
@@ -3145,13 +3170,14 @@ function pregameHoleInsightsHtml(c,priority=[]){
   const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
   const insight=h?usefulHoleInsight(h):'';
   const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
+  const interactive=Boolean(mb&&cached?.geom);
   return `
     <section id="pregameHoleInsights" class="pregame-hole-insights">
       <div class="section-head">
         <div><div class="eyebrow">HOLE INSIGHTS</div><h2>Hole ${hole}</h2></div>
         <button class="button secondary" type="button" onclick="toggleCoursePreviewHoles()">${state.coursePreviewShowAll?'Hide holes':'Show all holes'}</button>
       </div>
-      ${!mb?`<div class="mapbox-missing">Satellite view needs your Mapbox public token. <button type="button" class="hole-preview-btn" onclick="configureMapboxToken()">Set Mapbox token</button></div>`:''}
+      ${!mb?`<div class="mapbox-missing">Showing free satellite imagery. For interactive pan/zoom, <button type="button" class="hole-preview-btn" onclick="configureMapboxToken()">set a Mapbox token</button>.</div>`:''}
       ${state.coursePreviewShowAll?`<div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>`:''}
       <div class="preview-hero-grid">
         <div>
@@ -3162,8 +3188,8 @@ function pregameHoleInsightsHtml(c,priority=[]){
             </div>
             <div id="coursePreviewMapBody">${mapBody}</div>
           </div>
-          <div class="preview-map-tools"><span>Drag to pan · scroll or pinch to zoom</span><button type="button" onclick="resetCoursePreviewMap()">Fit hole</button></div>
-          <div class="preview-attribution">Satellite imagery © Mapbox / providers · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
+          <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom':'Satellite overlay · set Mapbox for interactive pan/zoom'}</span>${interactive?`<button type="button" onclick="resetCoursePreviewMap()">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
+          <div class="preview-attribution">Satellite imagery © ${interactive?'Mapbox / providers':'Esri / providers'} · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
         </div>
         <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
           ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
@@ -3329,10 +3355,8 @@ function coursePreviewView(){
   }
   const avgScore=h?.avgScore;
   const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
-  const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is checking the golf-course data for this hole.';
   const mb=mapboxToken();
-  const mapReady=Boolean(mb&&cached?.geom&&(!cached.courseId||String(cached.courseId)===String(c.id)));
-  const mapBody=mapReady?`<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`:`<div class="preview-map-empty"><div><strong>${state.coursePreviewLoading?`Loading Hole ${hole}…`:(!mb?'Mapbox token required':'Hole geometry not available yet')}</strong><span>${safeText(!mb?'Set your Mapbox token above to enable the interactive satellite hole view.':emptyMsg)}</span></div></div>`;
+  const mapBody=holePreviewMapBodyHtml(c,hole,cached);
   const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
   const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
   const holePar=h?.par??c.pars?.[holeIdx]??'—';
@@ -3341,14 +3365,15 @@ function coursePreviewView(){
   const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
   const insight=h?usefulHoleInsight(h):'';
   const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
+  const interactive=Boolean(mb&&cached?.geom);
   return `
     <div class="preview-page-head">
       <button class="preview-back" type="button" onclick="closeCoursePreview()">← Back</button>
       <div class="muted">${safeText(c.name)} · ${safeText(c.tees||'')} tees</div>
     </div>
     <div class="section-head"><div><div class="eyebrow">COURSE PREVIEW</div><h2>${safeText(c.name)}</h2></div></div>
-    <div class="mapbox-row"><span><span class="mapbox-dot ${mb?'ready':''}"></span>${mb?'Mapbox Satellite ready':'Mapbox Satellite not configured'}</span><button type="button" onclick="configureMapboxToken()">${mb?'Change token':'Set Mapbox token'}</button></div>
-    ${mb?'':`<div class="mapbox-missing">For the upgraded satellite imagery, tap <strong>Set Mapbox token</strong> and paste a free public Mapbox token. Until then GolfRecon falls back to the previous imagery source.</div>`}
+    <div class="mapbox-row"><span><span class="mapbox-dot ${mb?'ready':''}"></span>${mb?'Mapbox Satellite ready':'Free satellite fallback active'}</span><button type="button" onclick="configureMapboxToken()">${mb?'Change token':'Set Mapbox token'}</button></div>
+    ${mb?'':`<div class="mapbox-missing">Hole Preview works with free satellite tiles now. Optional: tap <strong>Set Mapbox token</strong> for interactive pan/zoom.</div>`}
     <div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>
 
     <div class="preview-hero-grid">
@@ -3360,8 +3385,8 @@ function coursePreviewView(){
           </div>
           <div id="coursePreviewMapBody">${mapBody}</div>
         </div>
-        <div class="preview-map-tools"><span>Drag to pan · scroll or pinch to zoom · use + / − for step zoom</span><button type="button" onclick="resetCoursePreviewMap()">Fit hole</button></div>
-        <div class="preview-attribution">Satellite imagery © Mapbox / providers · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
+        <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom · use + / − for step zoom':'Satellite overlay · set Mapbox for interactive pan/zoom'}</span>${interactive?`<button type="button" onclick="resetCoursePreviewMap()">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
+        <div class="preview-attribution">Satellite imagery © ${interactive?'Mapbox / providers':'Esri / providers'} · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
       </div>
 
       <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
