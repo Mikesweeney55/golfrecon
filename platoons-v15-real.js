@@ -288,6 +288,7 @@ function platoonStandings(p){
   const members=membersOf(p),score=new Map(members.map(m=>[String(m.name||'').trim().toLowerCase(),{name:m.name,points:0,played:0,totalPoints:0}]));
   for(const m of (p.missions||[])){
     if(m.type==='war'||m.status!=='completed')continue;
+    if(m.league_points===false)continue;
     for(const r of resultRows(m)){
       const k=String(r.player_name||'').trim().toLowerCase();
       if(!score.has(k))continue;
@@ -322,15 +323,22 @@ function missionActions(m,warId){
   return `<div class="gr-mini-actions">${bits.join('')}</div>`;
 }
 
+function leagueTag(m){
+  if(m?.status!=='completed')return'';
+  const counts=typeof window.grCountsForLeaguePoints==='function'?window.grCountsForLeaguePoints(m):m.league_points!==false;
+  return counts
+    ? `<span class="gr-tag gr-league-on" title="Counts toward My Time ⛳ Points">⛳ Cup</span>`
+    : `<span class="gr-tag gr-league-off" title="Excluded from My Time ⛳ Points">No cup</span>`;
+}
 function missionCard(p,m,featured=false){
   const people=peopleOf(p,m),pre=previewFor(p,m),warId=warIdOf(m),phase=phaseOf(m);
   const showPrev=phase==='ready'||phase==='in_progress';
-  return `<div class="gr-mission ${featured?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}</div></div><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div>${showPrev?previewMarkup(pre):''}${phase==='completed'?`<div class="gr-summary gr-summary-compact">${missionSummaryMarkup(m)}</div>`:''}${missionActions(m,warId)}</div>`;
+  return `<div class="gr-mission ${featured?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}${leagueTag(m)}</div></div><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div>${showPrev?previewMarkup(pre):''}${phase==='completed'?`<div class="gr-summary gr-summary-compact">${missionSummaryMarkup(m)}</div>`:''}${missionActions(m,warId)}</div>`;
 }
 
 function completedMissionAccordion(p,m,open=false){
   const people=peopleOf(p,m),warId=warIdOf(m),phase=phaseOf(m);
-  return `<details class="gr-mission gr-mission-accordion ${open?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}" ${open?'open':''}><summary class="gr-mission-accordion-sum"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}</div></div></summary><div class="gr-mission-accordion-body"><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div><div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>${missionActions(m,warId)}</div></details>`;
+  return `<details class="gr-mission gr-mission-accordion ${open?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}" ${open?'open':''}><summary class="gr-mission-accordion-sum"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}${leagueTag(m)}</div></div></summary><div class="gr-mission-accordion-body"><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div><div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>${missionActions(m,warId)}</div></details>`;
 }
 
 function leaderboard(p,war){
@@ -960,6 +968,14 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
       <div class="gr-guest-list" id="grGuests"></div>
     </label>
     <label>Notes<textarea id="grMNotes" rows="2" placeholder="Optional">${E(baseNotes)}</textarea></label>
+    <div class="gr-league-points-toggle" style="margin-top:12px">
+      <div class="eyebrow">MY TIME ⛳ POINTS</div>
+      <p class="muted" style="font-size:var(--fs-data);margin:4px 0 8px">Include this round’s 18Birdies points in the season cup average?</p>
+      <div class="gr-league-toggle" role="group" aria-label="League points">
+        <button type="button" class="button ${(m?.league_points===false)?'secondary':'primary'}" id="grMLeagueYes" data-league="1" aria-pressed="${m?.league_points===false?'false':'true'}">Include in total</button>
+        <button type="button" class="button ${(m?.league_points===false)?'primary':'secondary'}" id="grMLeagueNo" data-league="0" aria-pressed="${m?.league_points===false?'true':'false'}">Don’t count</button>
+      </div>
+    </div>
     <div class="gr-mission-photos-setup">
       <div class="eyebrow" style="margin-top:10px">MISSION PHOTOS</div>
       <p class="muted" style="font-size:var(--fs-data);margin:4px 0 6px">Up to 3 shots for the Mission summary / After Action. HEIC converts on device.</p>
@@ -973,6 +989,16 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grMSave">Save Mission</button></div>`);
 
   let guests=[...gs].map(g=>String(g||'').trim()).filter(Boolean);
+  let leaguePoints=opts.league_points!=null?!!opts.league_points:(m?.league_points!==false);
+  const syncLeagueToggle=()=>{
+    const yes=d.querySelector('#grMLeagueYes');
+    const no=d.querySelector('#grMLeagueNo');
+    if(yes){yes.className=leaguePoints?'button primary':'button secondary';yes.setAttribute('aria-pressed',leaguePoints?'true':'false')}
+    if(no){no.className=!leaguePoints?'button primary':'button secondary';no.setAttribute('aria-pressed',!leaguePoints?'true':'false')}
+  };
+  d.querySelector('#grMLeagueYes')?.addEventListener('click',()=>{leaguePoints=true;syncLeagueToggle()});
+  d.querySelector('#grMLeagueNo')?.addEventListener('click',()=>{leaguePoints=false;syncLeagueToggle()});
+  syncLeagueToggle();
   let missionPhotos=missionPhotosOf(p,m||{id:id||'',photos:opts.photos}).map(x=>({...x}));
   const photoThumbs=d.querySelector('#grMPhotoThumbs');
   const photoClear=d.querySelector('#grMPhotoClear');
@@ -1177,7 +1203,8 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
       participants:[...d.querySelectorAll('[data-member]:checked')].map(x=>x.dataset.member),
       guests:guestList,
       notes:composed,
-      type:m?.type||'battle'
+      type:m?.type||'battle',
+      league_points:leaguePoints
     };
     const prepared=typeof window.grPrepareMissionDraft==='function'?window.grPrepareMissionDraft(draftInput,{existing:m}):{ok:true,mission:Object.assign(m||{id:uid('mission'),type:'battle',status:'planned',results:[]},draftInput)};
     if(!prepared.ok){alert(prepared.error||'Could not save Mission.');return}
@@ -1193,6 +1220,7 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     }else obj.notes=composed;
     obj.courseId=resolved.courseId||obj.courseId||'';
     obj.photos=cleanMissionPhotos(missionPhotos);
+    obj.league_points=leaguePoints;
     if(typeof window.grUpsertMission==='function')window.grUpsertMission(p,obj);else if(!m)p.missions.push(obj);else Object.assign(m,obj);
     writeMissionPhotosSide(p,obj.id,obj.photos);
     savePlatoonLocal(p);closeModal();
