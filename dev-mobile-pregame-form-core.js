@@ -37,9 +37,10 @@ if(!window.__grSupabaseFirstSaveInstalled){
     return callPlatoonFunction({action:'save_state',snapshot:p}).then(out=>{
       if(out?.platoon&&typeof writePlatoonLocal==='function'){
         // Never let a lagging server snapshot wipe local Club Eagle / Records (hqMeta).
-        const merged=typeof window.grMergeHqMetaPreserve==='function'
+        let merged=typeof window.grMergeHqMetaPreserve==='function'
           ? window.grMergeHqMetaPreserve(out.platoon,p)
           : Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||p?.hqMeta});
+        if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,p);
         try{window.__grHqMetaServer=!!out.platoon.hqMetaSupported}catch{}
         writePlatoonLocal(merged);
       }
@@ -62,9 +63,10 @@ async function refreshPlatoonFromSupabase(){
     const localBefore=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
     const out=await callPlatoonFunction({action:'bootstrap',snapshot:localBefore||undefined});
     if(out?.platoon&&typeof writePlatoonLocal==='function'){
-      const merged=typeof window.grMergeHqMetaPreserve==='function'
+      let merged=typeof window.grMergeHqMetaPreserve==='function'
         ? window.grMergeHqMetaPreserve(out.platoon,localBefore)
         : Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore?.hqMeta});
+      if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,localBefore);
       writePlatoonLocal(merged);
     }
     try{if(typeof platoonSyncError!=='undefined')platoonSyncError=''}catch{}

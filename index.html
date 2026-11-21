@@ -3364,7 +3364,8 @@ async function pushPlatoonServer(p){
   try{
     const out=await callPlatoonFunction({action:'save_state',snapshot:p});
     if(out?.platoon){
-      const merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,p):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||p.hqMeta});
+      let merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,p):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||p.hqMeta});
+      if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,p);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
     }
@@ -3382,7 +3383,8 @@ async function syncPlatoonFromServer(){
     const localBefore=loadPlatoonLocal();
     const out=await callPlatoonFunction({action:'bootstrap',snapshot:localBefore});
     if(out?.platoon){
-      const merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,localBefore):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore.hqMeta});
+      let merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,localBefore):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore.hqMeta});
+      if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,localBefore);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
     }
@@ -5083,7 +5085,7 @@ initializeAuth();
   <script src="platoon-recap-shared.js?v=4"></script>
   <script src="platoon-mission-core.js?v=6"></script>
   <script src="platoon-hq-records.js?v=177"></script>
-  <script src="platoons-v15-real.js?v=186"></script>
+  <script src="platoons-v15-real.js?v=187"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=181"></script>
 <script src="past-mission-import.js?v=172"></script>
