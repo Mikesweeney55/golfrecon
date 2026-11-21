@@ -358,19 +358,27 @@ function loadHeic2Any(){
 async function convertHeicToJpegFile(file){
   const heic2any=await loadHeic2Any();
   const buf=await file.arrayBuffer();
-  const typed=new Blob([buf],{type:file.type&&/heic|heif/i.test(file.type)?file.type:'image/heic'});
+  const typed=new Blob([buf],{type:file.type&&/heic|heif|sequence/i.test(file.type)?file.type:'image/heic'});
   let lastErr=null;
-  for(const quality of [0.88,0.7,0.55]){
-    try{
-      const converted=await heic2any({blob:typed,toType:'image/jpeg',quality});
-      const blobs=(Array.isArray(converted)?converted:[converted]).filter(Boolean);
-      if(!blobs.length)continue;
-      // Live Photo containers can return multiple images — keep the largest still.
-      blobs.sort((a,b)=>(b.size||0)-(a.size||0));
-      const blob=blobs[0];
-      const base=String(file?.name||'photo').replace(/\.(heic|heif)$/i,'')||'photo';
-      return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
-    }catch(err){lastErr=err}
+  // heic2any REQUIRES boolean `multiple` — omitting it throws and breaks Live Photos.
+  for(const multiple of [true,false]){
+    for(const quality of [0.85,0.65]){
+      try{
+        const converted=await heic2any({blob:typed,toType:'image/jpeg',quality,multiple});
+        const blobs=(Array.isArray(converted)?converted:[converted]).filter(Boolean);
+        if(!blobs.length)continue;
+        // Live Photo / burst containers can return multiple stills — keep the largest.
+        blobs.sort((a,b)=>(b.size||0)-(a.size||0));
+        const blob=blobs[0];
+        const base=String(file?.name||'photo').replace(/\.(heic|heif)$/i,'')||'photo';
+        return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+      }catch(err){
+        lastErr=err;
+        const msg=String(err?.message||err||'');
+        // Already a normal JPEG/PNG — let caller decode the original file.
+        if(/already browser readable/i.test(msg))throw err;
+      }
+    }
   }
   throw lastErr||new Error('HEIC conversion failed');
 }
@@ -432,12 +440,58 @@ async function compressImageFile(file,{max=1280,quality=.72}={}){
   }
 }
 
+
+const CLUBHOUSE_PHOTOS_KEY='golfreconClubhousePhotosV1';
+function clubhousePhotosStorageKey(p){
+  return CLUBHOUSE_PHOTOS_KEY+':'+String(p?.id||p?.serverId||'local');
+}
+function readClubhousePhotosSide(p){
+  try{
+    const raw=localStorage.getItem(clubhousePhotosStorageKey(p));
+    const arr=raw?JSON.parse(raw):[];
+    return Array.isArray(arr)?arr.filter(x=>x&&x.dataUrl).slice(0,8):[];
+  }catch{return []}
+}
+function writeClubhousePhotosSide(p,photos){
+  try{
+    const clean=(Array.isArray(photos)?photos:[]).filter(x=>x&&x.dataUrl).slice(0,8);
+    localStorage.setItem(clubhousePhotosStorageKey(p),JSON.stringify(clean));
+    return true;
+  }catch(e){
+    console.warn('Clubhouse photo side-store failed',e);
+    return false;
+  }
+}
+/** Server snapshots do not include clubhousePhotos yet — never let sync wipe them. */
+function preserveClientPlatoonFields(serverP,localP){
+  if(!serverP)return localP||serverP;
+  const localPhotos=Array.isArray(localP?.clubhousePhotos)?localP.clubhousePhotos.filter(x=>x&&x.dataUrl):[];
+  const serverPhotos=Array.isArray(serverP.clubhousePhotos)?serverP.clubhousePhotos.filter(x=>x&&x.dataUrl):[];
+  if(!serverPhotos.length&&localPhotos.length)serverP.clubhousePhotos=localPhotos.slice(0,8);
+  else if(!serverPhotos.length){
+    const side=readClubhousePhotosSide(localP||serverP);
+    if(side.length)serverP.clubhousePhotos=side;
+  }
+  if(!serverP.logoData&&localP?.logoData)serverP.logoData=localP.logoData;
+  return serverP;
+}
+window.grPreserveClientPlatoonFields=preserveClientPlatoonFields;
+window.grWriteClubhousePhotosSide=writeClubhousePhotosSide;
+
 function clubhousePhotosOf(p){
-  return Array.isArray(p?.clubhousePhotos)?p.clubhousePhotos.filter(x=>x&&x.dataUrl).slice(0,8):[];
+  let photos=Array.isArray(p?.clubhousePhotos)?p.clubhousePhotos.filter(x=>x&&x.dataUrl).slice(0,8):[];
+  if(!photos.length){
+    const side=readClubhousePhotosSide(p);
+    if(side.length){
+      photos=side;
+      if(p)p.clubhousePhotos=side;
+    }
+  }
+  return photos;
 }
 function renderClubhousePhotoThumbs(photos){
   if(!photos.length)return '<div class="muted" style="font-size:11px">No platoon photos yet — stock course shots still rotate.</div>';
-  return `<div class="gr-clubhouse-thumbs">${photos.map((ph,i)=>`<div class="gr-clubhouse-thumb" data-photo-id="${E(ph.id)}"><img src="${E(ph.dataUrl)}" alt="Clubhouse photo ${i+1}"><div class="gr-clubhouse-thumb-actions"><button type="button" class="gr-clubhouse-thumb-replace" data-replace-photo="${E(ph.id)}" title="Replace this photo">Replace</button><button type="button" class="gr-clubhouse-thumb-del" data-del-photo="${E(ph.id)}" title="Remove">✕</button></div></div>`).join('')}</div>`;
+  return `<div class="gr-clubhouse-thumbs">${photos.map((ph,i)=>`<div class="gr-clubhouse-thumb" data-photo-id="${E(ph.id)}"><img src="${String(ph.dataUrl||'').replace(/"/g,'')}" alt="Clubhouse photo ${i+1}"><div class="gr-clubhouse-thumb-actions"><button type="button" class="gr-clubhouse-thumb-replace" data-replace-photo="${E(ph.id)}" title="Replace this photo">Replace</button><button type="button" class="gr-clubhouse-thumb-del" data-del-photo="${E(ph.id)}" title="Remove">✕</button></div></div>`).join('')}</div>`;
 }
 function setupAliasesOf(m){
   if(typeof window.grAliasesOf==='function')return window.grAliasesOf(m);
@@ -542,7 +596,7 @@ window.grOpenSetup=()=>{
     for(const f of files){
       if(photos.length>=8){hitMax=true;break}
       try{
-        const dataUrl=await compressImageFile(f,{max:1280,quality:.7});
+        const dataUrl=await compressImageFile(f,{max:960,quality:.62});
         photos.push({id:`ph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,dataUrl,createdAt:new Date().toISOString()});
         added++;
         refreshThumbs();
@@ -577,7 +631,7 @@ window.grOpenSetup=()=>{
     replaceTargetId='';
     if(!f||!id)return;
     try{
-      const dataUrl=await compressImageFile(f,{max:1280,quality:.7});
+      const dataUrl=await compressImageFile(f,{max:960,quality:.62});
       const idx=photos.findIndex(x=>String(x.id)===String(id));
       if(idx<0)return;
       photos[idx]={...photos[idx],dataUrl,createdAt:new Date().toISOString()};
@@ -606,6 +660,7 @@ window.grOpenSetup=()=>{
     if(logoCleared)p.logoData='';
     else if(pendingLogo)p.logoData=pendingLogo;
     p.clubhousePhotos=photos.slice(0,8);
+    writeClubhousePhotosSide(p,p.clubhousePhotos);
     [...roster.querySelectorAll('.gr155-roster-row')].forEach(row=>{
       const m=p.members[Number(row.dataset.i)];if(!m)return;
       m.name=row.querySelector('[data-name]').value.trim()||m.name;
