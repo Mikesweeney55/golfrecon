@@ -3842,6 +3842,7 @@ function personalRoundScorecardHtml(r){
     holes:r.holes,
     holeNumbers,
     pars:c?.pars||[],
+    handicaps:c?.handicaps||[],
     scores:r.scores||[],
     fairways:r.fairways||[],
     gir:r.gir||[],
@@ -3876,7 +3877,7 @@ function roundsView(){
  <div class="stat-tabs">${Object.entries(roundStatDefs).map(([k,x])=>`<button class="stat-tab ${k===key?'active':''}" data-round-stat="${k}">${x.short}</button>`).join('')}</div>
  <div class="filter-tabs"><button class="filter-tab ${state.roundFilter==='18'?'active':''}" data-round-filter="18">18 holes</button><button class="filter-tab ${state.roundFilter==='all'?'active':''}" data-round-filter="all">All</button><button class="filter-tab ${state.roundFilter==='9'?'active':''}" data-round-filter="9">9 holes</button></div>
  ${roundsChart(sorted,key)}
- <div class="section-head"><div><div class="eyebrow">ROUND LIST</div><h2>${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'Score by round'}</h2></div></div><div class="card">${list||'<div class="empty">No rounds in this filter.</div>'}</div>
+ <div class="section-head"><div><div class="eyebrow">ROUND LIST</div><h2>${selectedCourse?(selectedCourse.baseName||selectedCourse.name):'Score by round'}</h2></div></div><div class="card" data-round-list>${list||'<div class="empty">No rounds in this filter.</div>'}</div>
  ${selectedCourse?courseMemorySection(selectedCourse.id):''}`;
 }
 
@@ -4037,15 +4038,17 @@ function myGame(){
  <div class="section-head"><div><div class="eyebrow">CLUB MEMORY</div><h2>On-course distances</h2></div></div>
  <div class="card">${db.clubStats.map(x=>`<div class="round-row"><div><strong>${x.club}</strong></div><div class="score-big">${x.distance}</div><div class="muted">yds</div></div>`).join('')}</div>`;
 }
-function selectRoundFromBar(id,{toggle=false}={}){
+function selectRoundFromBar(id,{toggle=true}={}){
+ // Accordion: one open scorecard at a time. Same-row click collapses.
  const next=toggle&&String(state.selectedRoundId)===String(id)?null:id;
+ if(String(state.selectedRoundId)===String(next))return;
+ const keepY=window.scrollY||document.documentElement.scrollTop||0;
  state.selectedRoundId=next;
  if(state.view!=='rounds')return;
  render();
  requestAnimationFrame(()=>{
-   const row=next?document.querySelector(`[data-round-row="${next}"]`):null;
-   const expand=next?document.querySelector(`[data-round-expand="${next}"]`):null;
-   (expand||row)?.scrollIntoView({behavior:'smooth',block:'nearest'});
+   window.scrollTo(0,keepY);
+   if(typeof window.grSyncScorecardScrollHints==='function')window.grSyncScorecardScrollHints();
  });
 }
 function render(){
@@ -4077,11 +4080,17 @@ function render(){
  document.querySelectorAll('[data-round-stat]').forEach(b=>b.addEventListener('click',()=>{state.roundStat=b.dataset.roundStat;render()}));
  document.querySelectorAll('[data-round-filter]').forEach(b=>b.addEventListener('click',()=>{state.roundFilter=b.dataset.roundFilter;state.selectedRoundId=null;render()}));
  document.querySelectorAll('[data-round-bar]').forEach(b=>{b.addEventListener('click',()=>selectRoundFromBar(b.dataset.roundBar,{toggle:true}));b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectRoundFromBar(b.dataset.roundBar,{toggle:true})}})});
- document.querySelectorAll('[data-round-row]').forEach(row=>{
-   row.addEventListener('click',e=>{
+ const roundList=document.querySelector('[data-round-list]');
+ if(roundList){
+   roundList.addEventListener('click',e=>{
      if(e.target.closest('[data-round-action]'))return;
+     if(e.target.closest('[data-round-expand]'))return;
+     const row=e.target.closest('[data-round-row]');
+     if(!row)return;
      selectRoundFromBar(row.dataset.roundRow,{toggle:true});
    });
+ }
+ document.querySelectorAll('[data-round-row]').forEach(row=>{
    row.addEventListener('keydown',e=>{
      if(e.key==='Enter'||e.key===' '){
        e.preventDefault();
@@ -5225,7 +5234,7 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=203"></script>
+  <script src="platoon-recap-shared.js?v=204"></script>
   <script src="platoon-mission-core.js?v=196"></script>
   <script src="platoon-hq-records.js?v=195"></script>
   <script src="platoons-v15-real.js?v=196"></script>
