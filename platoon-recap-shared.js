@@ -88,6 +88,13 @@ function cleanCourseName(v){
   for(const k of known){
     if(s.toLowerCase().startsWith(k.toLowerCase()))return k;
   }
+  // 18Birdies SEO / share titles → keep the club name only.
+  s=s.replace(/\s*\|\s*18Birdies\b[\s\S]*$/i,'').trim();
+  s=s.replace(/\s+Playing at\b[\s\S]*$/i,'').trim();
+  s=s.replace(/\s+Check out their scores\b[\s\S]*$/i,'').trim();
+  s=s.replace(/\s+Golf Course Details(?:\s*&\s*Scorecard)?\b[\s\S]*$/i,'').trim();
+  s=s.replace(/\s*[-–—]\s*\d+\s*Holes?\b[\s\S]*$/i,'').trim();
+  s=s.replace(/\s*[-–—,]?\s*(Black|Blue|White|Gold|Red|Green|Championship|Forward|Member)\s+\d{3,5}\s*Yds?\b[\s\S]*$/i,'').trim();
   for(const token of ['...','…']){
     const i=s.indexOf(token);
     if(i>=0)s=s.slice(0,i).trim();
