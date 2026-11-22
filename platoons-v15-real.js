@@ -462,19 +462,30 @@ function canvasFromSize(w,h,draw,quality){
 let heicToLoader=null,heic2anyLoader=null;
 function loadScriptOnce(src,flag){
   return new Promise((resolve,reject)=>{
-    const existing=document.querySelector(`script[${flag}]`);
+    let existing=document.querySelector(`script[${flag}]`);
+    if(existing?.dataset.loaded==='1'){resolve();return}
+    // Failed tags must be removed or the next call waits forever on a dead script.
+    if(existing?.dataset.failed==='1'){try{existing.remove()}catch{}existing=null}
     if(existing){
-      if(existing.dataset.loaded==='1'){resolve();return}
-      existing.addEventListener('load',()=>resolve());
-      existing.addEventListener('error',()=>reject(new Error('Failed to load '+src)));
+      let settled=false;
+      const finish=(ok,err)=>{
+        if(settled)return;settled=true;clearTimeout(watch);
+        if(ok){existing.dataset.loaded='1';resolve()}
+        else{existing.dataset.failed='1';try{existing.remove()}catch{};reject(err||new Error('Failed to load '+src))}
+      };
+      // Watchdog: if load/error already fired before we attached, don't hang.
+      const watch=setTimeout(()=>finish(false,new Error('Timed out loading '+src)),20000);
+      existing.addEventListener('load',()=>finish(true));
+      existing.addEventListener('error',()=>finish(false,new Error('Failed to load '+src)));
       return;
     }
     const s=document.createElement('script');
     s.src=src;
     s.async=true;
     s.setAttribute(flag,'1');
+    s.dataset.started=String(Date.now());
     s.onload=()=>{s.dataset.loaded='1';resolve()};
-    s.onerror=()=>reject(new Error('Failed to load '+src));
+    s.onerror=()=>{s.dataset.failed='1';try{s.remove()}catch{};reject(new Error('Failed to load '+src))};
     document.head.appendChild(s);
   });
 }
@@ -584,14 +595,21 @@ async function decodeImageToDataUrl(file,{max=1280,quality=.72,preferImg=false}=
   }
   throw last||new Error('decode-failed');
 }
+function withDeadline(promise,ms,message){
+  let timer=null;
+  return Promise.race([
+    Promise.resolve(promise).finally(()=>{if(timer)clearTimeout(timer)}),
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message||'Timed out')),ms)})
+  ]);
+}
 async function compressImageFile(file,{max=1280,quality=.72}={}){
   if(!file)throw new Error('No image selected');
   const heic=await sniffHeic(file);
-  try{return await decodeImageToDataUrl(file,{max,quality,preferImg:heic})}catch{/* convert path */}
+  try{return await withDeadline(decodeImageToDataUrl(file,{max,quality,preferImg:heic}),20000,'decode-timeout')}catch{/* convert path */}
   // After native failure, always try HEIC converter — iPhone files are often mislabeled.
   try{
-    const jpeg=await convertHeicToJpegFile(file);
-    return await decodeImageToDataUrl(jpeg,{max,quality,preferImg:false});
+    const jpeg=await withDeadline(convertHeicToJpegFile(file),45000,'HEIC conversion timed out');
+    return await withDeadline(decodeImageToDataUrl(jpeg,{max,quality,preferImg:false}),20000,'decode-timeout');
   }catch(err){
     console.warn('Photo convert failed', file?.name, err);
     throw new Error(unsupportedImageHint(file));

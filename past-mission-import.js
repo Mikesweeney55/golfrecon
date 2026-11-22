@@ -26,8 +26,14 @@ const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
 const uid=()=>`mission-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 function aliasesOf(m){return typeof window.grAliasesOf==='function'?window.grAliasesOf(m):[]}
 function canonicalMember(p,raw){return typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,raw):null}
+let pastImportSession=0,pastImportBusy=false,pastImportAbort=null;
 function dialog(inner){let d=document.getElementById('grPastMissionDialog');if(!d){d=document.createElement('dialog');d.id='grPastMissionDialog';document.body.appendChild(d)}d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
-function close(){document.getElementById('grPastMissionDialog')?.close()}
+function close(){
+  try{pastImportAbort?.abort()}catch{}
+  pastImportAbort=null;
+  pastImportBusy=false;
+  document.getElementById('grPastMissionDialog')?.close();
+}
 function fmtBytes(n){if(!Number.isFinite(n))return'';if(n<1024)return`${n} B`;if(n<1048576)return`${(n/1024).toFixed(1)} KB`;return`${(n/1048576).toFixed(1)} MB`}
 function cleanCourseName(v){return typeof window.grCleanCourseName==='function'?window.grCleanCourseName(v):String(v||'').trim()}
 function guestPool(p){return typeof window.grGuestPoolOf==='function'?window.grGuestPoolOf(p):[]}
@@ -74,9 +80,31 @@ function refreshGuestOptions(root,p){
     }
   });
 }
+function withTimeout(promise,ms,message){
+  let timer=null;
+  return Promise.race([
+    Promise.resolve(promise).finally(()=>{if(timer)clearTimeout(timer)}),
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message||'The screenshot reader timed out. Please try again; the files were not saved or changed.')),ms)})
+  ]);
+}
+function dataUrlToPayload(dataUrl){
+  const m=String(dataUrl||'').match(/^data:([^;]+);base64,(.+)$/);
+  if(!m||!m[2])throw new Error('Image conversion failed.');
+  return {type:m[1]||'image/jpeg',data:m[2]};
+}
 async function compactImageFile(file,maxDim=1600,quality=.82){
+  // Prefer shared HEIC-aware compressor so iPhone screenshots don't hang OCR.
+  if(typeof window.grCompressImageFile==='function'){
+    const dataUrl=await withTimeout(
+      window.grCompressImageFile(file,{max:maxDim,quality}),
+      45000,
+      `Could not prepare ${file?.name||'screenshot'} (timed out). Export as JPG and try again.`
+    );
+    return dataUrlToPayload(dataUrl);
+  }
   try{
-    const bmp=await createImageBitmap(file),scale=Math.min(1,maxDim/Math.max(bmp.width,bmp.height));
+    const bmp=await withTimeout(createImageBitmap(file),20000,`Could not prepare ${file?.name||'screenshot'} (timed out).`);
+    const scale=Math.min(1,maxDim/Math.max(bmp.width,bmp.height));
     const w=Math.max(1,Math.round(bmp.width*scale)),h=Math.max(1,Math.round(bmp.height*scale));
     const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');ctx.drawImage(bmp,0,0,w,h);bmp.close?.();
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Image conversion failed.')),'image/jpeg',quality));
@@ -87,7 +115,6 @@ async function compactImageFile(file,maxDim=1600,quality=.82){
     throw e;
   }
 }
-function withTimeout(promise,ms){return Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('The screenshot reader timed out. Please try again; the files were not saved or changed.')),ms))])}
 function cleanHolesLocal(holes){
   if(typeof window.grCleanHoles==='function')return window.grCleanHoles(holes);
   const map=new Map();
@@ -120,21 +147,41 @@ function resultRow(playerName,r){
 async function openImport(){
   const p=window.loadPlatoonLocal?.();if(!p)return alert('Platoon data is unavailable.');
   if(typeof window.callPlatoonFunction!=='function')return alert('Screenshot import is unavailable.');
+  // New dialog session cancels any in-flight read so reused DOM can't look hung.
+  try{pastImportAbort?.abort()}catch{}
+  pastImportAbort=null;
+  pastImportBusy=false;
+  const session=++pastImportSession;
   const d=dialog(`<div class="dialog-head"><div><div class="eyebrow">HISTORICAL IMPORT</div><h2>Import Past Mission</h2></div><button class="icon-button" data-close type="button">✕</button></div><p class="muted" style="font-size:var(--fs-data)">Upload the event overview, net/points leaderboard, and expanded gross scorecards (front 9 + back 9). Hole-by-hole scores attach to each player’s Mission result and seed their personal round without wiping later detail.</p><label class="upload-zone" style="cursor:pointer"><strong>📥 Add screenshots</strong><span>Overview + net LB + expanded gross cards (front/back 9)</span><input id="grPastFiles" type="file" accept="image/*" multiple></label><div id="grPastFilesList" class="file-list"></div><label>Round story / anything worth highlighting<textarea id="grPastStory" rows="3" placeholder="Optional — weather, trash talk, crazy shots, side bets, meltdowns…"></textarea></label><div id="grPastProgress"></div><div id="grPastOut"></div><div class="dialog-actions"><button class="button secondary" data-cancel type="button">Cancel</button><button class="button primary" id="grPastRead" type="button">Read Screenshots</button></div>`);
   d.querySelector('[data-close]').onclick=close;d.querySelector('[data-cancel]').onclick=close;
   const files=d.querySelector('#grPastFiles'),fileList=d.querySelector('#grPastFilesList'),progress=d.querySelector('#grPastProgress'),out=d.querySelector('#grPastOut'),btn=d.querySelector('#grPastRead');
   files.onchange=()=>{const fs=[...files.files];fileList.innerHTML=fs.length?`<div class="platoon-notice" style="margin:8px 0"><strong>${fs.length} screenshot${fs.length===1?'':'s'} ready</strong>${fs.map((f,i)=>`<div style="margin-top:4px">${i+1}. ${esc(f.name)} <span class="muted">· ${fmtBytes(f.size)}</span></div>`).join('')}</div>`:'';progress.innerHTML='';out.innerHTML=''};
   btn.onclick=async()=>{
     const fs=[...files.files];if(!fs.length){out.innerHTML='<div class="platoon-notice">Add at least one screenshot.</div>';return}
+    if(pastImportBusy||session!==pastImportSession)return;
+    pastImportBusy=true;
+    try{pastImportAbort?.abort()}catch{}
+    const ctrl=typeof AbortController!=='undefined'?new AbortController():null;
+    pastImportAbort=ctrl;
+    const alive=()=>session===pastImportSession&&(!ctrl||!ctrl.signal.aborted);
     btn.disabled=true;btn.textContent='Reading…';out.innerHTML='';
     try{
       const images=[];
       for(let i=0;i<fs.length;i++){
+        if(!alive())return;
         progress.innerHTML=`<div class="platoon-notice" style="margin-top:10px">Preparing screenshot ${i+1} of ${fs.length}…</div>`;
         images.push(await compactImageFile(fs[i]));
       }
+      if(!alive())return;
       progress.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Reading ${fs.length} screenshot${fs.length===1?'':'s'}…</strong><br><span class="muted">This can take 20–60 seconds. Keep this window open.</span></div>`;
-      const parsed=await withTimeout(window.callPlatoonFunction({action:'parse_completed_mission',images}),90000);
+      const timeoutMs=90000;
+      let timer=null;
+      if(ctrl)timer=setTimeout(()=>{try{ctrl.abort()}catch{}},timeoutMs);
+      let parsed;
+      try{
+        parsed=await window.callPlatoonFunction({action:'parse_completed_mission',images},{signal:ctrl?.signal});
+      }finally{if(timer)clearTimeout(timer)}
+      if(!alive())return;
       progress.innerHTML='';
       const ev=parsed?.event||{},results=Array.isArray(parsed?.results)?parsed.results:[];
       if(!results.length)throw new Error('No player results were found.');
@@ -170,23 +217,29 @@ async function openImport(){
           : '';
       };
       refreshPastPhotos();
+      let photoBusy=false;
       out.querySelector('#grPastPhotos')?.addEventListener('change',async e=>{
-        const files=[...(e.target.files||[])];
+        const picked=[...(e.target.files||[])];
         e.target.value='';
-        if(!files.length)return;
+        if(!picked.length||photoBusy||!alive())return;
         const compress=typeof window.grCompressImageFile==='function'?window.grCompressImageFile:null;
         if(!compress){if(photoStatus)photoStatus.textContent='Photo upload unavailable.';return}
+        photoBusy=true;
         let added=0,failed=0,hitMax=false;
         if(photoStatus)photoStatus.textContent='Adding photos…';
-        for(const f of files){
-          if(missionPhotos.length>=photoMax){hitMax=true;break}
-          try{
-            const dataUrl=await compress(f,{max:960,quality:.62});
-            missionPhotos.push({id:`mph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,dataUrl,createdAt:new Date().toISOString()});
-            added++;
-            refreshPastPhotos();
-          }catch(err){failed++;console.warn('Past import photo skipped',f?.name,err)}
-        }
+        try{
+          for(const f of picked){
+            if(!alive())return;
+            if(missionPhotos.length>=photoMax){hitMax=true;break}
+            try{
+              const dataUrl=await withTimeout(compress(f,{max:960,quality:.62}),45000,`Could not read ${f?.name||'photo'} (timed out). Try JPG.`);
+              missionPhotos.push({id:`mph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,dataUrl,createdAt:new Date().toISOString()});
+              added++;
+              refreshPastPhotos();
+            }catch(err){failed++;console.warn('Past import photo skipped',f?.name,err)}
+          }
+        }finally{photoBusy=false}
+        if(!alive())return;
         if(photoStatus){
           if(hitMax&&!added)photoStatus.textContent=`Max ${photoMax} mission photos.`;
           else if(added&&failed)photoStatus.textContent=`Added ${added}. Skipped ${failed}.`;
@@ -295,7 +348,18 @@ async function openImport(){
           alert(`Created completed Mission: ${title}${holePlayers?`\nHole-by-hole saved for ${holePlayers} player${holePlayers===1?'':'s'}.`:''}${claimed?`\nSeeded ${claimed} personal round${claimed===1?'':'s'} (blank fields only).`:''}`);
         }catch(e){p.missions=p.missions.filter(x=>x.id!==mission.id);createBtn.disabled=false;createBtn.textContent='Create Completed Mission';alert(e?.message||String(e))}
       };
-    }catch(e){progress.innerHTML='';out.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Could not read the screenshots.</strong><br>${esc(e?.message||String(e))}</div>`;btn.disabled=false;btn.textContent='Try Again'}
+    }catch(e){
+      if(!alive())return;
+      progress.innerHTML='';
+      out.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Could not read the screenshots.</strong><br>${esc(e?.message||String(e))}</div>`;
+      btn.disabled=false;btn.textContent='Try Again';
+    }finally{
+      if(pastImportAbort===ctrl)pastImportAbort=null;
+      pastImportBusy=false;
+      if(alive()&&btn.style.display!=='none'&&btn.disabled&&btn.textContent==='Reading…'){
+        btn.disabled=false;btn.textContent='Try Again';
+      }
+    }
   };
 }
 window.grImportPastMission=openImport;

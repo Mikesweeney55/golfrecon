@@ -3577,17 +3577,23 @@ function openMissionDetail(id){
     <div class="mission-actions"><button class="button secondary" type="button" onclick="closePlatoonDialog();openMissionEditor('${safeText(m.date)}','${safeText(m.id)}')">Edit Mission</button><button class="button primary" type="button" onclick="closePlatoonDialog();openMissionImport('${safeText(m.id)}')">Import Mission Results</button></div>`);
 }
 async function platoonFilePayload(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve({type:file.type||'image/jpeg',data:String(r.result||'').split(',')[1]||''});r.onerror=reject;r.readAsDataURL(file)})}
-async function callPlatoonFunction(payload,retry=true){
+async function callPlatoonFunction(payload,retryOrOpts=true){
+  const opts=(retryOrOpts&&typeof retryOrOpts==='object')?retryOrOpts:{retry:retryOrOpts!==false};
+  const retry=opts.retry!==false;
+  const signal=opts.signal;
   if(window.grTestEnvActive&&payload&&['save_state','delete_mission'].includes(String(payload.action||''))){
     throw new Error(`Platoon action "${payload.action}" is disabled in the TEST build to protect production data.`);
   }
   const session=await ensureAuthSession();if(!session?.access_token)throw new Error('Please sign in again.');
   let res;
   try{
-    res=await fetch(`${SUPABASE_URL}/functions/v1/platoon-import`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify(payload)});
-  }catch(e){throw new Error('Platoon server is not online yet. The platoon-import Edge Function still needs to be deployed in Supabase.')}
+    res=await fetch(`${SUPABASE_URL}/functions/v1/platoon-import`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify(payload),signal});
+  }catch(e){
+    if(e?.name==='AbortError')throw new Error('The screenshot reader timed out. Please try again; the files were not saved or changed.');
+    throw new Error('Platoon server is not online yet. The platoon-import Edge Function still needs to be deployed in Supabase.');
+  }
   const body=await res.json().catch(()=>({error:'Invalid server response'}));
-  if(res.status===401&&retry&&authSession?.refresh_token){try{await refreshAuthSession();return callPlatoonFunction(payload,false)}catch{}}
+  if(res.status===401&&retry&&authSession?.refresh_token){try{await refreshAuthSession();return callPlatoonFunction(payload,{retry:false,signal})}catch{}}
   if(!res.ok){
     if(body.error==='PLATOON_SCHEMA_NOT_READY')throw new Error('Platoon cloud sync is not ready yet. Apply the Platoons database migration in Supabase.');
     throw new Error(body.error||body.message||`Platoon request failed (${res.status})`);
@@ -5247,10 +5253,10 @@ initializeAuth();
   <script src="platoon-recap-shared.js?v=204"></script>
   <script src="platoon-mission-core.js?v=196"></script>
   <script src="platoon-hq-records.js?v=195"></script>
-  <script src="platoons-v15-real.js?v=196"></script>
+  <script src="platoons-v15-real.js?v=197"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
-<script src="past-mission-import.js?v=196"></script>
+<script src="past-mission-import.js?v=197"></script>
 <script src="mission-delete.js?v=4"></script>
 </body>
 </html>
