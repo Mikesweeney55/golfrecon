@@ -436,22 +436,72 @@ async function openImport(){
         missionPhotos=missionPhotos.filter(x=>String(x.id)!==String(del.getAttribute('data-del-mission-photo')));
         refreshPastPhotos();
       });
+      const matchWarn=document.createElement('div');
+      matchWarn.id='grPastMatchWarn';
+      matchWarn.className='platoon-notice';
+      matchWarn.style.cssText='margin-top:10px;display:none';
+      const playersHead=[...out.querySelectorAll('.eyebrow')].find(el=>/PLAYERS/i.test(el.textContent||''));
+      const firstResult=out.querySelector('.gr-past-result');
+      if(playersHead?.parentElement)playersHead.parentElement.insertBefore(matchWarn, playersHead.nextSibling);
+      else if(firstResult?.parentElement)firstResult.parentElement.insertBefore(matchWarn, firstResult);
+      else out.appendChild(matchWarn);
+      const scanMatchSafeties=()=>{
+        const rows=[...out.querySelectorAll('.gr-past-result')];
+        const counts=new Map();
+        const labels=new Map();
+        for(const row of rows){
+          const sel=row.querySelector('[data-match]');
+          const raw=sel?.value||'';
+          row.style.outline='';
+          if(!raw||raw==='__add_guest__')continue;
+          if(!(raw.startsWith('member:')||raw.startsWith('guest:')))continue;
+          counts.set(raw,(counts.get(raw)||0)+1);
+          if(!labels.has(raw)){
+            const opt=sel?.selectedOptions?.[0];
+            labels.set(raw,opt?.textContent?.trim()||raw);
+          }
+        }
+        const dupKeys=[...counts.entries()].filter(([,n])=>n>1).map(([k])=>k);
+        for(const row of rows){
+          const raw=row.querySelector('[data-match]')?.value||'';
+          if(dupKeys.includes(raw))row.style.outline='2px solid rgba(220,80,80,.85)';
+        }
+        const unmatched=rows.filter(row=>{
+          const v=row.querySelector('[data-match]')?.value||'';
+          return !v||v==='__add_guest__';
+        }).map(row=>results[Number(row.dataset.i)]?.player_name).filter(Boolean);
+        const dupNames=dupKeys.map(k=>labels.get(k)||k);
+        if(dupNames.length||unmatched.length){
+          matchWarn.style.display='';
+          matchWarn.innerHTML=[
+            dupNames.length?`<strong>Duplicate My Time link:</strong> ${esc(dupNames.join(', '))} is matched more than once. Each Platoon player can only take one score.`:'',
+            unmatched.length?`<strong>Unmatched:</strong> ${esc(unmatched.join(', '))}`:''
+          ].filter(Boolean).join('<br>');
+        }else{
+          matchWarn.style.display='none';
+          matchWarn.innerHTML='';
+        }
+        return {dupNames,unmatched,dupKeys};
+      };
       out.querySelectorAll('[data-match]').forEach(sel=>{
         sel.addEventListener('change',()=>{
-          if(sel.value!=='__add_guest__')return;
-          const row=sel.closest('.gr-past-result');
-          const i=Number(row?.dataset.i);
-          const suggested=String(results[i]?.player_name||'').trim();
-          const name=prompt('Add guest name',suggested||'');
-          if(!name||!String(name).trim()){sel.value='';return}
-          const aliases=suggested&&norm(suggested)!==norm(name)?[suggested]:[];
-          const g=typeof window.grUpsertGuestPool==='function'
-            ? window.grUpsertGuestPool(p,String(name).trim(),{aliases})
-            : {id:'gst-'+Date.now(),name:String(name).trim()};
-          refreshGuestOptions(out,p);
-          sel.value=`guest:${g.id}`;
+          if(sel.value==='__add_guest__'){
+            const row=sel.closest('.gr-past-result');
+            const i=Number(row?.dataset.i);
+            const suggested=String(results[i]?.player_name||'').trim();
+            const name=prompt('Add guest name',suggested||'');
+            if(!name||!String(name).trim()){sel.value='';scanMatchSafeties();return}
+            const aliases=suggested&&norm(suggested)!==norm(name)?[suggested]:[];
+            const g=typeof window.grUpsertGuestPool==='function'
+              ? window.grUpsertGuestPool(p,String(name).trim(),{aliases})
+              : {id:'gst-'+Date.now(),name:String(name).trim()};
+            refreshGuestOptions(out,p);
+            sel.value=`guest:${g.id}`;
+          }
+          scanMatchSafeties();
         });
       });
+      scanMatchSafeties();
       out.querySelectorAll('[data-past-date]').forEach(b=>b.addEventListener('click',()=>{
         const now=new Date();let target=new Date(now.getFullYear(),now.getMonth(),now.getDate());
         if(b.dataset.datePreset==='sat'){const day=target.getDay();const add=((6-day)+7)%7||7;target.setDate(target.getDate()+add)}
@@ -495,11 +545,23 @@ async function openImport(){
           ? (window.grReadMissionFormat(out,formatIds)||'Stroke play (net)')
           : (out.querySelector('#grPastFormat')?.value.trim()||'Stroke Play');
         if(!date)return alert('Confirm the round date before creating the Mission.');
+        const safety=scanMatchSafeties();
+        if(safety.unmatched.length){
+          return alert(`Match every player before creating the Mission. Still unmatched: ${safety.unmatched.join(', ')}`);
+        }
+        if(safety.dupNames.length){
+          return alert(`Each My Time player can only take one score in this round.\nDuplicated: ${safety.dupNames.join(', ')}\nFix the matches, then create again.`);
+        }
         const participants=[],guests=[],saved=[];
         const pool=guestPool(p);
+        const seenLinks=new Set();
         for(const row of out.querySelectorAll('.gr-past-result')){
           const i=Number(row.dataset.i),r=results[i],raw=row.querySelector('[data-match]')?.value||'';
           if(!raw||raw==='__add_guest__')continue;
+          if(seenLinks.has(raw)){
+            return alert('Each My Time player can only take one score in this round. Fix the duplicate matches and try again.');
+          }
+          seenLinks.add(raw);
           if(raw.startsWith('member:')){
             const memberId=raw.slice(7);
             const member=roster.find(x=>x.id===memberId);if(!member)continue;
@@ -517,10 +579,7 @@ async function openImport(){
         }
         if(!saved.length)return alert('Match at least one player before creating the Mission.');
         if(saved.length<results.length){
-          const missing=[...out.querySelectorAll('.gr-past-result')]
-            .filter(row=>{const v=row.querySelector('[data-match]')?.value||'';return !v||v==='__add_guest__'})
-            .map(row=>results[Number(row.dataset.i)]?.player_name).filter(Boolean);
-          return alert(`Match every player before creating the Mission.${missing.length?` Still unmatched: ${missing.join(', ')}`:''}`);
+          return alert(`Match every player before creating the Mission.${safety.unmatched.length?` Still unmatched: ${safety.unmatched.join(', ')}`:''}`);
         }
         const story=d.querySelector('#grPastStory')?.value.trim()||'';
         const guestList=[...new Set(guests.map(g=>String(g||'').trim()).filter(Boolean))];
