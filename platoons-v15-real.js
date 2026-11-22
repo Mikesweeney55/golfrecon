@@ -1153,7 +1153,7 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
       participants:[...d.querySelectorAll('[data-member]:checked')].map(x=>x.dataset.member)
     };
     const wiz=modal(`<div class="dialog-head"><div><div class="eyebrow">COURSE</div><h2>Add course</h2></div><button class="icon-button" id="grCourseCancel" type="button">✕</button></div>
-      <p class="muted" style="font-size:var(--fs-data)">Saves into your Golf Recon course list with scorecard basics (par / rating / slope). Hole-by-hole maps can still come from Hole Preview later.</p>
+      <p class="muted" style="font-size:var(--fs-data)">Saves into your Golf Recon course list with scorecard basics (par / rating / slope).</p>
       <label>Course name<input id="grCName" placeholder="Four Oaks Country Club" required></label>
       <div class="grid two"><label>Tees<input id="grCTees" placeholder="White / Blue" value="White"></label><label>Holes<select id="grCHoles"><option value="18">18</option><option value="9">9</option></select></label></div>
       <div class="grid three"><label>Par<input id="grCPar" type="number" inputmode="numeric" placeholder="72"></label><label>Rating<input id="grCRating" type="number" inputmode="decimal" step="0.1" placeholder="71.2"></label><label>Slope<input id="grCSlope" type="number" inputmode="numeric" placeholder="128"></label></div>

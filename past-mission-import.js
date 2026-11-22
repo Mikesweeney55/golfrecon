@@ -36,6 +36,44 @@ function close(){
 }
 function fmtBytes(n){if(!Number.isFinite(n))return'';if(n<1024)return`${n} B`;if(n<1048576)return`${(n/1024).toFixed(1)} KB`;return`${(n/1048576).toFixed(1)} MB`}
 function cleanCourseName(v){return typeof window.grCleanCourseName==='function'?window.grCleanCourseName(v):String(v||'').trim()}
+function courseScore(a,b){
+  if(typeof window.courseNameScore==='function')return window.courseNameScore(a,b);
+  const na=norm(a),nb=norm(b);if(!na||!nb)return 0;
+  if(na===nb)return 100;if(na.includes(nb)||nb.includes(na))return 88;
+  const A=new Set(na.split(' ').filter(Boolean)),B=new Set(nb.split(' ').filter(Boolean));
+  let hit=0;for(const x of A)if(B.has(x))hit++;
+  return A.size||B.size?Math.round(100*hit/Math.max(A.size,B.size)):0;
+}
+function rankedCoursesForRaw(raw){
+  const cleaned=cleanCourseName(raw);
+  let list=[];
+  try{list=(typeof db!=='undefined'&&Array.isArray(db.courses))?db.courses.slice():[]}catch{list=[]}
+  const scored=list.map(c=>{
+    const label=typeof window.courseMenuLabel==='function'?window.courseMenuLabel(c):(c.baseName||c.name||'');
+    const score=Math.max(courseScore(cleaned,c.name),courseScore(cleaned,c.baseName),courseScore(cleaned,label),courseScore(raw,c.name));
+    return {c,label,score};
+  }).filter(x=>x.score>=55).sort((a,b)=>b.score-a.score||String(a.label).localeCompare(String(b.label)));
+  const seen=new Set(scored.map(x=>x.c.id));
+  const rest=list.filter(c=>!seen.has(c.id)).map(c=>({
+    c,label:typeof window.courseMenuLabel==='function'?window.courseMenuLabel(c):(c.baseName||c.name||''),score:0
+  })).sort((a,b)=>String(a.label).localeCompare(String(b.label)));
+  return {cleaned,best:scored[0]||null,options:[...scored,...rest]};
+}
+function courseConfirmMarkup(raw){
+  const {cleaned,best,options}=rankedCoursesForRaw(raw);
+  const opts=options.map(x=>`<option value="id:${esc(x.c.id)}" ${best&&best.c.id===x.c.id?'selected':''}>${esc(x.label)}${x.score>=88?' ✓':''}</option>`).join('');
+  const otherSelected=!best;
+  return `<label>Course <span class="muted" style="font-weight:600">(confirm)</span>
+    <select id="grPastCoursePick" class="gr-mission-select">
+      <option value="">Select course…</option>
+      ${opts||'<option value="" disabled>No Golf Recon courses yet</option>'}
+      <option value="__other__" ${otherSelected?'selected':''}>Other / type below…</option>
+    </select>
+    <input id="grPastCourse" value="${esc(cleaned)}" placeholder="Course name" style="${otherSelected?'':'display:none'};margin-top:7px">
+    ${best?`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">Matched “${esc(cleaned)}” → <strong>${esc(best.label)}</strong>. Change if wrong.</div>`
+      :`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">Cleaned to “${esc(cleaned)}”. Pick a Golf Recon course or keep the typed name.</div>`}
+  </label>`;
+}
 function guestPool(p){return typeof window.grGuestPoolOf==='function'?window.grGuestPoolOf(p):[]}
 function findGuest(p,raw){
   const key=norm(raw);
@@ -195,7 +233,7 @@ async function openImport(){
         : `<input id="grPastFormat" value="${esc(ev.format||'Stroke Play')}">`;
       let missionPhotos=[];
       const photoMax=Number(window.grMissionPhotosMax)||3;
-      out.innerHTML=`<div class="platoon-notice" style="margin-top:12px"><strong>Confirm before creating.</strong><br>Edit anything the screenshots did not capture correctly. Use <strong>Add as guest</strong> for non-members — they go in the guest pool.</div><div class="grid two"><label>Mission name<input id="grPastTitle" value="${esc(ev.title||'Past Mission')}"></label><label>Date<input id="grPastDate" class="gr-datetime gr-date-picker" type="date" value="${esc(ev.date||'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sun">Next Sun</button></div></label><label>Tee time <span class="muted" style="font-weight:600">(10 min)</span>${teeMarkup}</label><label>Format${formatMarkup}</label></div><label>Course<input id="grPastCourse" value="${esc(cleanCourseName(ev.course_name||''))}"></label><div class="gr-league-points-toggle" style="margin-top:12px"><div class="eyebrow">MY TIME ⛳ POINTS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 8px">Include this round’s 18Birdies points in the season cup average?</p><div class="gr-league-toggle" role="group" aria-label="League points"><button type="button" class="button primary" id="grPastLeagueYes" data-league="1" aria-pressed="true">Include in total</button><button type="button" class="button secondary" id="grPastLeagueNo" data-league="0" aria-pressed="false">Don’t count</button></div></div><div class="gr-mission-photos-setup" style="margin-top:12px"><div class="eyebrow">MISSION PHOTOS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 6px">Optional — up to ${photoMax} for the Mission summary.</p><div id="grPastPhotoThumbs"></div><label class="gr-logo-upload" style="margin:6px 0 0;cursor:pointer;display:inline-block"><strong>📷 Add photos</strong><input id="grPastPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple></label><div id="grPastPhotoStatus" class="muted" style="font-size:var(--fs-data);margin-top:4px"></div></div><div style="margin-top:14px"><div class="eyebrow">PLAYERS & RESULTS</div>${results.map((r,i)=>{const hc=finite(r.handicap)?`HCP ${Number(r.handicap)}`:'';const holeN=Array.isArray(r.holes)?r.holes.filter(h=>finite(h?.score)).length:0;const holeBit=holeN?`${holeN} holes`:'no holes yet';return `<div class="gr-past-result" data-i="${i}" style="border:1px solid var(--line);border-radius:12px;padding:9px;margin-top:7px"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><strong>${esc(r.player_name||'Player')}${hc?` <span class="muted" style="font-weight:600">· ${hc}</span>`:''}</strong><span>${finite(r.net)?`Net ${Number(r.net)}`:'Net —'} · ${finite(r.gross)?`Gross ${Number(r.gross)}`:'Gross —'}${finite(r.raw_points)?` · ${Number(r.raw_points)} pts`:''} · ${holeBit}</span></div><label style="margin-top:7px">Match to Platoon player${matchSelectHtml(p,roster,r)}</label></div>`}).join('')}</div>${Array.isArray(parsed?.warnings)&&parsed.warnings.length?`<div class="platoon-notice" style="margin-top:10px">${parsed.warnings.map(x=>esc(x)).join('<br>')}</div>`:''}<div class="dialog-actions"><button class="button secondary" id="grPastBack" type="button">Back</button><button class="button primary" id="grPastCreate" type="button">Create Completed Mission</button></div>`;
+      out.innerHTML=`<div class="platoon-notice" style="margin-top:12px"><strong>Confirm before creating.</strong><br>Edit anything the screenshots did not capture correctly. Use <strong>Add as guest</strong> for non-members — they go in the guest pool.</div><div class="grid two"><label>Mission name<input id="grPastTitle" value="${esc(ev.title||'Past Mission')}"></label><label>Date<input id="grPastDate" class="gr-datetime gr-date-picker" type="date" value="${esc(ev.date||'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sun">Next Sun</button></div></label><label>Tee time <span class="muted" style="font-weight:600">(10 min)</span>${teeMarkup}</label><label>Format${formatMarkup}</label></div>${courseConfirmMarkup(ev.course_name||'')}<div class="gr-league-points-toggle" style="margin-top:12px"><div class="eyebrow">MY TIME ⛳ POINTS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 8px">Include this round’s 18Birdies points in the season cup average?</p><div class="gr-league-toggle" role="group" aria-label="League points"><button type="button" class="button primary" id="grPastLeagueYes" data-league="1" aria-pressed="true">Include in total</button><button type="button" class="button secondary" id="grPastLeagueNo" data-league="0" aria-pressed="false">Don’t count</button></div></div><div class="gr-mission-photos-setup" style="margin-top:12px"><div class="eyebrow">MISSION PHOTOS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 6px">Optional — up to ${photoMax} for the Mission summary.</p><div id="grPastPhotoThumbs"></div><label class="gr-logo-upload" style="margin:6px 0 0;cursor:pointer;display:inline-block"><strong>📷 Add photos</strong><input id="grPastPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple></label><div id="grPastPhotoStatus" class="muted" style="font-size:var(--fs-data);margin-top:4px"></div></div><div style="margin-top:14px"><div class="eyebrow">PLAYERS & RESULTS</div>${results.map((r,i)=>{const hc=finite(r.handicap)?`HCP ${Number(r.handicap)}`:'';const holeN=Array.isArray(r.holes)?r.holes.filter(h=>finite(h?.score)).length:0;const holeBit=holeN?`${holeN} holes`:'no holes yet';return `<div class="gr-past-result" data-i="${i}" style="border:1px solid var(--line);border-radius:12px;padding:9px;margin-top:7px"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><strong>${esc(r.player_name||'Player')}${hc?` <span class="muted" style="font-weight:600">· ${hc}</span>`:''}</strong><span>${finite(r.net)?`Net ${Number(r.net)}`:'Net —'} · ${finite(r.gross)?`Gross ${Number(r.gross)}`:'Gross —'}${finite(r.raw_points)?` · ${Number(r.raw_points)} pts`:''} · ${holeBit}</span></div><label style="margin-top:7px">Match to Platoon player${matchSelectHtml(p,roster,r)}</label></div>`}).join('')}</div>${Array.isArray(parsed?.warnings)&&parsed.warnings.length?`<div class="platoon-notice" style="margin-top:10px">${parsed.warnings.map(x=>esc(x)).join('<br>')}</div>`:''}<div class="dialog-actions"><button class="button secondary" id="grPastBack" type="button">Back</button><button class="button primary" id="grPastCreate" type="button">Create Completed Mission</button></div>`;
       btn.style.display='none';
       if(typeof window.grWireTeeTimeWheel==='function')window.grWireTeeTimeWheel(out,'grPastTime');
       if(typeof window.grWireFormatSelect==='function')window.grWireFormatSelect(out,formatIds);
@@ -209,6 +247,22 @@ async function openImport(){
       out.querySelector('#grPastLeagueYes')?.addEventListener('click',()=>{leaguePoints=true;syncLeagueToggle()});
       out.querySelector('#grPastLeagueNo')?.addEventListener('click',()=>{leaguePoints=false;syncLeagueToggle()});
       syncLeagueToggle();
+      const coursePick=out.querySelector('#grPastCoursePick');
+      const courseInput=out.querySelector('#grPastCourse');
+      const syncCourseOther=()=>{
+        if(!coursePick||!courseInput)return;
+        const other=coursePick.value==='__other__'||!coursePick.value;
+        courseInput.style.display=other?'':'none';
+        if(!other&&coursePick.value.startsWith('id:')){
+          const id=coursePick.value.slice(3);
+          try{
+            const c=(typeof db!=='undefined'?db.courses:[]).find(x=>String(x.id)===String(id));
+            if(c)courseInput.value=typeof window.courseMenuLabel==='function'?window.courseMenuLabel(c):(c.baseName||c.name||courseInput.value);
+          }catch{}
+        }
+      };
+      coursePick?.addEventListener('change',syncCourseOther);
+      syncCourseOther();
       const photoThumbs=out.querySelector('#grPastPhotoThumbs');
       const photoStatus=out.querySelector('#grPastPhotoStatus');
       const refreshPastPhotos=()=>{
@@ -281,7 +335,21 @@ async function openImport(){
         const title=out.querySelector('#grPastTitle').value.trim()||'Past Mission';
         const date=out.querySelector('#grPastDate').value;
         const teeTime=out.querySelector('#grPastTime').value;
-        const locationName=out.querySelector('#grPastCourse').value.trim()||'Course TBD';
+        let courseId='';
+        let locationName='Course TBD';
+        const pick=out.querySelector('#grPastCoursePick')?.value||'';
+        const typed=out.querySelector('#grPastCourse')?.value.trim()||'';
+        if(pick.startsWith('id:')){
+          courseId=pick.slice(3);
+          try{
+            const c=(typeof db!=='undefined'?db.courses:[]).find(x=>String(x.id)===String(courseId));
+            locationName=c?(typeof window.courseMenuLabel==='function'?window.courseMenuLabel(c):(c.baseName||c.name||typed)):typed;
+          }catch{locationName=typed||'Course TBD'}
+        }else{
+          locationName=typed||cleanCourseName(ev.course_name||'')||'Course TBD';
+        }
+        if(!locationName)locationName='Course TBD';
+
         const format=typeof window.grReadMissionFormat==='function'
           ? (window.grReadMissionFormat(out,formatIds)||'Stroke play (net)')
           : (out.querySelector('#grPastFormat')?.value.trim()||'Stroke Play');
@@ -317,8 +385,8 @@ async function openImport(){
         const guestList=[...new Set(guests.map(g=>String(g||'').trim()).filter(Boolean))];
         const photos=(typeof window.grCleanMissionPhotos==='function'?window.grCleanMissionPhotos(missionPhotos):missionPhotos.slice(0,photoMax));
         const built=typeof window.grBuildCompletedMissionFromImport==='function'
-          ? window.grBuildCompletedMissionFromImport({id:uid(),date,teeTime,locationName,title,format,notes:story,recap_note:story,participants,guests:guestList,results:saved,photos,league_points:leaguePoints})
-          : {ok:true,mission:{id:uid(),date,teeTime,type:'battle',courseId:'',locationName,title,format,notes:story,status:'completed',participants:[...new Set(participants)],guests:guestList,results:saved,photos,league_points:leaguePoints,recap_note:story||undefined}};
+          ? window.grBuildCompletedMissionFromImport({id:uid(),date,teeTime,courseId,locationName,title,format,notes:story,recap_note:story,participants,guests:guestList,results:saved,photos,league_points:leaguePoints})
+          : {ok:true,mission:{id:uid(),date,teeTime,type:'battle',courseId,locationName,title,format,notes:story,status:'completed',participants:[...new Set(participants)],guests:guestList,results:saved,photos,league_points:leaguePoints,recap_note:story||undefined}};
         if(!built.ok){alert(built.error||'Could not create Mission.');return}
         const mission=built.mission;
         mission.league_points=leaguePoints;

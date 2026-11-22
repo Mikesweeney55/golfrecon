@@ -494,6 +494,8 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .preview-hero-grid{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:12px;align-items:stretch}
 .preview-hero-grid .course-preview-map{min-width:0}
 .preview-stats-column{display:flex;flex-direction:column;gap:7px;min-width:0}
+.preview-stats-only{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:7px}
+.preview-stats-only .preview-read-card,.preview-stats-only .risk-card{grid-column:1/-1}
 .preview-side-card{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:42px}
 .preview-side-card strong{font-size:var(--fs-subtitle);line-height:1}.preview-side-card span{font-size:var(--fs-data);color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:right}
 .preview-side-card.risk-card{min-height:48px}.preview-side-card.risk-card strong{display:flex;align-items:center;gap:8px;font-size:var(--fs-data)}
@@ -3158,58 +3160,36 @@ function pregameHoleInsightsHtml(c,priority=[]){
   state.coursePreviewHole=hole;
   const mem=holeMemory(c.id),h=mem.find(x=>Number(x.hole)===hole);
   const last=h?holeLastRound(c.id,hole):null;
-  let cached=coursePreviewCache.get(`preview:${c.id}:${hole}`);
-  // Never reuse geometry tied to a different course id.
-  if(cached&&cached.courseId&&String(cached.courseId)!==String(c.id)){
-    coursePreviewCache.delete(`preview:${c.id}:${hole}`);
-    cached=null;
-  }
   const avgScore=h?.avgScore;
   const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
-  const mb=mapboxToken();
-  const mapBody=holePreviewMapBodyHtml(c,hole,cached);
-  const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
   const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
   const holePar=h?.par??c.pars?.[holeIdx]??'—';
   const holeHcp=c.handicaps?.[holeIdx]??'—';
-  const holeYd=previewHoleYardage(c,hole,titleBuilt);
+  const holeYd=previewHoleYardage(c,hole,null);
   const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
   const insight=h?usefulHoleInsight(h):'';
   const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
-  const interactive=Boolean(mb&&cached?.geom);
+  // Hole Preview map paused for a few revs — keep stats / risk / recon only.
   return `
     <section id="pregameHoleInsights" class="pregame-hole-insights">
       <div class="section-head">
         <div><div class="eyebrow">HOLE INSIGHTS</div><h2>Hole ${hole}</h2></div>
         <button class="button secondary" type="button" onclick="toggleCoursePreviewHoles()">${state.coursePreviewShowAll?'Hide holes':'Show all holes'}</button>
       </div>
-      ${!mb?`<div class="mapbox-missing">Showing free satellite imagery. For interactive pan/zoom, <button type="button" class="hole-preview-btn" onclick="configureMapboxToken()">set a Mapbox token</button>.</div>`:''}
       ${state.coursePreviewShowAll?`<div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>`:''}
-      <div class="preview-hero-grid">
-        <div>
-          <div class="course-preview-map">
-            <div class="preview-map-head">
-              <div class="preview-hole-title"><strong>Hole ${hole}</strong><span>Par ${holePar} · ${yardageText} · HCP ${holeHcp}</span></div>
-              ${h?`<span class="risk-dot preview-risk" title="${riskLabel(h)}">${riskLetter(h)}</span>`:''}
-            </div>
-            <div id="coursePreviewMapBody">${mapBody}</div>
-          </div>
-          <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom':'Satellite overlay · set Mapbox for interactive pan/zoom'}</span>${interactive?`<button type="button" onclick="resetCoursePreviewMap()">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
-          <div class="preview-attribution">Satellite imagery © ${interactive?'Mapbox / providers':'Esri / providers'} · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
-        </div>
-        <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
-          ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
-          ${stat('Rounds',h?.played??'—')}
-          ${stat('Avg score',avgScore==null?'—':avgScore.toFixed(1))}
-          ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`)}
-          ${stat('Double+',h?.doubleRate==null?'—':h.doubleRate+'%')}
-          ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'))}
-          ${stat('GIR',h?.gir==null?'—':h.gir+'%')}
-          ${stat('Avg putts',h?.putts==null?'—':h.putts.toFixed(1))}
-          ${stat('Last score',last?.score??'—')}
-          <div class="preview-read-card"><div class="eyebrow">RECON READ</div><p>${safeText(insight||'More history will sharpen the hole-specific read.')}</p></div>
-        </aside>
-      </div>
+      <div class="preview-hole-title" style="margin:0 0 10px"><strong>Hole ${hole}</strong><span>Par ${holePar} · ${yardageText} · HCP ${holeHcp}</span></div>
+      <aside class="preview-stats-column preview-stats-only" aria-label="Hole ${hole} statistics">
+        ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
+        ${stat('Rounds',h?.played??'—')}
+        ${stat('Avg score',avgScore==null?'—':avgScore.toFixed(1))}
+        ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`)}
+        ${stat('Double+',h?.doubleRate==null?'—':h.doubleRate+'%')}
+        ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'))}
+        ${stat('GIR',h?.gir==null?'—':h.gir+'%')}
+        ${stat('Avg putts',h?.putts==null?'—':h.putts.toFixed(1))}
+        ${stat('Last score',last?.score??'—')}
+        <div class="preview-read-card"><div class="eyebrow">RECON READ</div><p>${safeText(insight||'More history will sharpen the hole-specific read.')}</p></div>
+      </aside>
     </section>`;
 }
 window.toggleCoursePreviewHoles=()=>{
@@ -3291,7 +3271,7 @@ function renderHoleCard(h,showPriority=false){
   return `<div class="hole-card risk-${h.risk}">
     <div class="hole-top">
       <div><span class="hole-number">${h.hole}</span> <span class="muted">Par ${h.par}</span></div>
-      <div style="display:flex;align-items:center;gap:6px"><button class="hole-preview-btn" type="button" data-hole-preview="${h.hole}">⛳ View</button><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span></div>
+      <div style="display:flex;align-items:center;gap:6px"><button class="hole-preview-btn" type="button" data-hole-preview="${h.hole}">Stats</button><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span></div>
     </div>
     ${priorityTag}
     <div class="hole-stats">
@@ -4143,8 +4123,6 @@ function render(){
  if(state.view==='rounds')requestAnimationFrame(()=>document.querySelectorAll('.round-chart-wrap').forEach(w=>w.scrollLeft=w.scrollWidth));
  if(state.view==='pregame')requestAnimationFrame(()=>{
    const l=document.getElementById('pregameChatLog');if(l)l.scrollTop=l.scrollHeight;
-   ensureCoursePreviewLoaded(state.selectedCourseId,state.coursePreviewHole);
-   requestAnimationFrame(initInteractiveCourseMap);
  });
 
 }
@@ -5250,13 +5228,13 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=204"></script>
+  <script src="platoon-recap-shared.js?v=205"></script>
   <script src="platoon-mission-core.js?v=196"></script>
   <script src="platoon-hq-records.js?v=195"></script>
-  <script src="platoons-v15-real.js?v=197"></script>
+  <script src="platoons-v15-real.js?v=198"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
-<script src="past-mission-import.js?v=197"></script>
+<script src="past-mission-import.js?v=198"></script>
 <script src="mission-delete.js?v=4"></script>
 </body>
 </html>
