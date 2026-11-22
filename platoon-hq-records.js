@@ -965,20 +965,17 @@ function installStyles(){
   .gr-record-flash strong{font-size:var(--fs-subtitle)!important;color:#fff6e8}
   .gr-ace-row{padding:6px 0!important}
   .gr-honor-intel,.gr-honor-constitution{grid-column:1/-1}
-  .gr-constitution-body{font-size:var(--fs-data);line-height:1.55;color:#e8f0ea;white-space:pre-wrap}
   .gr-honor-constitution{background:radial-gradient(circle at 12% -20%,rgba(212,175,106,.16),transparent 42%),linear-gradient(160deg,rgba(40,34,22,.55),rgba(12,12,10,.58))!important;padding:10px 12px!important}
+  .gr-honor-constitution.is-compact{padding:8px 10px!important}
   .gr-constitution-bubble{margin:0}
-  .gr-constitution-sum{list-style:none;cursor:pointer;display:grid;gap:4px}
-  .gr-constitution-sum::-webkit-details-marker{display:none}
-  .gr-constitution-sum::marker{content:''}
-  .gr-constitution-peek{font-size:var(--fs-data);line-height:1.4;color:#c9d5cf;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .gr-constitution-sum{appearance:none;-webkit-appearance:none;border:0;background:transparent;color:inherit;width:100%;text-align:left;padding:0;margin:0;cursor:pointer;display:grid;gap:4px;font:inherit}
+  .gr-constitution-peek{font-size:var(--fs-data);line-height:1.35;color:#c9d5cf;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;max-height:1.35em}
   .gr-constitution-toggle{font-size:var(--fs-data);font-weight:800;color:var(--accent,#d4af6a);letter-spacing:.04em}
-  .gr-constitution-bubble[open] .gr-constitution-peek{display:none}
-  .gr-constitution-toggle::after{content:'Read more'}
-  .gr-constitution-bubble[open] .gr-constitution-toggle::after{content:'Show less'}
-  .gr-constitution-bubble .gr-constitution-body{margin-top:8px}
-  .gr-constitution-bubble[open] .gr-constitution-sum{margin-bottom:2px}
-  @media(max-width:700px){.gr-constitution-body,.gr-constitution-peek{font-size:var(--fs-data);line-height:1.45}}
+  .gr-constitution-body{font-size:var(--fs-data);line-height:1.55;color:#e8f0ea;white-space:pre-wrap;margin-top:8px}
+  .gr-constitution-bubble.is-collapsed .gr-constitution-body{display:none!important;visibility:hidden!important;height:0!important;margin:0!important;padding:0!important;overflow:hidden!important}
+  .gr-constitution-bubble:not(.is-collapsed) .gr-constitution-peek{display:none!important}
+  .gr-constitution-bubble:not(.is-collapsed) .gr-constitution-sum{margin-bottom:2px}
+  @media(max-width:700px){.gr-constitution-body,.gr-constitution-peek{font-size:var(--fs-data)}}
   .gr-clubhouse-board .gr-honor-lockup{margin-bottom:8px;gap:8px}
   .gr-clubhouse-board .gr-honor-mark{width:40px;height:40px;font-size:var(--fs-title)}
   .gr-clubhouse-board .gr-honor-sub{font-size:var(--fs-data)}
@@ -1004,6 +1001,23 @@ function bindUi(){
     if(!e.target.closest('[data-gr-edit-constitution]'))return;
     e.preventDefault();e.stopPropagation();
     openConstitutionEditor();
+  },true);
+  document.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-gr-constitution-toggle]');
+    if(!btn)return;
+    e.preventDefault();e.stopPropagation();
+    const bubble=btn.closest('.gr-constitution-bubble');
+    const section=btn.closest('.gr-honor-constitution');
+    if(!bubble)return;
+    const open=!bubble.classList.contains('is-collapsed');
+    const nextOpen=!open;
+    bubble.classList.toggle('is-collapsed',!nextOpen);
+    btn.setAttribute('aria-expanded',nextOpen?'true':'false');
+    const body=bubble.querySelector('.gr-constitution-body');
+    if(body)body.hidden=!nextOpen;
+    const label=btn.querySelector('.gr-constitution-toggle');
+    if(label)label.textContent=nextOpen?'Show less':'Read more';
+    if(section)section.classList.toggle('is-compact',!nextOpen);
   },true);
 }
 
@@ -1061,20 +1075,20 @@ function platoonRecapMarkup(p){
     ${birdies}
     <div class="gr-eagle-stack">${eagle}${ace}</div>
     <section class="gr155-recap-block gr155-recap-copy gr155-intel-wide gr-honor-intel"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section>
-    <section class="gr155-recap-block gr155-recap-copy gr155-intel-wide gr-honor-constitution">
+    <section class="gr155-recap-block gr155-recap-copy gr155-intel-wide gr-honor-constitution is-compact">
       <div class="gr-hq-title-row"><div class="gr155-recap-title">MY TIME CONSTITUTION</div>${canEditHq(p)?`<button type="button" class="gr-hq-edit" data-gr-edit-constitution title="Edit Constitution">✎</button>`:''}</div>
       ${(()=>{
         const text=constitutionOf(p);
         if(!text)return `<p class="muted" style="margin:0">No constitution yet.${canEditHq(p)?' Tap edit to write the house rules.':''}</p>`;
         const peek=text.replace(/\s+/g,' ').trim();
-        const short=peek.length>110?`${peek.slice(0,110).trim()}…`:peek;
-        return `<details class="gr-constitution-bubble">
-          <summary class="gr-constitution-sum">
-            <div class="gr-constitution-peek">${esc(short)}</div>
-            <span class="gr-constitution-toggle"></span>
-          </summary>
-          <div class="gr-constitution-body">${esc(text).replace(/\n/g,'<br>')}</div>
-        </details>`;
+        const short=peek.length>64?`${peek.slice(0,64).trim()}…`:peek;
+        return `<div class="gr-constitution-bubble is-collapsed">
+          <button type="button" class="gr-constitution-sum" data-gr-constitution-toggle aria-expanded="false">
+            <span class="gr-constitution-peek">${esc(short)}</span>
+            <span class="gr-constitution-toggle">Read more</span>
+          </button>
+          <div class="gr-constitution-body" hidden>${esc(text).replace(/\n/g,'<br>')}</div>
+        </div>`;
       })()}
     </section>
   </div>`;
