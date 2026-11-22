@@ -26,13 +26,31 @@ const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
 const uid=()=>`mission-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 function aliasesOf(m){return typeof window.grAliasesOf==='function'?window.grAliasesOf(m):[]}
 function canonicalMember(p,raw){return typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,raw):null}
-let pastImportSession=0,pastImportBusy=false,pastImportAbort=null;
-function dialog(inner){let d=document.getElementById('grPastMissionDialog');if(!d){d=document.createElement('dialog');d.id='grPastMissionDialog';document.body.appendChild(d)}d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
+let pastImportSession=0,pastImportRead=0,pastImportBusy=false,pastImportAbort=null;
+function destroyDialog(){
+  const d=document.getElementById('grPastMissionDialog');
+  if(!d)return;
+  try{d.close()}catch{}
+  try{d.remove()}catch{}
+}
+function dialog(inner){
+  // Always rebuild from scratch so the next import can't inherit the previous confirm form
+  // (Safari/Chrome will otherwise restore values into stable #grPast* ids).
+  destroyDialog();
+  const d=document.createElement('dialog');
+  d.id='grPastMissionDialog';
+  d.setAttribute('data-gr-import-session',String(pastImportSession));
+  document.body.appendChild(d);
+  d.innerHTML=`<div class="dialog-card">${inner}</div>`;
+  d.showModal();
+  return d;
+}
 function close(){
   try{pastImportAbort?.abort()}catch{}
   pastImportAbort=null;
   pastImportBusy=false;
-  document.getElementById('grPastMissionDialog')?.close();
+  pastImportSession++; // invalidate any in-flight confirm paint / create handlers
+  destroyDialog();
 }
 function fmtBytes(n){if(!Number.isFinite(n))return'';if(n<1024)return`${n} B`;if(n<1048576)return`${(n/1024).toFixed(1)} KB`;return`${(n/1048576).toFixed(1)} MB`}
 function cleanCourseName(v){return typeof window.grCleanCourseName==='function'?window.grCleanCourseName(v):String(v||'').trim()}
@@ -64,12 +82,12 @@ function courseConfirmMarkup(raw){
   const opts=options.map(x=>`<option value="id:${esc(x.c.id)}" ${best&&best.c.id===x.c.id?'selected':''}>${esc(x.label)}${x.score>=88?' ✓':''}</option>`).join('');
   const otherSelected=!best;
   return `<label>Course <span class="muted" style="font-weight:600">(confirm)</span>
-    <select id="grPastCoursePick" class="gr-mission-select">
+    <select id="grPastCoursePick" class="gr-mission-select" autocomplete="off">
       <option value="">Select course…</option>
       ${opts||'<option value="" disabled>No Golf Recon courses yet</option>'}
       <option value="__other__" ${otherSelected?'selected':''}>Other / type below…</option>
     </select>
-    <input id="grPastCourse" value="${esc(cleaned)}" placeholder="Course name" style="${otherSelected?'':'display:none'};margin-top:7px">
+    <input id="grPastCourse" value="${esc(cleaned)}" placeholder="Course name" style="${otherSelected?'':'display:none'};margin-top:7px" autocomplete="off" autocorrect="off" spellcheck="false">
     ${best?`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">Matched “${esc(cleaned)}” → <strong>${esc(best.label)}</strong>. Change if wrong.</div>`
       :`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">Cleaned to “${esc(cleaned)}”. Pick a Golf Recon course or keep the typed name.</div>`}
   </label>`;
@@ -182,18 +200,23 @@ function resultRow(playerName,r){
     ...(holes.length?{holes}:{})
   };
 }
+function resetFileInput(input){
+  if(!input)return;
+  try{input.value=''}catch{}
+}
 async function openImport(){
   const p=window.loadPlatoonLocal?.();if(!p)return alert('Platoon data is unavailable.');
   if(typeof window.callPlatoonFunction!=='function')return alert('Screenshot import is unavailable.');
-  // New dialog session cancels any in-flight read so reused DOM can't look hung.
+  // New dialog session cancels any in-flight read so reused DOM can't look hung / show stale confirm.
   try{pastImportAbort?.abort()}catch{}
   pastImportAbort=null;
   pastImportBusy=false;
   const session=++pastImportSession;
-  const d=dialog(`<div class="dialog-head"><div><div class="eyebrow">HISTORICAL IMPORT</div><h2>Import Past Mission</h2></div><button class="icon-button" data-close type="button">✕</button></div><p class="muted" style="font-size:var(--fs-data)">Upload the event overview, net/points leaderboard, and expanded gross scorecards (front 9 + back 9). Hole-by-hole scores attach to each player’s Mission result and seed their personal round without wiping later detail.</p><label class="upload-zone" style="cursor:pointer"><strong>📥 Add screenshots</strong><span>Overview + net LB + expanded gross cards (front/back 9)</span><input id="grPastFiles" type="file" accept="image/*" multiple></label><div id="grPastFilesList" class="file-list"></div><label>Round story / anything worth highlighting<textarea id="grPastStory" rows="3" placeholder="Optional — weather, trash talk, crazy shots, side bets, meltdowns…"></textarea></label><div id="grPastProgress"></div><div id="grPastOut"></div><div class="dialog-actions"><button class="button secondary" data-cancel type="button">Cancel</button><button class="button primary" id="grPastRead" type="button">Read Screenshots</button></div>`);
+  const d=dialog(`<form id="grPastImportForm" autocomplete="off" onsubmit="return false"><div class="dialog-head"><div><div class="eyebrow">HISTORICAL IMPORT</div><h2>Import Past Mission</h2></div><button class="icon-button" data-close type="button">✕</button></div><p class="muted" style="font-size:var(--fs-data)">Upload the event overview, net/points leaderboard, and expanded gross scorecards (front 9 + back 9). Hole-by-hole scores attach to each player’s Mission result and seed their personal round without wiping later detail.</p><label class="upload-zone" style="cursor:pointer"><strong>📥 Add screenshots</strong><span>Overview + net LB + expanded gross cards (front/back 9)</span><input id="grPastFiles" type="file" accept="image/*" multiple></label><div id="grPastFilesList" class="file-list"></div><label>Round story / anything worth highlighting<textarea id="grPastStory" name="gr-past-story-${session}" rows="3" placeholder="Optional — weather, trash talk, crazy shots, side bets, meltdowns…" autocomplete="off"></textarea></label><div id="grPastProgress"></div><div id="grPastOut"></div><div class="dialog-actions" id="grPastReadActions"><button class="button secondary" data-cancel type="button">Cancel</button><button class="button primary" id="grPastRead" type="button">Read Screenshots</button></div></form>`);
   d.querySelector('[data-close]').onclick=close;d.querySelector('[data-cancel]').onclick=close;
-  const files=d.querySelector('#grPastFiles'),fileList=d.querySelector('#grPastFilesList'),progress=d.querySelector('#grPastProgress'),out=d.querySelector('#grPastOut'),btn=d.querySelector('#grPastRead');
-  files.onchange=()=>{const fs=[...files.files];fileList.innerHTML=fs.length?`<div class="platoon-notice" style="margin:8px 0"><strong>${fs.length} screenshot${fs.length===1?'':'s'} ready</strong>${fs.map((f,i)=>`<div style="margin-top:4px">${i+1}. ${esc(f.name)} <span class="muted">· ${fmtBytes(f.size)}</span></div>`).join('')}</div>`:'';progress.innerHTML='';out.innerHTML=''};
+  const files=d.querySelector('#grPastFiles'),fileList=d.querySelector('#grPastFilesList'),progress=d.querySelector('#grPastProgress'),out=d.querySelector('#grPastOut'),btn=d.querySelector('#grPastRead'),story=d.querySelector('#grPastStory'),readActions=d.querySelector('#grPastReadActions');
+  const clearConfirm=()=>{progress.innerHTML='';out.innerHTML=''};
+  files.onchange=()=>{const fs=[...files.files];fileList.innerHTML=fs.length?`<div class="platoon-notice" style="margin:8px 0"><strong>${fs.length} screenshot${fs.length===1?'':'s'} ready</strong>${fs.map((f,i)=>`<div style="margin-top:4px">${i+1}. ${esc(f.name)} <span class="muted">· ${fmtBytes(f.size)}</span></div>`).join('')}</div>`:'';clearConfirm();if(readActions)readActions.style.display='';if(btn){btn.style.display='';btn.disabled=false;btn.textContent='Read Screenshots'}};
   btn.onclick=async()=>{
     const fs=[...files.files];if(!fs.length){out.innerHTML='<div class="platoon-notice">Add at least one screenshot.</div>';return}
     if(pastImportBusy||session!==pastImportSession)return;
@@ -201,8 +224,11 @@ async function openImport(){
     try{pastImportAbort?.abort()}catch{}
     const ctrl=typeof AbortController!=='undefined'?new AbortController():null;
     pastImportAbort=ctrl;
-    const alive=()=>session===pastImportSession&&(!ctrl||!ctrl.signal.aborted);
-    btn.disabled=true;btn.textContent='Reading…';out.innerHTML='';
+    const readId=++pastImportRead;
+    const alive=()=>session===pastImportSession&&readId===pastImportRead&&(!ctrl||!ctrl.signal.aborted);
+    btn.disabled=true;btn.textContent='Reading…';clearConfirm();
+    // Capture file fingerprints now so a later confirm can't accidentally come from a different pick.
+    const fileStamp=fs.map(f=>`${f.name}:${f.size}:${f.lastModified||0}`).join('|');
     try{
       const images=[];
       for(let i=0;i<fs.length;i++){
@@ -211,15 +237,20 @@ async function openImport(){
         images.push(await compactImageFile(fs[i]));
       }
       if(!alive())return;
+      // Guard: file input changed mid-prepare.
+      const stampNow=[...files.files].map(f=>`${f.name}:${f.size}:${f.lastModified||0}`).join('|');
+      if(stampNow!==fileStamp)throw new Error('Screenshots changed while reading. Tap Read Screenshots again.');
       progress.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Reading ${fs.length} screenshot${fs.length===1?'':'s'}…</strong><br><span class="muted">This can take 20–60 seconds. Keep this window open.</span></div>`;
       const timeoutMs=90000;
       let timer=null;
       if(ctrl)timer=setTimeout(()=>{try{ctrl.abort()}catch{}},timeoutMs);
       let parsed;
       try{
-        parsed=await window.callPlatoonFunction({action:'parse_completed_mission',images},{signal:ctrl?.signal});
+        parsed=await window.callPlatoonFunction({action:'parse_completed_mission',images,import_session:session,read_id:readId},{signal:ctrl?.signal});
       }finally{if(timer)clearTimeout(timer)}
       if(!alive())return;
+      // Deep-clone so later mutations / reused objects can't leak into the next confirm.
+      parsed=JSON.parse(JSON.stringify(parsed||{}));
       progress.innerHTML='';
       const ev=parsed?.event||{},results=Array.isArray(parsed?.results)?parsed.results:[];
       if(!results.length)throw new Error('No player results were found.');
@@ -230,11 +261,18 @@ async function openImport(){
       const formatIds={pickId:'grPastFormatPick',otherId:'grPastFormatOther'};
       const formatMarkup=typeof window.grFormatSelectMarkup==='function'
         ? window.grFormatSelectMarkup(ev.format||'Stroke Play',formatIds)
-        : `<input id="grPastFormat" value="${esc(ev.format||'Stroke Play')}">`;
+        : `<input id="grPastFormat" value="${esc(ev.format||'Stroke Play')}" autocomplete="off">`;
       let missionPhotos=[];
       const photoMax=Number(window.grMissionPhotosMax)||3;
-      out.innerHTML=`<div class="platoon-notice" style="margin-top:12px"><strong>Confirm before creating.</strong><br>Edit anything the screenshots did not capture correctly. Use <strong>Add as guest</strong> for non-members — they go in the guest pool.</div><div class="grid two"><label>Mission name<input id="grPastTitle" value="${esc(ev.title||'Past Mission')}"></label><label>Date<input id="grPastDate" class="gr-datetime gr-date-picker" type="date" value="${esc(ev.date||'')}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sun">Next Sun</button></div></label><label>Tee time <span class="muted" style="font-weight:600">(10 min)</span>${teeMarkup}</label><label>Format${formatMarkup}</label></div>${courseConfirmMarkup(ev.course_name||'')}<div class="gr-league-points-toggle" style="margin-top:12px"><div class="eyebrow">MY TIME ⛳ POINTS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 8px">Include this round’s 18Birdies points in the season cup average?</p><div class="gr-league-toggle" role="group" aria-label="League points"><button type="button" class="button primary" id="grPastLeagueYes" data-league="1" aria-pressed="true">Include in total</button><button type="button" class="button secondary" id="grPastLeagueNo" data-league="0" aria-pressed="false">Don’t count</button></div></div><div class="gr-mission-photos-setup" style="margin-top:12px"><div class="eyebrow">MISSION PHOTOS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 6px">Optional — up to ${photoMax} for the Mission summary.</p><div id="grPastPhotoThumbs"></div><label class="gr-logo-upload" style="margin:6px 0 0;cursor:pointer;display:inline-block"><strong>📷 Add photos</strong><input id="grPastPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple></label><div id="grPastPhotoStatus" class="muted" style="font-size:var(--fs-data);margin-top:4px"></div></div><div style="margin-top:14px"><div class="eyebrow">PLAYERS & RESULTS</div>${results.map((r,i)=>{const hc=finite(r.handicap)?`HCP ${Number(r.handicap)}`:'';const holeN=Array.isArray(r.holes)?r.holes.filter(h=>finite(h?.score)).length:0;const holeBit=holeN?`${holeN} holes`:'no holes yet';return `<div class="gr-past-result" data-i="${i}" style="border:1px solid var(--line);border-radius:12px;padding:9px;margin-top:7px"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><strong>${esc(r.player_name||'Player')}${hc?` <span class="muted" style="font-weight:600">· ${hc}</span>`:''}</strong><span>${finite(r.net)?`Net ${Number(r.net)}`:'Net —'} · ${finite(r.gross)?`Gross ${Number(r.gross)}`:'Gross —'}${finite(r.raw_points)?` · ${Number(r.raw_points)} pts`:''} · ${holeBit}</span></div><label style="margin-top:7px">Match to Platoon player${matchSelectHtml(p,roster,r)}</label></div>`}).join('')}</div>${Array.isArray(parsed?.warnings)&&parsed.warnings.length?`<div class="platoon-notice" style="margin-top:10px">${parsed.warnings.map(x=>esc(x)).join('<br>')}</div>`:''}<div class="dialog-actions"><button class="button secondary" id="grPastBack" type="button">Back</button><button class="button primary" id="grPastCreate" type="button">Create Completed Mission</button></div>`;
+      const titleVal=String(ev.title||'Past Mission');
+      const dateVal=String(ev.date||'');
+      out.innerHTML=`<div class="platoon-notice" style="margin-top:12px"><strong>Confirm before creating.</strong><br>Edit anything the screenshots did not capture correctly. Use <strong>Add as guest</strong> for non-members — they go in the guest pool.</div><div class="grid two"><label>Mission name<input id="grPastTitle" name="gr-past-title-${session}-${readId}" value="${esc(titleVal)}" autocomplete="off" autocorrect="off" spellcheck="false"></label><label>Date<input id="grPastDate" name="gr-past-date-${session}-${readId}" class="gr-datetime gr-date-picker" type="date" value="${esc(dateVal)}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sun">Next Sun</button></div></label><label>Tee time <span class="muted" style="font-weight:600">(10 min)</span>${teeMarkup}</label><label>Format${formatMarkup}</label></div>${courseConfirmMarkup(ev.course_name||'')}<div class="gr-league-points-toggle" style="margin-top:12px"><div class="eyebrow">MY TIME ⛳ POINTS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 8px">Include this round’s 18Birdies points in the season cup average?</p><div class="gr-league-toggle" role="group" aria-label="League points"><button type="button" class="button primary" id="grPastLeagueYes" data-league="1" aria-pressed="true">Include in total</button><button type="button" class="button secondary" id="grPastLeagueNo" data-league="0" aria-pressed="false">Don’t count</button></div></div><div class="gr-mission-photos-setup" style="margin-top:12px"><div class="eyebrow">MISSION PHOTOS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 6px">Optional — up to ${photoMax} for the Mission summary.</p><div id="grPastPhotoThumbs"></div><label class="gr-logo-upload" style="margin:6px 0 0;cursor:pointer;display:inline-block"><strong>📷 Add photos</strong><input id="grPastPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple></label><div id="grPastPhotoStatus" class="muted" style="font-size:var(--fs-data);margin-top:4px"></div></div><div style="margin-top:14px"><div class="eyebrow">PLAYERS & RESULTS</div>${results.map((r,i)=>{const hc=finite(r.handicap)?`HCP ${Number(r.handicap)}`:'';const holeN=Array.isArray(r.holes)?r.holes.filter(h=>finite(h?.score)).length:0;const holeBit=holeN?`${holeN} holes`:'no holes yet';return `<div class="gr-past-result" data-i="${i}" style="border:1px solid var(--line);border-radius:12px;padding:9px;margin-top:7px"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><strong>${esc(r.player_name||'Player')}${hc?` <span class="muted" style="font-weight:600">· ${hc}</span>`:''}</strong><span>${finite(r.net)?`Net ${Number(r.net)}`:'Net —'} · ${finite(r.gross)?`Gross ${Number(r.gross)}`:'Gross —'}${finite(r.raw_points)?` · ${Number(r.raw_points)} pts`:''} · ${holeBit}</span></div><label style="margin-top:7px">Match to Platoon player${matchSelectHtml(p,roster,r)}</label></div>`}).join('')}</div>${Array.isArray(parsed?.warnings)&&parsed.warnings.length?`<div class="platoon-notice" style="margin-top:10px">${parsed.warnings.map(x=>esc(x)).join('<br>')}</div>`:''}<div class="dialog-actions"><button class="button secondary" id="grPastBack" type="button">Back</button><button class="button primary" id="grPastCreate" type="button">Create Completed Mission</button></div>`;
+      if(!alive()){out.innerHTML='';return}
       btn.style.display='none';
+      if(readActions)readActions.style.display='none';
+      // Force values after paint — defeats browser autofill restoring the previous import.
+      const titleEl=out.querySelector('#grPastTitle');if(titleEl)titleEl.value=titleVal;
+      const dateEl=out.querySelector('#grPastDate');if(dateEl)dateEl.value=dateVal;
       if(typeof window.grWireTeeTimeWheel==='function')window.grWireTeeTimeWheel(out,'grPastTime');
       if(typeof window.grWireFormatSelect==='function')window.grWireFormatSelect(out,formatIds);
       let leaguePoints=true;
@@ -330,8 +368,21 @@ async function openImport(){
         if(b.dataset.datePreset==='sun'){const day=target.getDay();const add=((0-day)+7)%7||7;target.setDate(target.getDate()+add)}
         const el=out.querySelector('#'+b.dataset.pastDate);if(el)el.value=`${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
       }));
-      out.querySelector('#grPastBack').onclick=()=>{out.innerHTML='';progress.innerHTML='';btn.style.display='';btn.disabled=false;btn.textContent='Read Screenshots'};
+      out.querySelector('#grPastBack').onclick=()=>{
+        if(session!==pastImportSession)return;
+        // Drop this confirm + the prior file pick so the next Read can't silently reuse old screenshots.
+        clearConfirm();
+        resetFileInput(files);
+        if(fileList)fileList.innerHTML='';
+        if(story)story.value='';
+        if(readActions)readActions.style.display='';
+        btn.style.display='';btn.disabled=false;btn.textContent='Read Screenshots';
+      };
       out.querySelector('#grPastCreate').onclick=async()=>{
+        if(!alive()||session!==pastImportSession||readId!==pastImportRead){
+          alert('This confirm screen is out of date. Close and import again.');
+          return;
+        }
         const title=out.querySelector('#grPastTitle').value.trim()||'Past Mission';
         const date=out.querySelector('#grPastDate').value;
         const teeTime=out.querySelector('#grPastTime').value;
@@ -410,11 +461,17 @@ async function openImport(){
         const createBtn=out.querySelector('#grPastCreate');createBtn.disabled=true;createBtn.textContent='Saving…';
         try{
           await Promise.resolve(window.savePlatoonLocal(p));
+          if(session!==pastImportSession)return;
           close();
           setTimeout(()=>{if(typeof window.render==='function')window.render();else location.reload()},50);
           const holePlayers=(mission.results||[]).filter(r=>Array.isArray(r.holes)&&r.holes.length).length;
           alert(`Created completed Mission: ${title}${holePlayers?`\nHole-by-hole saved for ${holePlayers} player${holePlayers===1?'':'s'}.`:''}${claimed?`\nSeeded ${claimed} personal round${claimed===1?'':'s'} (blank fields only).`:''}`);
-        }catch(e){p.missions=p.missions.filter(x=>x.id!==mission.id);createBtn.disabled=false;createBtn.textContent='Create Completed Mission';alert(e?.message||String(e))}
+        }catch(e){
+          if(session!==pastImportSession)return;
+          p.missions=p.missions.filter(x=>x.id!==mission.id);
+          createBtn.disabled=false;createBtn.textContent='Create Completed Mission';
+          alert(e?.message||String(e));
+        }
       };
     }catch(e){
       if(!alive())return;
