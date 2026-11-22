@@ -3561,10 +3561,20 @@ async function callPlatoonFunction(payload,retryOrOpts=true){
   const opts=(retryOrOpts&&typeof retryOrOpts==='object')?retryOrOpts:{retry:retryOrOpts!==false};
   const retry=opts.retry!==false;
   const signal=opts.signal;
+  const throwIfAborted=()=>{
+    if(signal?.aborted){
+      const err=new Error('The screenshot reader was canceled.');
+      err.name='AbortError';
+      throw err;
+    }
+  };
   if(window.grTestEnvActive&&payload&&['save_state','delete_mission'].includes(String(payload.action||''))){
     throw new Error(`Platoon action "${payload.action}" is disabled in the TEST build to protect production data.`);
   }
-  const session=await ensureAuthSession();if(!session?.access_token)throw new Error('Please sign in again.');
+  throwIfAborted();
+  const session=await ensureAuthSession();
+  throwIfAborted();
+  if(!session?.access_token)throw new Error('Please sign in again.');
   let res;
   try{
     // Only CORS-allowed request headers (authorization, apikey, content-type, x-client-info).
@@ -3581,7 +3591,11 @@ async function callPlatoonFunction(payload,retryOrOpts=true){
       signal
     });
   }catch(e){
-    if(e?.name==='AbortError')throw new Error('The screenshot reader timed out. Please try again; the files were not saved or changed.');
+    if(e?.name==='AbortError'||signal?.aborted){
+      const err=new Error(opts.timeoutMessage||'The screenshot reader timed out. Please try again; the files were not saved or changed.');
+      err.name='AbortError';
+      throw err;
+    }
     const detail=String(e?.message||e||'').trim();
     throw new Error(detail&&!/failed to fetch|networkerror|load failed/i.test(detail)
       ? `Could not reach Platoon import (${detail}).`
@@ -5249,7 +5263,7 @@ initializeAuth();
   <script src="platoons-v15-real.js?v=198"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
-<script src="past-mission-import.js?v=199"></script>
+<script src="past-mission-import.js?v=200"></script>
 <script src="mission-delete.js?v=4"></script>
 </body>
 </html>

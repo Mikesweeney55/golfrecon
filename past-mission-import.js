@@ -225,30 +225,66 @@ async function openImport(){
     const ctrl=typeof AbortController!=='undefined'?new AbortController():null;
     pastImportAbort=ctrl;
     const readId=++pastImportRead;
-    const alive=()=>session===pastImportSession&&readId===pastImportRead&&(!ctrl||!ctrl.signal.aborted);
+    // "current" = this dialog/read still owns the UI. Do NOT fold signal.aborted into this —
+    // timeout aborts the signal, and we still need to show an error + re-enable Try Again.
+    const current=()=>session===pastImportSession&&readId===pastImportRead;
+    let timedOut=false;
+    let heartbeat=null;
+    const startedAt=Date.now();
+    const setProgress=(title,detail='')=>{
+      if(!current())return;
+      const secs=Math.max(0,Math.round((Date.now()-startedAt)/1000));
+      progress.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>${title}</strong><br><span class="muted">${detail||`Elapsed ${secs}s`}</span><div style="margin-top:8px"><button type="button" class="button secondary" id="grPastStopRead">Stop</button></div></div>`;
+      progress.querySelector('#grPastStopRead')?.addEventListener('click',()=>{
+        try{ctrl?.abort()}catch{}
+        if(current()){
+          progress.innerHTML='';
+          out.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Stopped.</strong><br>Screenshots were not saved. Tap Try Again when ready.</div>`;
+          btn.disabled=false;btn.textContent='Try Again';
+        }
+      },{once:true});
+    };
+    const restoreReadBtn=()=>{
+      if(!current()||!btn?.isConnected)return;
+      if(btn.style.display==='none')return;
+      btn.disabled=false;
+      if(btn.textContent==='Reading…'||btn.textContent==='Preparing…')btn.textContent='Try Again';
+    };
     btn.disabled=true;btn.textContent='Reading…';clearConfirm();
     // Capture file fingerprints now so a later confirm can't accidentally come from a different pick.
     const fileStamp=fs.map(f=>`${f.name}:${f.size}:${f.lastModified||0}`).join('|');
     try{
       const images=[];
       for(let i=0;i<fs.length;i++){
-        if(!alive())return;
-        progress.innerHTML=`<div class="platoon-notice" style="margin-top:10px">Preparing screenshot ${i+1} of ${fs.length}…</div>`;
-        images.push(await compactImageFile(fs[i]));
+        if(!current())return;
+        if(ctrl?.signal?.aborted)throw Object.assign(new Error('Canceled.'),{name:'AbortError'});
+        setProgress(`Preparing screenshot ${i+1} of ${fs.length}…`,'Compressing for the reader…');
+        // Leaner OCR payload — big PNGs after a few imports were stalling mobile uploads.
+        images.push(await compactImageFile(fs[i],1280,.72));
       }
-      if(!alive())return;
+      if(!current())return;
+      if(ctrl?.signal?.aborted)throw Object.assign(new Error('Canceled.'),{name:'AbortError'});
       // Guard: file input changed mid-prepare.
       const stampNow=[...files.files].map(f=>`${f.name}:${f.size}:${f.lastModified||0}`).join('|');
       if(stampNow!==fileStamp)throw new Error('Screenshots changed while reading. Tap Read Screenshots again.');
-      progress.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Reading ${fs.length} screenshot${fs.length===1?'':'s'}…</strong><br><span class="muted">This can take 20–60 seconds. Keep this window open.</span></div>`;
-      const timeoutMs=90000;
+      setProgress(`Reading ${fs.length} screenshot${fs.length===1?'':'s'}…`,'Usually 20–60 seconds. You can Stop and retry.');
+      heartbeat=setInterval(()=>{
+        if(!current()||ctrl?.signal?.aborted)return;
+        const secs=Math.max(0,Math.round((Date.now()-startedAt)/1000));
+        setProgress(`Reading ${fs.length} screenshot${fs.length===1?'':'s'}…`,`Still working · ${secs}s elapsed`);
+      },1000);
+      const timeoutMs=75000;
       let timer=null;
-      if(ctrl)timer=setTimeout(()=>{try{ctrl.abort()}catch{}},timeoutMs);
+      if(ctrl)timer=setTimeout(()=>{timedOut=true;try{ctrl.abort()}catch{}},timeoutMs);
       let parsed;
       try{
-        parsed=await window.callPlatoonFunction({action:'parse_completed_mission',images,import_session:session,read_id:readId},{signal:ctrl?.signal});
-      }finally{if(timer)clearTimeout(timer)}
-      if(!alive())return;
+        parsed=await window.callPlatoonFunction(
+          {action:'parse_completed_mission',images,import_session:session,read_id:readId},
+          {signal:ctrl?.signal,timeoutMessage:'The screenshot reader timed out. Please try again with fewer or clearer screenshots.'}
+        );
+      }finally{if(timer)clearTimeout(timer);if(heartbeat){clearInterval(heartbeat);heartbeat=null}}
+      if(!current())return;
+      if(ctrl?.signal?.aborted)throw Object.assign(new Error(timedOut?'The screenshot reader timed out. Please try again with fewer or clearer screenshots.':'Canceled.'),{name:'AbortError'});
       // Deep-clone so later mutations / reused objects can't leak into the next confirm.
       parsed=JSON.parse(JSON.stringify(parsed||{}));
       progress.innerHTML='';
@@ -267,7 +303,7 @@ async function openImport(){
       const titleVal=String(ev.title||'Past Mission');
       const dateVal=String(ev.date||'');
       out.innerHTML=`<div class="platoon-notice" style="margin-top:12px"><strong>Confirm before creating.</strong><br>Edit anything the screenshots did not capture correctly. Use <strong>Add as guest</strong> for non-members — they go in the guest pool.</div><div class="grid two"><label>Mission name<input id="grPastTitle" name="gr-past-title-${session}-${readId}" value="${esc(titleVal)}" autocomplete="off" autocorrect="off" spellcheck="false"></label><label>Date<input id="grPastDate" name="gr-past-date-${session}-${readId}" class="gr-datetime gr-date-picker" type="date" value="${esc(dateVal)}" inputmode="none" autocomplete="off"><div class="gr-date-quick"><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-past-date="grPastDate" data-date-preset="sun">Next Sun</button></div></label><label>Tee time <span class="muted" style="font-weight:600">(10 min)</span>${teeMarkup}</label><label>Format${formatMarkup}</label></div>${courseConfirmMarkup(ev.course_name||'')}<div class="gr-league-points-toggle" style="margin-top:12px"><div class="eyebrow">MY TIME ⛳ POINTS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 8px">Include this round’s 18Birdies points in the season cup average?</p><div class="gr-league-toggle" role="group" aria-label="League points"><button type="button" class="button primary" id="grPastLeagueYes" data-league="1" aria-pressed="true">Include in total</button><button type="button" class="button secondary" id="grPastLeagueNo" data-league="0" aria-pressed="false">Don’t count</button></div></div><div class="gr-mission-photos-setup" style="margin-top:12px"><div class="eyebrow">MISSION PHOTOS</div><p class="muted" style="font-size:var(--fs-data);margin:4px 0 6px">Optional — up to ${photoMax} for the Mission summary.</p><div id="grPastPhotoThumbs"></div><label class="gr-logo-upload" style="margin:6px 0 0;cursor:pointer;display:inline-block"><strong>📷 Add photos</strong><input id="grPastPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple></label><div id="grPastPhotoStatus" class="muted" style="font-size:var(--fs-data);margin-top:4px"></div></div><div style="margin-top:14px"><div class="eyebrow">PLAYERS & RESULTS</div>${results.map((r,i)=>{const hc=finite(r.handicap)?`HCP ${Number(r.handicap)}`:'';const holeN=Array.isArray(r.holes)?r.holes.filter(h=>finite(h?.score)).length:0;const holeBit=holeN?`${holeN} holes`:'no holes yet';return `<div class="gr-past-result" data-i="${i}" style="border:1px solid var(--line);border-radius:12px;padding:9px;margin-top:7px"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><strong>${esc(r.player_name||'Player')}${hc?` <span class="muted" style="font-weight:600">· ${hc}</span>`:''}</strong><span>${finite(r.net)?`Net ${Number(r.net)}`:'Net —'} · ${finite(r.gross)?`Gross ${Number(r.gross)}`:'Gross —'}${finite(r.raw_points)?` · ${Number(r.raw_points)} pts`:''} · ${holeBit}</span></div><label style="margin-top:7px">Match to Platoon player${matchSelectHtml(p,roster,r)}</label></div>`}).join('')}</div>${Array.isArray(parsed?.warnings)&&parsed.warnings.length?`<div class="platoon-notice" style="margin-top:10px">${parsed.warnings.map(x=>esc(x)).join('<br>')}</div>`:''}<div class="dialog-actions"><button class="button secondary" id="grPastBack" type="button">Back</button><button class="button primary" id="grPastCreate" type="button">Create Completed Mission</button></div>`;
-      if(!alive()){out.innerHTML='';return}
+      if(!current()){out.innerHTML='';return}
       btn.style.display='none';
       if(readActions)readActions.style.display='none';
       // Force values after paint — defeats browser autofill restoring the previous import.
@@ -313,7 +349,7 @@ async function openImport(){
       out.querySelector('#grPastPhotos')?.addEventListener('change',async e=>{
         const picked=[...(e.target.files||[])];
         e.target.value='';
-        if(!picked.length||photoBusy||!alive())return;
+        if(!picked.length||photoBusy||!current()||ctrl?.signal?.aborted)return;
         const compress=typeof window.grCompressImageFile==='function'?window.grCompressImageFile:null;
         if(!compress){if(photoStatus)photoStatus.textContent='Photo upload unavailable.';return}
         photoBusy=true;
@@ -321,7 +357,7 @@ async function openImport(){
         if(photoStatus)photoStatus.textContent='Adding photos…';
         try{
           for(const f of picked){
-            if(!alive())return;
+            if(!current()||ctrl?.signal?.aborted)return;
             if(missionPhotos.length>=photoMax){hitMax=true;break}
             try{
               const dataUrl=await withTimeout(compress(f,{max:960,quality:.62}),45000,`Could not read ${f?.name||'photo'} (timed out). Try JPG.`);
@@ -331,7 +367,7 @@ async function openImport(){
             }catch(err){failed++;console.warn('Past import photo skipped',f?.name,err)}
           }
         }finally{photoBusy=false}
-        if(!alive())return;
+        if(!current())return;
         if(photoStatus){
           if(hitMax&&!added)photoStatus.textContent=`Max ${photoMax} mission photos.`;
           else if(added&&failed)photoStatus.textContent=`Added ${added}. Skipped ${failed}.`;
@@ -379,7 +415,7 @@ async function openImport(){
         btn.style.display='';btn.disabled=false;btn.textContent='Read Screenshots';
       };
       out.querySelector('#grPastCreate').onclick=async()=>{
-        if(!alive()||session!==pastImportSession||readId!==pastImportRead){
+        if(!current()){
           alert('This confirm screen is out of date. Close and import again.');
           return;
         }
@@ -474,16 +510,26 @@ async function openImport(){
         }
       };
     }catch(e){
-      if(!alive())return;
+      if(heartbeat){clearInterval(heartbeat);heartbeat=null}
+      // Superseded by a newer dialog/read — drop quietly.
+      if(!current())return;
       progress.innerHTML='';
-      out.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Could not read the screenshots.</strong><br>${esc(e?.message||String(e))}</div>`;
-      btn.disabled=false;btn.textContent='Try Again';
+      const canceled=e?.name==='AbortError'&&!timedOut;
+      if(canceled){
+        out.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Stopped.</strong><br>Screenshots were not saved. Tap Try Again when ready.</div>`;
+      }else{
+        const msg=timedOut
+          ? 'The screenshot reader timed out. Please try again with fewer or clearer screenshots.'
+          : (e?.message||String(e));
+        out.innerHTML=`<div class="platoon-notice" style="margin-top:10px"><strong>Could not read the screenshots.</strong><br>${esc(msg)}</div>`;
+      }
+      restoreReadBtn();
     }finally{
+      if(heartbeat){clearInterval(heartbeat);heartbeat=null}
       if(pastImportAbort===ctrl)pastImportAbort=null;
       pastImportBusy=false;
-      if(alive()&&btn.style.display!=='none'&&btn.disabled&&btn.textContent==='Reading…'){
-        btn.disabled=false;btn.textContent='Try Again';
-      }
+      // Always recover the Read button after timeout/cancel — do not require !aborted.
+      restoreReadBtn();
     }
   };
 }
