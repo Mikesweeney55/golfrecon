@@ -2968,20 +2968,41 @@ function gcxTeeColor(c){
   for(const color of ['black','blue','white','gold','red']) if(t.includes(color))return color;
   return 'white';
 }
-function gcxNameScore(hit,want){
-  const a=norm(want),b=norm(hit?.name||'');
-  if(!a||!b)return 0;
-  if(a===b)return 100;
-  if(b.includes(a)||a.includes(b))return 88;
-  const at=new Set(a.split(' ').filter(Boolean)),bt=new Set(b.split(' ').filter(Boolean));
-  if(!at.size||!bt.size)return 0;
-  let hitN=0; for(const x of at) if(bt.has(x))hitN++;
-  return Math.round(100*hitN/Math.max(at.size,bt.size));
+function gcxNorm(s){
+  return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
 }
-async function gcxFetchJson(url){
-  const res=await fetch(url,{headers:{Accept:'application/json'}});
-  if(!res.ok)throw new Error(`golfclubxy ${res.status}`);
-  return res.json();
+function gcxNameScore(hit,want){
+  // Light normalize only — do not strip "country club" / "golf course" (that picks the wrong Four Oaks).
+  const a=gcxNorm(want),b=gcxNorm(hit?.name||'');
+  if(!a||!b)return 0;
+  let score=0;
+  if(a===b)score=100;
+  else if(b.includes(a)||a.includes(b))score=88;
+  else{
+    const at=new Set(a.split(' ').filter(Boolean)),bt=new Set(b.split(' ').filter(Boolean));
+    if(!at.size||!bt.size)return 0;
+    let hitN=0; for(const x of at) if(bt.has(x))hitN++;
+    score=Math.round(100*hitN/Math.max(at.size,bt.size));
+  }
+  if(/\bcountry club\b/.test(b))score+=12;
+  if(hit?.tier==='A')score+=10; else if(hit?.tier==='B')score+=3;
+  if(String(hit?.status||'')==='full')score+=6;
+  if(Number(hit?.n_holes)===18)score+=4;
+  return score;
+}
+async function gcxFetchJson(url,{timeoutMs=12000}={}){
+  const ctrl=typeof AbortController!=='undefined'?new AbortController():null;
+  const timer=ctrl?setTimeout(()=>ctrl.abort(),timeoutMs):null;
+  try{
+    const res=await fetch(url,{headers:{Accept:'application/json'},signal:ctrl?.signal});
+    if(!res.ok)throw new Error(`golfclubxy ${res.status}`);
+    return await res.json();
+  }catch(e){
+    if(e?.name==='AbortError')throw new Error('golfclubxy timed out');
+    throw e;
+  }finally{
+    if(timer)clearTimeout(timer);
+  }
 }
 async function matchGolfclubxyCourse(c){
   const key=`gcx:v1:${c.id}`;
@@ -2992,7 +3013,7 @@ async function matchGolfclubxyCourse(c){
   const search=await gcxFetchJson(`${GCX_BASE}/courses?q=${encodeURIComponent(want)}&limit=8`);
   const rows=Array.isArray(search?.results)?search.results:[];
   if(!rows.length)throw new Error(`No golfclubxy match for “${want}”.`);
-  const ranked=rows.map(r=>({r,score:gcxNameScore(r,want)+(r.tier==='A'?8:r.tier==='B'?3:0)})).sort((a,b)=>b.score-a.score);
+  const ranked=rows.map(r=>({r,score:gcxNameScore(r,want)})).sort((a,b)=>b.score-a.score);
   const best=ranked[0];
   if(best.score<55)throw new Error(`Could not confidently match “${want}” in golfclubxy.`);
   const full=await gcxFetchJson(`${GCX_BASE}/courses/${best.r.osm_id}?tee=${encodeURIComponent(tee)}`);
@@ -3075,6 +3096,9 @@ async function ensureCoursePreviewLoaded(courseId,hole){
       }
     }catch(gcxErr){
       console.warn('[Hole Preview] golfclubxy unavailable, falling back to OSM',gcxErr);
+      if(map&&String(state.selectedCourseId)===String(courseId)){
+        map.innerHTML=`<div class="preview-map-empty"><div><strong>Loading Hole ${hole}…</strong><span>golfclubxy unavailable — trying OpenStreetMap fallback…</span></div></div>`;
+      }
     }
     const courseData=await loadOsmCourse(c);
     const geom=selectedHoleGeometry(courseData,hole);
@@ -3098,10 +3122,12 @@ async function ensureCoursePreviewLoaded(courseId,hole){
 window.retryCoursePreview=()=>{
   const id=state.selectedCourseId,hole=state.coursePreviewHole;
   if(!id||!hole)return;
-  coursePreviewCache.delete(`preview:${id}:${hole}`);
+  const key=`preview:${id}:${hole}`;
+  coursePreviewCache.delete(key);
   coursePreviewCache.delete(`gcx:v1:${id}`);
   coursePreviewCache.delete(`osm:v4:${id}`);
   coursePreviewCache.delete(`geo:v4:${id}`);
+  try{window.__grPreviewLoading?.delete(key)}catch{}
   state.coursePreviewError=null;
   state.coursePreviewLoading=false;
   render();
