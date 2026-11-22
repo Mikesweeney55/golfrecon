@@ -7,8 +7,6 @@
   <script src="gr-test-env.js?v=1"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Oswald:wght@500;600;700&family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -512,13 +510,6 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 /* v13.1 Interactive Course Preview */
 .course-preview-map{height:520px;min-height:520px}
 #coursePreviewMap{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-.course-preview-map .leaflet-container{width:100%;height:100%;background:#0b1410;font:inherit}
-.course-preview-map .leaflet-control-attribution{background:rgba(5,12,9,.72);color:#dce6e1;font-size:10px}
-.course-preview-map .leaflet-control-attribution a{color:#dce6e1}
-.course-preview-map .leaflet-top.leaflet-right{top:76px;right:6px}
-.course-preview-map .leaflet-bar a{width:34px;height:34px;line-height:34px;background:#13211b;color:var(--text);border-color:var(--line)}
-.gcx-marker-label{background:rgba(5,12,9,.78)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:8px!important;color:#fff!important;font-weight:850;font-size:11px;padding:2px 6px;box-shadow:none!important}
-.gcx-marker-label::before{display:none}
 .course-preview-map .mapboxgl-map{font:inherit}
 .course-preview-map .mapboxgl-ctrl-top-right{top:76px;right:6px}
 .course-preview-map .mapboxgl-ctrl-group{border-radius:11px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.35)}
@@ -2756,11 +2747,9 @@ function satelliteHoleMap(geom){
 
 let coursePreviewMapInstance=null;
 let coursePreviewMapFocusBounds=null;
-let coursePreviewLeafletMap=null;
 function destroyCoursePreviewMap(){
   if(coursePreviewMapInstance){try{coursePreviewMapInstance.remove()}catch{}coursePreviewMapInstance=null;}
   coursePreviewMapFocusBounds=null;
-  if(coursePreviewLeafletMap){try{coursePreviewLeafletMap.remove()}catch{}coursePreviewLeafletMap=null;}
 }
 function ptsCentroid(pts){
   if(!pts?.length)return null;
@@ -2927,13 +2916,7 @@ function fitCoursePreviewMap(extraZoom=true){
 window.resetCoursePreviewMap=()=>fitCoursePreviewMap(false);
 function initInteractiveCourseMap(){
   if(!['pregame','coursePreview'].includes(state.view))return;
-  const container=document.getElementById('coursePreviewMap');
-  if(!container)return;
-  if(container.dataset.mapEngine==='leaflet'){
-    initLeafletHoleMap();
-    return;
-  }
-  const token=mapboxToken();if(!token||!window.mapboxgl)return;
+  const container=document.getElementById('coursePreviewMap'),token=mapboxToken();if(!container||!token||!window.mapboxgl)return;
   const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);
   if(!cached?.geom)return;
   if(cached.courseId&&String(cached.courseId)!==String(state.selectedCourseId))return;
@@ -2961,110 +2944,6 @@ function initInteractiveCourseMap(){
   });
 }
 
-/* ── golfclubxy free course/hole metrics + Leaflet/Esri map ── */
-const GCX_BASE='https://golfclubxy.willconia.com';
-function gcxTeeColor(c){
-  const t=String(c?.tees||'').toLowerCase();
-  for(const color of ['black','blue','white','gold','red']) if(t.includes(color))return color;
-  return 'white';
-}
-function gcxNorm(s){
-  return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
-}
-function gcxNameScore(hit,want){
-  // Light normalize only — do not strip "country club" / "golf course" (that picks the wrong Four Oaks).
-  const a=gcxNorm(want),b=gcxNorm(hit?.name||'');
-  if(!a||!b)return 0;
-  let score=0;
-  if(a===b)score=100;
-  else if(b.includes(a)||a.includes(b))score=88;
-  else{
-    const at=new Set(a.split(' ').filter(Boolean)),bt=new Set(b.split(' ').filter(Boolean));
-    if(!at.size||!bt.size)return 0;
-    let hitN=0; for(const x of at) if(bt.has(x))hitN++;
-    score=Math.round(100*hitN/Math.max(at.size,bt.size));
-  }
-  if(/\bcountry club\b/.test(b))score+=12;
-  if(hit?.tier==='A')score+=10; else if(hit?.tier==='B')score+=3;
-  if(String(hit?.status||'')==='full')score+=6;
-  if(Number(hit?.n_holes)===18)score+=4;
-  return score;
-}
-async function gcxFetchJson(url,{timeoutMs=12000}={}){
-  const ctrl=typeof AbortController!=='undefined'?new AbortController():null;
-  const timer=ctrl?setTimeout(()=>ctrl.abort(),timeoutMs):null;
-  try{
-    const res=await fetch(url,{headers:{Accept:'application/json'},signal:ctrl?.signal});
-    if(!res.ok)throw new Error(`golfclubxy ${res.status}`);
-    return await res.json();
-  }catch(e){
-    if(e?.name==='AbortError')throw new Error('golfclubxy timed out');
-    throw e;
-  }finally{
-    if(timer)clearTimeout(timer);
-  }
-}
-async function matchGolfclubxyCourse(c){
-  const key=`gcx:v1:${c.id}`;
-  if(coursePreviewCache.has(key))return coursePreviewCache.get(key);
-  const want=cleanCourseForMap(c.baseName||c.name);
-  if(!want)throw new Error('No course name for golfclubxy lookup.');
-  const tee=gcxTeeColor(c);
-  const search=await gcxFetchJson(`${GCX_BASE}/courses?q=${encodeURIComponent(want)}&limit=8`);
-  const rows=Array.isArray(search?.results)?search.results:[];
-  if(!rows.length)throw new Error(`No golfclubxy match for “${want}”.`);
-  const ranked=rows.map(r=>({r,score:gcxNameScore(r,want)})).sort((a,b)=>b.score-a.score);
-  const best=ranked[0];
-  if(best.score<55)throw new Error(`Could not confidently match “${want}” in golfclubxy.`);
-  const full=await gcxFetchJson(`${GCX_BASE}/courses/${best.r.osm_id}?tee=${encodeURIComponent(tee)}`);
-  const result={...full,_matchScore:best.score,_tee:tee,_query:want};
-  coursePreviewCache.set(key,result);
-  return result;
-}
-function gcxHoleOf(coursePayload,hole){
-  const holes=Array.isArray(coursePayload?.holes)?coursePayload.holes:[];
-  return holes.find(h=>Number(h.number)===Number(hole))||null;
-}
-function gcxHoleReady(h){
-  return Boolean(h&&Number.isFinite(Number(h?.tee?.lat))&&Number.isFinite(Number(h?.tee?.lon))&&Number.isFinite(Number(h?.green?.lat))&&Number.isFinite(Number(h?.green?.lon)));
-}
-function initLeafletHoleMap(){
-  if(coursePreviewMapInstance){try{coursePreviewMapInstance.remove()}catch{}coursePreviewMapInstance=null;}
-  coursePreviewMapFocusBounds=null;
-  destroyLeafletOnly();
-  const container=document.getElementById('coursePreviewMap');
-  if(!container||!window.L)return;
-  const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);
-  if(cached?.source!=='golfclubxy'||!gcxHoleReady(cached?.gcx?.hole))return;
-  if(container.dataset.mapEngine!=='leaflet')return;
-  const h=cached.gcx.hole;
-  const tee=[Number(h.tee.lat),Number(h.tee.lon)];
-  const green=[Number(h.green.lat),Number(h.green.lon)];
-  const map=window.L.map(container,{zoomControl:true,attributionControl:true});
-  coursePreviewLeafletMap=map;
-  window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-    maxZoom:19,
-    attribution:'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics & others · Hole GPS © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OSM</a> via golfclubxy'
-  }).addTo(map);
-  window.L.polyline([tee,green],{color:'#d7ff9f',weight:3.5,opacity:.95,dashArray:'7 6'}).addTo(map);
-  const tip=txt=>window.L.tooltip({permanent:true,direction:'right',offset:[10,0],className:'gcx-marker-label'}).setContent(txt);
-  window.L.circleMarker(tee,{radius:7,color:'#07100c',weight:2,fillColor:'#b8ea68',fillOpacity:1}).bindTooltip(tip('TEE')).addTo(map);
-  window.L.circleMarker(green,{radius:7,color:'#07100c',weight:2,fillColor:'#ffffff',fillOpacity:1}).bindTooltip(tip('GREEN')).addTo(map);
-  const bounds=window.L.latLngBounds([tee,green]);
-  map.fitBounds(bounds.pad(0.55),{animate:false,maxZoom:18});
-  requestAnimationFrame(()=>map.invalidateSize());
-}
-function destroyLeafletOnly(){
-  if(coursePreviewLeafletMap){try{coursePreviewLeafletMap.remove()}catch{}coursePreviewLeafletMap=null;}
-}
-window.resetCoursePreviewLeaflet=()=>{
-  if(!coursePreviewLeafletMap)return;
-  const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);
-  const h=cached?.gcx?.hole; if(!gcxHoleReady(h))return;
-  const tee=[Number(h.tee.lat),Number(h.tee.lon)],green=[Number(h.green.lat),Number(h.green.lon)];
-  coursePreviewLeafletMap.fitBounds(window.L.latLngBounds([tee,green]).pad(0.55),{animate:true,maxZoom:18});
-};
-
 async function ensureCoursePreviewLoaded(courseId,hole){
   const c=course(courseId); if(!c||!['pregame','coursePreview'].includes(state.view))return;
   const key=`preview:${courseId}:${hole}`;
@@ -3082,36 +2961,21 @@ async function ensureCoursePreviewLoaded(courseId,hole){
   }
   const map=document.getElementById('coursePreviewMapBody');
   if(map&&String(state.selectedCourseId)===String(courseId)){
-    map.innerHTML=`<div class="preview-map-empty"><div><strong>Loading Hole ${hole}…</strong><span>Matching ${safeText(cleanCourseForMap(c.baseName||c.name))} via golfclubxy, then free Esri satellite.</span></div></div>`;
+    map.innerHTML=`<div class="preview-map-empty"><div><strong>Loading Hole ${hole}…</strong><span>Finding golf-specific OpenStreetMap geometry for ${safeText(cleanCourseForMap(c.baseName||c.name))}.</span></div></div>`;
   }
   try{
-    // Prefer free golfclubxy tee/green GPS + yardage.
-    try{
-      const gcxCourse=await matchGolfclubxyCourse(c);
-      const gcxHole=gcxHoleOf(gcxCourse,hole);
-      if(gcxHoleReady(gcxHole)){
-        coursePreviewCache.set(key,{source:'golfclubxy',gcx:{course:gcxCourse,hole:gcxHole},courseData:null,geom:null,courseId:String(courseId)});
-        if(String(state.selectedCourseId)!==String(courseId)&&state.view==='pregame')return;
-        return;
-      }
-    }catch(gcxErr){
-      console.warn('[Hole Preview] golfclubxy unavailable, falling back to OSM',gcxErr);
-      if(map&&String(state.selectedCourseId)===String(courseId)){
-        map.innerHTML=`<div class="preview-map-empty"><div><strong>Loading Hole ${hole}…</strong><span>golfclubxy unavailable — trying OpenStreetMap fallback…</span></div></div>`;
-      }
-    }
     const courseData=await loadOsmCourse(c);
     const geom=selectedHoleGeometry(courseData,hole);
     // Always stamp courseId so a late response cannot paint another course's geometry.
-    coursePreviewCache.set(key,{source:'osm',courseData,geom,courseId:String(courseId)});
+    coursePreviewCache.set(key,{courseData,geom,courseId:String(courseId)});
     // Guard against late responses from a previously selected course.
     if(String(state.selectedCourseId)!==String(courseId)&&state.view==='pregame')return;
     if(!geom&&String(state.selectedCourseId)===String(courseId)){
-      state.coursePreviewError='Map geometry is unavailable for this hole. Scorecard hole # / par / yardage still show above — nothing from another course is used.';
+      state.coursePreviewError='Map geometry is unavailable for this hole on OpenStreetMap. Scorecard hole # / par / yardage still show above — nothing from another course is used.';
     }
   }catch(e){
     const msg=e.message||String(e);
-    coursePreviewCache.set(key,{source:null,courseData:null,geom:null,error:msg,courseId:String(courseId)});
+    coursePreviewCache.set(key,{courseData:null,geom:null,error:msg,courseId:String(courseId)});
     if(String(state.selectedCourseId)===String(courseId))state.coursePreviewError=msg;
   }finally{
     window.__grPreviewLoading.delete(key);
@@ -3122,28 +2986,21 @@ async function ensureCoursePreviewLoaded(courseId,hole){
 window.retryCoursePreview=()=>{
   const id=state.selectedCourseId,hole=state.coursePreviewHole;
   if(!id||!hole)return;
-  const key=`preview:${id}:${hole}`;
-  coursePreviewCache.delete(key);
-  coursePreviewCache.delete(`gcx:v1:${id}`);
+  coursePreviewCache.delete(`preview:${id}:${hole}`);
   coursePreviewCache.delete(`osm:v4:${id}`);
   coursePreviewCache.delete(`geo:v4:${id}`);
-  try{window.__grPreviewLoading?.delete(key)}catch{}
   state.coursePreviewError=null;
   state.coursePreviewLoading=false;
   render();
 };
-/** Prefer free golfclubxy+Leaflet/Esri; Mapbox when token+OSM geom; else ArcGIS static. */
+/** Interactive Mapbox when token+geom exist; otherwise ArcGIS/static satellite tiles with OSM overlay. */
 function holePreviewMapBodyHtml(c,hole,cached){
   const mb=mapboxToken();
-  const gcxOk=Boolean(cached?.source==='golfclubxy'&&gcxHoleReady(cached?.gcx?.hole)&&(!cached.courseId||String(cached.courseId)===String(c.id)));
   const geomOk=Boolean(cached?.geom&&(!cached.courseId||String(cached.courseId)===String(c.id)));
   const waiting=!cached&&!state.coursePreviewError;
   const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is loading the golf-course data for this hole.';
-  if(gcxOk&&window.L){
-    return `<div id="coursePreviewMap" data-map-engine="leaflet" aria-label="Interactive satellite view for Hole ${hole}"></div>`;
-  }
   if(mb&&geomOk&&window.mapboxgl){
-    return `<div id="coursePreviewMap" data-map-engine="mapbox" aria-label="Interactive satellite view for Hole ${hole}"></div>`;
+    return `<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`;
   }
   if(geomOk){
     // ArcGIS (or Mapbox-tile) static satellite stack — works without interactive GL.
@@ -3151,7 +3008,7 @@ function holePreviewMapBodyHtml(c,hole,cached){
   }
   const emptyTitle=state.coursePreviewLoading||waiting
     ? `Loading Hole ${hole}…`
-    : (cached&&!cached.geom&&cached?.source!=='golfclubxy'?'Map unavailable — scorecard details still shown':'Hole geometry not available yet');
+    : (cached&&!cached.geom?'Map unavailable — scorecard details still shown':'Hole geometry not available yet');
   const retry=(!state.coursePreviewLoading&&!waiting)?`<div style="margin-top:12px"><button type="button" class="hole-preview-btn" onclick="retryCoursePreview()">Retry map</button></div>`:'';
   return `<div class="preview-map-empty"><div><strong>${emptyTitle}</strong><span>${safeText(emptyMsg)}</span>${retry}</div></div>`;
 }
@@ -3319,17 +3176,14 @@ function pregameHoleInsightsHtml(c,priority=[]){
   const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
   const insight=h?usefulHoleInsight(h):'';
   const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
-  const gcxOk=Boolean(cached?.source==='golfclubxy'&&gcxHoleReady(cached?.gcx?.hole));
-  const interactive=Boolean(gcxOk||(mb&&cached?.geom));
-  const fitBtn=gcxOk?'resetCoursePreviewLeaflet()':'resetCoursePreviewMap()';
-  const satCredit=gcxOk?'Esri / providers':(interactive?'Mapbox / providers':'Esri / providers');
+  const interactive=Boolean(mb&&cached?.geom);
   return `
     <section id="pregameHoleInsights" class="pregame-hole-insights">
       <div class="section-head">
         <div><div class="eyebrow">HOLE INSIGHTS</div><h2>Hole ${hole}</h2></div>
         <button class="button secondary" type="button" onclick="toggleCoursePreviewHoles()">${state.coursePreviewShowAll?'Hide holes':'Show all holes'}</button>
       </div>
-      ${gcxOk?`<div class="mapbox-missing">Free Hole Preview · tee/green GPS via golfclubxy · Esri satellite · pan & zoom included.</div>`:(!mb?`<div class="mapbox-missing">Showing free satellite imagery. For interactive pan/zoom, <button type="button" class="hole-preview-btn" onclick="configureMapboxToken()">set a Mapbox token</button>.</div>`:'')}
+      ${!mb?`<div class="mapbox-missing">Showing free satellite imagery. For interactive pan/zoom, <button type="button" class="hole-preview-btn" onclick="configureMapboxToken()">set a Mapbox token</button>.</div>`:''}
       ${state.coursePreviewShowAll?`<div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>`:''}
       <div class="preview-hero-grid">
         <div>
@@ -3340,8 +3194,8 @@ function pregameHoleInsightsHtml(c,priority=[]){
             </div>
             <div id="coursePreviewMapBody">${mapBody}</div>
           </div>
-          <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom':('Satellite overlay · set Mapbox for interactive pan/zoom')}</span>${interactive?`<button type="button" onclick="${fitBtn}">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
-          <div class="preview-attribution">Satellite imagery © ${satCredit} · Hole GPS © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>${gcxOk?' via golfclubxy':''}</div>
+          <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom':'Satellite overlay · set Mapbox for interactive pan/zoom'}</span>${interactive?`<button type="button" onclick="resetCoursePreviewMap()">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
+          <div class="preview-attribution">Satellite imagery © ${interactive?'Mapbox / providers':'Esri / providers'} · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
         </div>
         <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
           ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
@@ -3485,8 +3339,6 @@ function previewHoleYardage(c,hole,built){
   const hv=c?.holes?.find?.(x=>Number(x?.hole??x?.number??x?.hole_number)===Number(hole));
   const direct=Number(hv?.yardage??hv?.yards??hv?.distance);
   if(Number.isFinite(direct)&&direct>0)return {value:Math.round(direct),approx:false};
-  const gcxYd=Number(coursePreviewCache.get(`preview:${c?.id}:${hole}`)?.gcx?.hole?.yards);
-  if(Number.isFinite(gcxYd)&&gcxYd>0)return {value:Math.round(gcxYd),approx:true};
   const pts=built?.playLine?.length?built.playLine:built?.ctx?.path;
   const approx=previewPolylineYards(pts);
   return approx?{value:approx,approx:true}:null;
@@ -3519,18 +3371,15 @@ function coursePreviewView(){
   const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
   const insight=h?usefulHoleInsight(h):'';
   const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
-  const gcxOk=Boolean(cached?.source==='golfclubxy'&&gcxHoleReady(cached?.gcx?.hole));
-  const interactive=Boolean(gcxOk||(mb&&cached?.geom));
-  const fitBtn=gcxOk?'resetCoursePreviewLeaflet()':'resetCoursePreviewMap()';
-  const satCredit=gcxOk?'Esri / providers':(interactive?'Mapbox / providers':'Esri / providers');
+  const interactive=Boolean(mb&&cached?.geom);
   return `
     <div class="preview-page-head">
       <button class="preview-back" type="button" onclick="closeCoursePreview()">← Back</button>
       <div class="muted">${safeText(c.name)} · ${safeText(c.tees||'')} tees</div>
     </div>
     <div class="section-head"><div><div class="eyebrow">COURSE PREVIEW</div><h2>${safeText(c.name)}</h2></div></div>
-    <div class="mapbox-row"><span><span class="mapbox-dot ${gcxOk||mb?'ready':''}"></span>${gcxOk?'Free golfclubxy + Esri ready':(mb?'Mapbox Satellite ready':'Free satellite fallback active')}</span><button type="button" onclick="configureMapboxToken()">${mb?'Change token':'Set Mapbox token'}</button></div>
-    ${gcxOk?`<div class="mapbox-missing">Free Hole Preview · tee/green GPS via golfclubxy · Esri satellite · pan & zoom included.</div>`:(mb?'':`<div class="mapbox-missing">Hole Preview works with free satellite tiles now. Optional: tap <strong>Set Mapbox token</strong> for interactive pan/zoom.</div>`)}
+    <div class="mapbox-row"><span><span class="mapbox-dot ${mb?'ready':''}"></span>${mb?'Mapbox Satellite ready':'Free satellite fallback active'}</span><button type="button" onclick="configureMapboxToken()">${mb?'Change token':'Set Mapbox token'}</button></div>
+    ${mb?'':`<div class="mapbox-missing">Hole Preview works with free satellite tiles now. Optional: tap <strong>Set Mapbox token</strong> for interactive pan/zoom.</div>`}
     <div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>
 
     <div class="preview-hero-grid">
@@ -3542,8 +3391,8 @@ function coursePreviewView(){
           </div>
           <div id="coursePreviewMapBody">${mapBody}</div>
         </div>
-        <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom · use + / − for step zoom':'Satellite overlay · set Mapbox for interactive pan/zoom'}</span>${interactive?`<button type="button" onclick="${fitBtn}">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
-        <div class="preview-attribution">Satellite imagery © ${satCredit} · Hole GPS © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>${gcxOk?' via golfclubxy':''}</div>
+        <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom · use + / − for step zoom':'Satellite overlay · set Mapbox for interactive pan/zoom'}</span>${interactive?`<button type="button" onclick="resetCoursePreviewMap()">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
+        <div class="preview-attribution">Satellite imagery © ${interactive?'Mapbox / providers':'Esri / providers'} · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
       </div>
 
       <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
