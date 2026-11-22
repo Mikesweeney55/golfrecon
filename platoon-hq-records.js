@@ -966,8 +966,19 @@ function installStyles(){
   .gr-ace-row{padding:6px 0!important}
   .gr-honor-intel,.gr-honor-constitution{grid-column:1/-1}
   .gr-constitution-body{font-size:var(--fs-data);line-height:1.55;color:#e8f0ea;white-space:pre-wrap}
-  .gr-honor-constitution{background:radial-gradient(circle at 12% -20%,rgba(212,175,106,.16),transparent 42%),linear-gradient(160deg,rgba(40,34,22,.55),rgba(12,12,10,.58))!important}
-  @media(max-width:700px){.gr-constitution-body{font-size:var(--fs-data);line-height:1.5}}
+  .gr-honor-constitution{background:radial-gradient(circle at 12% -20%,rgba(212,175,106,.16),transparent 42%),linear-gradient(160deg,rgba(40,34,22,.55),rgba(12,12,10,.58))!important;padding:10px 12px!important}
+  .gr-constitution-bubble{margin:0}
+  .gr-constitution-sum{list-style:none;cursor:pointer;display:grid;gap:4px}
+  .gr-constitution-sum::-webkit-details-marker{display:none}
+  .gr-constitution-sum::marker{content:''}
+  .gr-constitution-peek{font-size:var(--fs-data);line-height:1.4;color:#c9d5cf;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .gr-constitution-toggle{font-size:var(--fs-data);font-weight:800;color:var(--accent,#d4af6a);letter-spacing:.04em}
+  .gr-constitution-bubble[open] .gr-constitution-peek{display:none}
+  .gr-constitution-toggle::after{content:'Read more'}
+  .gr-constitution-bubble[open] .gr-constitution-toggle::after{content:'Show less'}
+  .gr-constitution-bubble .gr-constitution-body{margin-top:8px}
+  .gr-constitution-bubble[open] .gr-constitution-sum{margin-bottom:2px}
+  @media(max-width:700px){.gr-constitution-body,.gr-constitution-peek{font-size:var(--fs-data);line-height:1.45}}
   .gr-clubhouse-board .gr-honor-lockup{margin-bottom:8px;gap:8px}
   .gr-clubhouse-board .gr-honor-mark{width:40px;height:40px;font-size:var(--fs-title)}
   .gr-clubhouse-board .gr-honor-sub{font-size:var(--fs-data)}
@@ -1052,7 +1063,19 @@ function platoonRecapMarkup(p){
     <section class="gr155-recap-block gr155-recap-copy gr155-intel-wide gr-honor-intel"><div class="gr155-recap-title">PLATOON INTEL</div>${intel.map(x=>`<p>${esc(x)}</p>`).join('')}</section>
     <section class="gr155-recap-block gr155-recap-copy gr155-intel-wide gr-honor-constitution">
       <div class="gr-hq-title-row"><div class="gr155-recap-title">MY TIME CONSTITUTION</div>${canEditHq(p)?`<button type="button" class="gr-hq-edit" data-gr-edit-constitution title="Edit Constitution">✎</button>`:''}</div>
-      ${constitutionOf(p)?`<div class="gr-constitution-body">${esc(constitutionOf(p)).replace(/\n/g,'<br>')}</div>`:`<p class="muted" style="margin:0">No constitution yet.${canEditHq(p)?' Tap edit to write the house rules.':''}</p>`}
+      ${(()=>{
+        const text=constitutionOf(p);
+        if(!text)return `<p class="muted" style="margin:0">No constitution yet.${canEditHq(p)?' Tap edit to write the house rules.':''}</p>`;
+        const peek=text.replace(/\s+/g,' ').trim();
+        const short=peek.length>110?`${peek.slice(0,110).trim()}…`:peek;
+        return `<details class="gr-constitution-bubble">
+          <summary class="gr-constitution-sum">
+            <div class="gr-constitution-peek">${esc(short)}</div>
+            <span class="gr-constitution-toggle"></span>
+          </summary>
+          <div class="gr-constitution-body">${esc(text).replace(/\n/g,'<br>')}</div>
+        </details>`;
+      })()}
     </section>
   </div>`;
 }
