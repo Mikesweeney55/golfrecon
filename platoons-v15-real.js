@@ -330,15 +330,28 @@ function leagueTag(m){
     ? `<span class="gr-tag gr-league-on" title="Counts toward My Time ⛳ Points">⛳ Cup</span>`
     : `<span class="gr-tag gr-league-off" title="Excluded from My Time ⛳ Points">No cup</span>`;
 }
+/** Collapsed-card line: top My Time points winner(s). */
+function missionWinnerLine(m){
+  if(phaseOf(m)!=='completed')return'';
+  const rows=resultRows(m)
+    .filter(r=>Number.isFinite(Number(r.raw_points)))
+    .map(r=>({name:String(r.player_name||'Player').trim()||'Player',pts:Number(r.raw_points)}));
+  if(!rows.length)return'';
+  const top=Math.max(...rows.map(r=>r.pts));
+  if(!(top>0))return'';
+  const names=[...new Set(rows.filter(r=>r.pts===top).map(r=>r.name))];
+  if(!names.length)return'';
+  return `<div class="gr-mission-winner">winner: ${E(names.join(' & '))}</div>`;
+}
 function missionCard(p,m,featured=false){
   const people=peopleOf(p,m),pre=previewFor(p,m),warId=warIdOf(m),phase=phaseOf(m);
   const showPrev=phase==='ready'||phase==='in_progress';
-  return `<div class="gr-mission ${featured?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}${leagueTag(m)}</div></div><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div>${showPrev?previewMarkup(pre):''}${phase==='completed'?`<div class="gr-summary gr-summary-compact">${missionSummaryMarkup(m)}</div>`:''}${missionActions(m,warId)}</div>`;
+  return `<div class="gr-mission ${featured?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div>${missionWinnerLine(m)}</div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}${leagueTag(m)}</div></div><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div>${showPrev?previewMarkup(pre):''}${phase==='completed'?`<div class="gr-summary gr-summary-compact">${missionSummaryMarkup(m)}</div>`:''}${missionActions(m,warId)}</div>`;
 }
 
 function completedMissionAccordion(p,m,open=false){
   const people=peopleOf(p,m),warId=warIdOf(m),phase=phaseOf(m);
-  return `<details class="gr-mission gr-mission-accordion ${open?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}" ${open?'open':''}><summary class="gr-mission-accordion-sum"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div></div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}${leagueTag(m)}</div></div></summary><div class="gr-mission-accordion-body"><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div><div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>${missionActions(m,warId)}</div></details>`;
+  return `<details class="gr-mission gr-mission-accordion ${open?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}" ${open?'open':''}><summary class="gr-mission-accordion-sum"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div>${missionWinnerLine(m)}</div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}${leagueTag(m)}</div></div></summary><div class="gr-mission-accordion-body"><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div><div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>${missionActions(m,warId)}</div></details>`;
 }
 
 function leaderboard(p,war){
