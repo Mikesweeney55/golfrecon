@@ -3567,21 +3567,25 @@ async function callPlatoonFunction(payload,retryOrOpts=true){
   const session=await ensureAuthSession();if(!session?.access_token)throw new Error('Please sign in again.');
   let res;
   try{
+    // Only CORS-allowed request headers (authorization, apikey, content-type, x-client-info).
+    // Extra headers like Cache-Control fail the browser preflight and look like "server offline".
     res=await fetch(`${SUPABASE_URL}/functions/v1/platoon-import`,{
       method:'POST',
       cache:'no-store',
       headers:{
         'Content-Type':'application/json',
         'Authorization':`Bearer ${session.access_token}`,
-        'apikey':SUPABASE_PUBLISHABLE_KEY,
-        'Cache-Control':'no-store'
+        'apikey':SUPABASE_PUBLISHABLE_KEY
       },
       body:JSON.stringify(payload?.action?{...payload,client_request_id:`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`}:payload),
       signal
     });
   }catch(e){
     if(e?.name==='AbortError')throw new Error('The screenshot reader timed out. Please try again; the files were not saved or changed.');
-    throw new Error('Platoon server is not online yet. The platoon-import Edge Function still needs to be deployed in Supabase.');
+    const detail=String(e?.message||e||'').trim();
+    throw new Error(detail&&!/failed to fetch|networkerror|load failed/i.test(detail)
+      ? `Could not reach Platoon import (${detail}).`
+      : 'Could not reach Platoon import. Check your connection and try again.');
   }
   const body=await res.json().catch(()=>({error:'Invalid server response'}));
   if(res.status===401&&retry&&authSession?.refresh_token){try{await refreshAuthSession();return callPlatoonFunction(payload,{retry:false,signal})}catch{}}
