@@ -3567,7 +3567,18 @@ async function callPlatoonFunction(payload,retryOrOpts=true){
   const session=await ensureAuthSession();if(!session?.access_token)throw new Error('Please sign in again.');
   let res;
   try{
-    res=await fetch(`${SUPABASE_URL}/functions/v1/platoon-import`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify(payload),signal});
+    res=await fetch(`${SUPABASE_URL}/functions/v1/platoon-import`,{
+      method:'POST',
+      cache:'no-store',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${session.access_token}`,
+        'apikey':SUPABASE_PUBLISHABLE_KEY,
+        'Cache-Control':'no-store'
+      },
+      body:JSON.stringify(payload?.action?{...payload,client_request_id:`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`}:payload),
+      signal
+    });
   }catch(e){
     if(e?.name==='AbortError')throw new Error('The screenshot reader timed out. Please try again; the files were not saved or changed.');
     throw new Error('Platoon server is not online yet. The platoon-import Edge Function still needs to be deployed in Supabase.');
@@ -5234,7 +5245,7 @@ initializeAuth();
   <script src="platoons-v15-real.js?v=198"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
-<script src="past-mission-import.js?v=198"></script>
+<script src="past-mission-import.js?v=199"></script>
 <script src="mission-delete.js?v=4"></script>
 </body>
 </html>
