@@ -3597,7 +3597,11 @@ async function callPlatoonFunction(payload,retryOrOpts=true){
       throw err;
     }
     const detail=String(e?.message||e||'').trim();
-    throw new Error(detail&&!/failed to fetch|networkerror|load failed/i.test(detail)
+    // Mobile browsers often surface oversized/interrupted POSTs as generic TypeError: Failed to fetch.
+    if(/failed to fetch|networkerror|load failed/i.test(detail)){
+      throw new Error('Upload to Platoon import failed. Screenshots may be too large for this connection — the app will try a smaller package, or use fewer/clearer JPGs.');
+    }
+    throw new Error(detail
       ? `Could not reach Platoon import (${detail}).`
       : 'Could not reach Platoon import. Check your connection and try again.');
   }
@@ -5263,7 +5267,7 @@ initializeAuth();
   <script src="platoons-v15-real.js?v=198"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
-<script src="past-mission-import.js?v=200"></script>
+<script src="past-mission-import.js?v=201"></script>
 <script src="mission-delete.js?v=4"></script>
 </body>
 </html>

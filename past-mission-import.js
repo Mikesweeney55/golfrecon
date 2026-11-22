@@ -148,7 +148,7 @@ function dataUrlToPayload(dataUrl){
   if(!m||!m[2])throw new Error('Image conversion failed.');
   return {type:m[1]||'image/jpeg',data:m[2]};
 }
-async function compactImageFile(file,maxDim=1600,quality=.82){
+async function compactImageFile(file,maxDim=1600,quality=.82,{allowRawFallback=false}={}){
   // Prefer shared HEIC-aware compressor so iPhone screenshots don't hang OCR.
   if(typeof window.grCompressImageFile==='function'){
     const dataUrl=await withTimeout(
@@ -167,9 +167,26 @@ async function compactImageFile(file,maxDim=1600,quality=.82){
     const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||'').split(',')[1]||'');r.onerror=()=>reject(r.error||new Error('Image read failed.'));r.readAsDataURL(blob)});
     return {type:'image/jpeg',data};
   }catch(e){
-    if(typeof window.platoonFilePayload==='function')return window.platoonFilePayload(file);
+    // Never upload raw multi-MB PNGs for OCR — that fails as "Could not reach Platoon import" on mobile.
+    if(allowRawFallback&&typeof window.platoonFilePayload==='function')return window.platoonFilePayload(file);
     throw e;
   }
+}
+function ocrPayloadBytes(images){
+  return (Array.isArray(images)?images:[]).reduce((n,img)=>n+String(img?.data||'').length,0);
+}
+async function prepareOcrImages(fileList,{maxDim=1100,quality=.68,signal,onProgress}={}){
+  const images=[];
+  for(let i=0;i<fileList.length;i++){
+    if(signal?.aborted)throw Object.assign(new Error('Canceled.'),{name:'AbortError'});
+    onProgress?.(i,fileList.length);
+    images.push(await compactImageFile(fileList[i],maxDim,quality,{allowRawFallback:false}));
+  }
+  return images;
+}
+function isReachError(err){
+  const m=String(err?.message||err||'');
+  return /could not reach platoon import|failed to fetch|networkerror|load failed|upload to platoon import failed/i.test(m);
 }
 function cleanHolesLocal(holes){
   if(typeof window.grCleanHoles==='function')return window.grCleanHoles(holes);
@@ -254,35 +271,63 @@ async function openImport(){
     // Capture file fingerprints now so a later confirm can't accidentally come from a different pick.
     const fileStamp=fs.map(f=>`${f.name}:${f.size}:${f.lastModified||0}`).join('|');
     try{
-      const images=[];
-      for(let i=0;i<fs.length;i++){
-        if(!current())return;
-        if(ctrl?.signal?.aborted)throw Object.assign(new Error('Canceled.'),{name:'AbortError'});
-        setProgress(`Preparing screenshot ${i+1} of ${fs.length}…`,'Compressing for the reader…');
-        // Leaner OCR payload — big PNGs after a few imports were stalling mobile uploads.
-        images.push(await compactImageFile(fs[i],1280,.72));
+      if(fs.length>6)throw new Error('Too many screenshots at once. Use up to 6 (overview, net LB, gross cards).');
+      // Guard: file input changed mid-prepare.
+      const stampStill=()=>[...files.files].map(f=>`${f.name}:${f.size}:${f.lastModified||0}`).join('|')===fileStamp;
+      let images=await prepareOcrImages(fs,{
+        maxDim:1100,
+        quality:.68,
+        signal:ctrl?.signal,
+        onProgress:(i,n)=>setProgress(`Preparing screenshot ${i+1} of ${n}…`,'Compressing for a reliable upload…')
+      });
+      if(!current())return;
+      if(!stampStill())throw new Error('Screenshots changed while reading. Tap Read Screenshots again.');
+      // Keep the JSON under a mobile-friendly budget (~2.5MB base64 ≈ safer POST).
+      if(ocrPayloadBytes(images)>2500000){
+        setProgress('Shrinking screenshots…','Package was large for mobile upload');
+        images=await prepareOcrImages(fs,{maxDim:900,quality:.55,signal:ctrl?.signal});
+      }
+      if(ocrPayloadBytes(images)>3200000){
+        throw new Error('Screenshots are still too large to upload. Try fewer images or export them as JPG first.');
       }
       if(!current())return;
       if(ctrl?.signal?.aborted)throw Object.assign(new Error('Canceled.'),{name:'AbortError'});
-      // Guard: file input changed mid-prepare.
-      const stampNow=[...files.files].map(f=>`${f.name}:${f.size}:${f.lastModified||0}`).join('|');
-      if(stampNow!==fileStamp)throw new Error('Screenshots changed while reading. Tap Read Screenshots again.');
-      setProgress(`Reading ${fs.length} screenshot${fs.length===1?'':'s'}…`,'Usually 20–60 seconds. You can Stop and retry.');
-      heartbeat=setInterval(()=>{
-        if(!current()||ctrl?.signal?.aborted)return;
-        const secs=Math.max(0,Math.round((Date.now()-startedAt)/1000));
-        setProgress(`Reading ${fs.length} screenshot${fs.length===1?'':'s'}…`,`Still working · ${secs}s elapsed`);
-      },1000);
-      const timeoutMs=75000;
-      let timer=null;
-      if(ctrl)timer=setTimeout(()=>{timedOut=true;try{ctrl.abort()}catch{}},timeoutMs);
+      const startHeartbeat=()=>{
+        if(heartbeat)clearInterval(heartbeat);
+        heartbeat=setInterval(()=>{
+          if(!current()||ctrl?.signal?.aborted)return;
+          const secs=Math.max(0,Math.round((Date.now()-startedAt)/1000));
+          setProgress(`Reading ${fs.length} screenshot${fs.length===1?'':'s'}…`,`Still working · ${secs}s elapsed`);
+        },1000);
+      };
+      const runParse=async(imgs,label)=>{
+        setProgress(label||`Reading ${fs.length} screenshot${fs.length===1?'':'s'}…`,'Usually 20–60 seconds. You can Stop and retry.');
+        startHeartbeat();
+        const timeoutMs=75000;
+        let timer=null;
+        if(ctrl)timer=setTimeout(()=>{timedOut=true;try{ctrl.abort()}catch{}},timeoutMs);
+        try{
+          return await window.callPlatoonFunction(
+            {action:'parse_completed_mission',images:imgs,import_session:session,read_id:readId},
+            {signal:ctrl?.signal,timeoutMessage:'The screenshot reader timed out. Please try again with fewer or clearer screenshots.'}
+          );
+        }finally{if(timer)clearTimeout(timer);if(heartbeat){clearInterval(heartbeat);heartbeat=null}}
+      };
       let parsed;
       try{
-        parsed=await window.callPlatoonFunction(
-          {action:'parse_completed_mission',images,import_session:session,read_id:readId},
-          {signal:ctrl?.signal,timeoutMessage:'The screenshot reader timed out. Please try again with fewer or clearer screenshots.'}
-        );
-      }finally{if(timer)clearTimeout(timer);if(heartbeat){clearInterval(heartbeat);heartbeat=null}}
+        parsed=await runParse(images);
+      }catch(err){
+        if(!current())return;
+        if(err?.name==='AbortError'||ctrl?.signal?.aborted||timedOut)throw err;
+        if(!isReachError(err))throw err;
+        // Mobile often drops the first large POST — shrink once and retry on the same read.
+        setProgress('Upload failed — retrying smaller…','Connection dropped on the first try');
+        images=await prepareOcrImages(fs,{maxDim:820,quality:.48,signal:ctrl?.signal});
+        if(!current())return;
+        if(ctrl?.signal?.aborted)throw Object.assign(new Error('Canceled.'),{name:'AbortError'});
+        timedOut=false;
+        parsed=await runParse(images,'Reading smaller screenshots…');
+      }
       if(!current())return;
       if(ctrl?.signal?.aborted)throw Object.assign(new Error(timedOut?'The screenshot reader timed out. Please try again with fewer or clearer screenshots.':'Canceled.'),{name:'AbortError'});
       // Deep-clone so later mutations / reused objects can't leak into the next confirm.
