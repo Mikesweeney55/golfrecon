@@ -148,28 +148,37 @@ function dataUrlToPayload(dataUrl){
   if(!m||!m[2])throw new Error('Image conversion failed.');
   return {type:m[1]||'image/jpeg',data:m[2]};
 }
-async function compactImageFile(file,maxDim=1600,quality=.82,{allowRawFallback=false}={}){
-  // Prefer shared HEIC-aware compressor so iPhone screenshots don't hang OCR.
-  if(typeof window.grCompressImageFile==='function'){
-    const dataUrl=await withTimeout(
-      window.grCompressImageFile(file,{max:maxDim,quality}),
-      45000,
-      `Could not prepare ${file?.name||'screenshot'} (timed out). Export as JPG and try again.`
-    );
-    return dataUrlToPayload(dataUrl);
-  }
+async function compactImageFileLocal(file,maxDim,quality){
+  const bmp=await withTimeout(createImageBitmap(file),20000,`Could not prepare ${file?.name||'screenshot'} (timed out).`);
   try{
-    const bmp=await withTimeout(createImageBitmap(file),20000,`Could not prepare ${file?.name||'screenshot'} (timed out).`);
     const scale=Math.min(1,maxDim/Math.max(bmp.width,bmp.height));
     const w=Math.max(1,Math.round(bmp.width*scale)),h=Math.max(1,Math.round(bmp.height*scale));
-    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');ctx.drawImage(bmp,0,0,w,h);bmp.close?.();
+    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');ctx.drawImage(bmp,0,0,w,h);
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Image conversion failed.')),'image/jpeg',quality));
     const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||'').split(',')[1]||'');r.onerror=()=>reject(r.error||new Error('Image read failed.'));r.readAsDataURL(blob)});
     return {type:'image/jpeg',data};
+  }finally{bmp.close?.()}
+}
+async function compactImageFile(file,maxDim=1600,quality=.82,{allowRawFallback=false}={}){
+  // Prefer shared HEIC-aware compressor; fall back to local canvas so JPG screenshots still work.
+  if(typeof window.grCompressImageFile==='function'){
+    try{
+      const dataUrl=await withTimeout(
+        window.grCompressImageFile(file,{max:maxDim,quality}),
+        45000,
+        `Could not prepare ${file?.name||'screenshot'} (timed out). Export as JPG and try again.`
+      );
+      return dataUrlToPayload(dataUrl);
+    }catch(err){
+      console.warn('Shared compress failed; trying local canvas', file?.name, err);
+    }
+  }
+  try{
+    return await compactImageFileLocal(file,maxDim,quality);
   }catch(e){
     // Never upload raw multi-MB PNGs for OCR — that fails as "Could not reach Platoon import" on mobile.
     if(allowRawFallback&&typeof window.platoonFilePayload==='function')return window.platoonFilePayload(file);
-    throw e;
+    throw new Error(`Could not prepare ${file?.name||'screenshot'}. Export as JPG from Photos and try again.`);
   }
 }
 function ocrPayloadBytes(images){
@@ -229,7 +238,7 @@ async function openImport(){
   pastImportAbort=null;
   pastImportBusy=false;
   const session=++pastImportSession;
-  const d=dialog(`<form id="grPastImportForm" autocomplete="off" onsubmit="return false"><div class="dialog-head"><div><div class="eyebrow">HISTORICAL IMPORT</div><h2>Import Past Mission</h2></div><button class="icon-button" data-close type="button">✕</button></div><p class="muted" style="font-size:var(--fs-data)">Upload the event overview, net/points leaderboard, and expanded gross scorecards (front 9 + back 9). Hole-by-hole scores attach to each player’s Mission result and seed their personal round without wiping later detail.</p><label class="upload-zone" style="cursor:pointer"><strong>📥 Add screenshots</strong><span>Overview + net LB + expanded gross cards (front/back 9)</span><input id="grPastFiles" type="file" accept="image/*" multiple></label><div id="grPastFilesList" class="file-list"></div><label>Round story / anything worth highlighting<textarea id="grPastStory" name="gr-past-story-${session}" rows="3" placeholder="Optional — weather, trash talk, crazy shots, side bets, meltdowns…" autocomplete="off"></textarea></label><div id="grPastProgress"></div><div id="grPastOut"></div><div class="dialog-actions" id="grPastReadActions"><button class="button secondary" data-cancel type="button">Cancel</button><button class="button primary" id="grPastRead" type="button">Read Screenshots</button></div></form>`);
+  const d=dialog(`<form id="grPastImportForm" autocomplete="off" onsubmit="return false"><div class="dialog-head"><div><div class="eyebrow">HISTORICAL IMPORT</div><h2>Import Past Mission</h2></div><button class="icon-button" data-close type="button">✕</button></div><p class="muted" style="font-size:var(--fs-data)">Upload <strong>Gross (G)</strong> and <strong>Net (N)</strong> leaderboards. If the list is long, scroll and capture extra shots so every player (including guests) appears. Optional: event overview + expanded hole scorecards.</p><label class="upload-zone" style="cursor:pointer"><strong>📥 Add screenshots</strong><span>Gross (G) + Net (N) · scroll for all players · optional hole cards</span><input id="grPastFiles" type="file" accept="image/*" multiple></label><div id="grPastFilesList" class="file-list"></div><label>Round story / anything worth highlighting<textarea id="grPastStory" name="gr-past-story-${session}" rows="3" placeholder="Optional — weather, trash talk, crazy shots, side bets, meltdowns…" autocomplete="off"></textarea></label><div id="grPastProgress"></div><div id="grPastOut"></div><div class="dialog-actions" id="grPastReadActions"><button class="button secondary" data-cancel type="button">Cancel</button><button class="button primary" id="grPastRead" type="button">Read Screenshots</button></div></form>`);
   d.querySelector('[data-close]').onclick=close;d.querySelector('[data-cancel]').onclick=close;
   const files=d.querySelector('#grPastFiles'),fileList=d.querySelector('#grPastFilesList'),progress=d.querySelector('#grPastProgress'),out=d.querySelector('#grPastOut'),btn=d.querySelector('#grPastRead'),story=d.querySelector('#grPastStory'),readActions=d.querySelector('#grPastReadActions');
   const clearConfirm=()=>{progress.innerHTML='';out.innerHTML=''};
@@ -334,7 +343,7 @@ async function openImport(){
       parsed=JSON.parse(JSON.stringify(parsed||{}));
       progress.innerHTML='';
       const ev=parsed?.event||{},results=Array.isArray(parsed?.results)?parsed.results:[];
-      if(!results.length)throw new Error('No player results were found.');
+      if(!results.length)throw new Error('No player results were found. Include Gross (G) and Net (N) leaderboard screenshots, and scroll so every player (including guests) is visible.');
       const roster=(p.members||[]).filter(m=>m.status!=='inactive');
       const teeMarkup=typeof window.grTeeTimeWheelMarkup==='function'
         ? window.grTeeTimeWheelMarkup('grPastTime',(ev.tee_time||'').slice(0,5))

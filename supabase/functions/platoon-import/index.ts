@@ -227,13 +227,16 @@ async function parseCompletedMission(body:any){
     text:`You are the Golf Recon historical completed-Mission parser.
 The user is uploading screenshots from ONE completed 18Birdies tournament/event. Screenshots may include:
 1) event overview (title/date/tee/course/format/participants)
-2) net / points leaderboard (Individual Stroke (N))
-3) gross leaderboard (Individual Stroke (G)) with EXPANDED hole-by-hole scorecards (front 9 Out and/or back 9 In)
+2) Individual Stroke (G) GROSS leaderboard LIST (rank / name / T-HCP / +N(score)) — may be scrolled across MULTIPLE screenshots
+3) Individual Stroke (N) NET / points leaderboard LIST — may also be scrolled across MULTIPLE screenshots
+4) EXPANDED hole-by-hole scorecards (front 9 Out and/or back 9 In) when available
+
+Leaderboard LIST screenshots alone are enough. Hole grids are optional. Guests appear as normal name rows — include EVERY visible player; never drop someone because they look like a guest.
 
 Build one event and merge the player rows across all screenshots. Never guess values that are not visible.
 
 Event fields:
-- title: tournament/event name exactly as visible
+- title: tournament/event name exactly as visible (e.g. "Rainy Rumble")
 - date: YYYY-MM-DD when visible
 - tee_time: HH:MM in 24-hour local time when visible
 - course_name: course name exactly as visible
@@ -242,22 +245,25 @@ Event fields:
 For each player return:
 - player_name exactly as shown (keep truncated forms like "Kevi..." if that is all that is visible; do not invent a full name)
 - handicap: tournament handicap (T-HCP) when visible, else null. CRITICAL when two players share the same truncated first name — use handicap + photo/context to keep them as SEPARATE players
-- gross: from the gross leaderboard or clearly labeled gross score
-- net: from the net leaderboard or clearly labeled net score
+- gross: from the Gross (G) leaderboard score in parentheses, e.g. +8(78) → gross 78
+- net: from the Net (N) leaderboard score in parentheses when that tab is visible
 - raw_points: points from the net/points leaderboard when visible
-- finish_position: use the handicap/net/points competition ranking when visible. If gross and net rankings differ, DO NOT use gross rank for finish_position; gross is only the gross score source.
+- finish_position: prefer Net (N) / points ranking when that screenshot is present. If ONLY Gross (G) screenshots are provided, use the gross rank. If both differ, DO NOT use gross rank when net rank is visible.
 - eagle_count: count of eagles visible from hole scores (score <= par-2) when hole data exists; else only when explicitly labeled; otherwise null
-- holes: array of {hole, par, score} from expanded scorecard grids when visible. Merge front-nine (1-9 / Out) and back-nine (10-18 / In) for the SAME player into one holes array. If only one nine is visible, return those holes only. Empty array if no hole grid is visible.
+- holes: array of {hole, par, score} from expanded scorecard grids when visible. Merge front-nine (1-9 / Out) and back-nine (10-18 / In) for the SAME player into one holes array. If only one nine is visible, return those holes only. Empty array [] if no hole grid is visible — that is normal for leaderboard-list uploads.
 
 Important merging rules:
 - Screenshots are all from the same event.
+- SCROLLED LISTS: if multiple screenshots show the same tab (G or N) at different scroll positions, UNION every distinct player row (name + T-HCP). Do not keep only the players from the first screenshot.
+- Merge Gross + Net for the same person when name + T-HCP match across tabs.
 - Merge abbreviations of the same visible player only when identity is clear from name + handicap + photo/context. Two "Kevi..." / "Kevin C." rows with DIFFERENT T-HCP values are DIFFERENT people — never merge them.
-- A score like +13(84) means 84 gross on a gross leaderboard; on a net leaderboard +2(73) means 73 net.
+- A score like +13(84) on Gross (G) means 84 gross; on Net (N) +2(73) means 73 net.
 - Do not calculate missing net/gross from handicap unless the screenshot explicitly gives the score.
 - Preserve points exactly as shown.
 - Ignore "Out" / "In" total columns as hole numbers — only holes 1-18.
 - Circles around scores usually mean birdie/eagle; squares usually mean bogey — still read the numeric score from the cell.
-- If anything conflicts or is ambiguous, prefer null / empty holes plus a warning rather than guessing.`
+- If anything conflicts or is ambiguous, prefer null / empty holes plus a warning rather than guessing.
+- Always return a non-empty results array when any leaderboard rows are readable.`
   }];
   for(const img of body.images){if(img?.type&&img?.data)content.push({type:"input_image",image_url:`data:${img.type};base64,${img.data}`,detail:"high"})}
   const ai=await fetch("https://api.openai.com/v1/responses",{
