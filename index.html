@@ -3409,18 +3409,30 @@ function platoonDefault(){
 }
 function loadPlatoonLocal(){
   const d=platoonDefault();
+  let p=d;
   try{
     const raw=localStorage.getItem(PLATOON_LOCAL_KEY)||localStorage.getItem('golfreconPlatoonV1410');
     const x=JSON.parse(raw||'null');
     if(x&&!localStorage.getItem(PLATOON_LOCAL_KEY))try{localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(x))}catch{}
-    if(!x)return d;
-    const p={...d,...x};
-    p.members=Array.isArray(x.members)&&x.members.length?x.members:d.members;
-    p.missions=Array.isArray(x.missions)?x.missions:[];
-    if(x.hqMeta&&typeof x.hqMeta==='object')p.hqMeta=x.hqMeta;
-    else if(!p.hqMeta)p.hqMeta=(typeof window.grHqMetaDefault==='function'?window.grHqMetaDefault():{version:1,modes:{},records:[],eagleBalances:[],eagleDetails:[],suppressedAuto:[]});
-    return p;
-  }catch{return d}
+    if(!x)p=d;
+    else{
+      p={...d,...x};
+      p.members=Array.isArray(x.members)&&x.members.length?x.members:d.members;
+      p.missions=Array.isArray(x.missions)?x.missions:[];
+      if(x.hqMeta&&typeof x.hqMeta==='object')p.hqMeta=x.hqMeta;
+      else if(!p.hqMeta)p.hqMeta=(typeof window.grHqMetaDefault==='function'?window.grHqMetaDefault():{version:1,modes:{},records:[],eagleBalances:[],eagleDetails:[],suppressedAuto:[]});
+    }
+  }catch{p=d}
+  if(typeof window.grEnsureMyTimeMasters2026==='function'){
+    try{
+      const out=window.grEnsureMyTimeMasters2026(p);
+      if(out?.changed){
+        try{localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(p))}catch{}
+        try{queuePlatoonServerSave(p)}catch{}
+      }
+    }catch{}
+  }
+  return p;
 }
 function writePlatoonLocal(p){try{localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(p))}catch{}}
 function savePlatoonLocal(p,push=true){writePlatoonLocal(p);render();if(push)queuePlatoonServerSave(p)}
@@ -5264,7 +5276,8 @@ initializeAuth();
   <script src="platoon-recap-shared.js?v=205"></script>
   <script src="platoon-mission-core.js?v=196"></script>
   <script src="platoon-hq-records.js?v=197"></script>
-  <script src="platoons-v15-real.js?v=199"></script>
+  <script src="platoons-v15-real.js?v=200"></script>
+  <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
 <script src="past-mission-import.js?v=203"></script>

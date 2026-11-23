@@ -719,6 +719,9 @@ function preserveClientPlatoonFields(serverP,localP){
   }
   if(!serverP.logoData&&localP?.logoData)serverP.logoData=localP.logoData;
   preserveMissionPhotosOnSync(serverP,localP);
+  if(typeof window.grPreserveMyTimeMasters2026==='function'){
+    try{window.grPreserveMyTimeMasters2026(serverP,localP)}catch{}
+  }
   return serverP;
 }
 window.grPreserveClientPlatoonFields=preserveClientPlatoonFields;
