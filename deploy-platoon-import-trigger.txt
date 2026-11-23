@@ -1,1 +1,1 @@
-deploy platoon-import scrolled G/N leaderboards + guests 2026-11-22T21:40:00Z
+deploy platoon-import roster invite emails + claim-by-email 2026-11-23T03:45:00Z

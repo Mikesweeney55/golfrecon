@@ -147,6 +147,11 @@ function response(data:any,status=200){
 function text(v:any){return String(v??"").trim()}
 function safeYear(v:any){const n=Number(v);return Number.isInteger(n)&&n>=2020&&n<=2100?n:new Date().getFullYear()}
 function keyFor(v:any,fallback:string){const s=text(v);return s||fallback}
+function normEmail(v:any){
+  const s=text(v).toLowerCase();
+  if(!s||!s.includes("@")||s.length>254)return "";
+  return s;
+}
 function aliasesFor(v:any){
   const raw=Array.isArray(v)?v:(typeof v==="string"?v.split(/[,|]/):[]);
   return [...new Set(raw.map((x:any)=>text(x)).filter(Boolean))];
@@ -157,6 +162,15 @@ function memberAliasInput(m:any){
   return {present:false,aliases:[]};
 }
 function nicknameFor(aliases:any){const a=aliasesFor(aliases);return a.length?a.join(", "):null}
+function rosterEmailsFromSnapshot(snapshot:any){
+  const out:Record<string,string>={};
+  for(const m of (Array.isArray(snapshot?.members)?snapshot.members:[])){
+    const id=keyFor(m?.id,"");
+    const email=normEmail(m?.email);
+    if(id&&email)out[id]=email;
+  }
+  return out;
+}
 function schemaError(error:any){
   const m=String(error?.message||"");
   return error?.code==="42P01" || /does not exist/i.test(m) || /column .* does not exist/i.test(m);
@@ -404,9 +418,83 @@ async function activeMembership(supabase:any,userId:string){
   return data||null;
 }
 
+let _inviteEmailCol:boolean|null=null;
+async function inviteEmailColumnSupported(supabase:any){
+  if(_inviteEmailCol!=null)return _inviteEmailCol;
+  try{
+    const {error}=await supabase.from("golfrecon_platoon_members").select("invite_email").limit(1);
+    _inviteEmailCol=!error;
+    return _inviteEmailCol;
+  }catch{
+    _inviteEmailCol=false;
+    return false;
+  }
+}
+
+async function linkMemberSeat(supabase:any,member:any,user:any){
+  if(!member?.id)return null;
+  if(member.user_id&&member.user_id!==user.id)throw new Error("ROSTER_EMAIL_ALREADY_LINKED");
+  const nextRole=member.role==="chief"||member.role==="co_chief"?member.role:"member";
+  const patch:any={user_id:user.id,status:"active",role:nextRole,updated_at:new Date().toISOString()};
+  const {data,error}=await supabase.from("golfrecon_platoon_members")
+    .update(patch).eq("id",member.id)
+    .select("id,platoon_id,role,status,client_key").single();
+  if(error)throw error;
+  return data;
+}
+
+/** Claim an existing roster seat by invite email instead of creating a new Platoon. */
+async function claimMembershipByEmail(supabase:any,user:any){
+  const email=normEmail(user?.email);
+  if(!email)return null;
+
+  if(await inviteEmailColumnSupported(supabase)){
+    const {data:rows,error}=await supabase.from("golfrecon_platoon_members")
+      .select("id,platoon_id,role,status,client_key,user_id,invite_email")
+      .eq("status","active")
+      .ilike("invite_email",email)
+      .limit(5);
+    if(error&&!schemaError(error))throw error;
+    const hit=(rows||[]).find((r:any)=>normEmail(r.invite_email)===email);
+    if(hit){
+      if(hit.user_id&&hit.user_id===user.id){
+        return {id:hit.id,platoon_id:hit.platoon_id,role:hit.role,status:hit.status,client_key:hit.client_key};
+      }
+      return await linkMemberSeat(supabase,hit,user);
+    }
+  }
+
+  // Fallback before/without v5 column: emails mirrored into hq_meta.rosterEmails.
+  try{
+    const {data:platoons,error}=await supabase.from("golfrecon_platoons").select("id,hq_meta");
+    if(error){if(schemaError(error))return null;throw error}
+    for(const p of platoons||[]){
+      const map=(p?.hq_meta&&typeof p.hq_meta==="object"&&p.hq_meta.rosterEmails&&typeof p.hq_meta.rosterEmails==="object")
+        ? p.hq_meta.rosterEmails:{};
+      const clientKey=Object.keys(map).find(k=>normEmail(map[k])===email);
+      if(!clientKey)continue;
+      const {data:member,error:mErr}=await supabase.from("golfrecon_platoon_members")
+        .select("id,platoon_id,role,status,client_key,user_id")
+        .eq("platoon_id",p.id).eq("client_key",clientKey).eq("status","active").maybeSingle();
+      if(mErr)throw mErr;
+      if(!member)continue;
+      if(member.user_id&&member.user_id===user.id)return member;
+      return await linkMemberSeat(supabase,member,user);
+    }
+  }catch(e:any){
+    if(schemaError(e))return null;
+    throw e;
+  }
+  return null;
+}
+
 async function ensurePlatoon(supabase:any,user:any,snapshot:any){
   let membership=await activeMembership(supabase,user.id);
   if(membership)return {membership,created:false};
+
+  // Existing My Time seat with this email → claim it (do not spawn a parallel Platoon).
+  const claimed=await claimMembershipByEmail(supabase,user);
+  if(claimed)return {membership:claimed,created:false,claimed:true};
 
   const chiefSnapshot=snapshot?.members?.find((m:any)=>m?.role==="chief")||snapshot?.members?.find((m:any)=>m?.linked);
   const chiefName=text(snapshot?.chief)||text(chiefSnapshot?.name)||text(user.user_metadata?.username)||text(user.email?.split("@")[0])||"Golfer";
@@ -419,10 +507,14 @@ async function ensurePlatoon(supabase:any,user:any,snapshot:any){
   if(pErr){if(schemaError(pErr))throw new Error("PLATOON_SCHEMA_NOT_READY");throw pErr}
   const chiefKey=keyFor(chiefSnapshot?.id,"chief");
   const chiefAliases=memberAliasInput(chiefSnapshot);
-  const {data:member,error:mErr}=await supabase.from("golfrecon_platoon_members").insert({
+  const chiefEmail=normEmail(chiefSnapshot?.email)||normEmail(user.email)||null;
+  const chiefInsert:any={
     platoon_id:platoon.id,user_id:user.id,display_name:chiefName,role:"chief",status:"active",client_key:chiefKey,
     nickname:chiefAliases.present?nicknameFor(chiefAliases.aliases):null
-  }).select("id,platoon_id,role,status,client_key").single();
+  };
+  if(chiefEmail&&await inviteEmailColumnSupported(supabase))chiefInsert.invite_email=chiefEmail;
+  const {data:member,error:mErr}=await supabase.from("golfrecon_platoon_members").insert(chiefInsert)
+    .select("id,platoon_id,role,status,client_key").single();
   if(mErr)throw mErr;
   membership=member;
   return {membership,created:true};
@@ -444,8 +536,12 @@ async function readPlatoonState(supabase:any,platoonId:string){
     .select("id,name,motto,season_year,visibility,logo_data_url,created_by").eq("id",platoonId).single();
   if(pErr)throw pErr;
   const hq=await readHqMetaColumn(supabase,platoonId);
+  const emailCol=await inviteEmailColumnSupported(supabase);
+  const memberSelect=emailCol
+    ?"id,user_id,display_name,nickname,role,status,client_key,invite_email"
+    :"id,user_id,display_name,nickname,role,status,client_key";
   const {data:members,error:mErr}=await supabase.from("golfrecon_platoon_members")
-    .select("id,user_id,display_name,nickname,role,status,client_key").eq("platoon_id",platoonId).eq("status","active").order("joined_at");
+    .select(memberSelect).eq("platoon_id",platoonId).eq("status","active").order("joined_at");
   if(mErr)throw mErr;
   const {data:missions,error:miErr}=await supabase.from("golfrecon_missions")
     .select("id,client_key,title,mission_type,status,played_on,tee_time,course_id,location_name,format,rules_notes,results_snapshot")
@@ -461,13 +557,20 @@ async function readPlatoonState(supabase:any,platoonId:string){
   const memberKeyById=new Map((members||[]).map((m:any)=>[m.id,m.client_key||m.id]));
   const chief=(members||[]).find((m:any)=>m.role==="chief");
   const co=(members||[]).find((m:any)=>m.role==="co_chief");
+  const hqEmails=(hq.hqMeta&&typeof hq.hqMeta==="object"&&hq.hqMeta.rosterEmails&&typeof hq.hqMeta.rosterEmails==="object")
+    ? hq.hqMeta.rosterEmails:{};
   const state:any={
     id:p.id,serverId:p.id,name:p.name,motto:p.motto||"",season:p.season_year,
     visibility:p.visibility==="invite_only"?"Invite only":"Private",logoData:p.logo_data_url||"",
     chief:chief?.display_name||"",coChief:co?.client_key||co?.id||"",
-    members:(members||[]).map((m:any)=>({
-      id:m.client_key||m.id,serverId:m.id,name:m.display_name,nickname:m.nickname||"",aliases:aliasesFor(m.nickname),linked:!!m.user_id,role:m.role
-    })),
+    members:(members||[]).map((m:any)=>{
+      const id=m.client_key||m.id;
+      const email=normEmail(m.invite_email)||normEmail(hqEmails[id])||"";
+      return {
+        id,serverId:m.id,name:m.display_name,nickname:m.nickname||"",aliases:aliasesFor(m.nickname),
+        email,linked:!!m.user_id,role:m.role
+      };
+    }),
     missions:(missions||[]).map((m:any)=>({
       id:m.client_key||m.id,serverId:m.id,date:m.played_on,teeTime:m.tee_time?String(m.tee_time).slice(0,5):"",
       type:m.mission_type,courseId:m.course_id||"",locationName:m.location_name,title:m.title||"",
@@ -477,14 +580,22 @@ async function readPlatoonState(supabase:any,platoonId:string){
     })),
     hqMetaSupported:hq.supported
   };
-  if(hq.supported)state.hqMeta=hq.hqMeta||{};
+  if(hq.supported){
+    const meta={...(hq.hqMeta||{})};
+    meta.rosterEmails=rosterEmailsFromSnapshot(state);
+    state.hqMeta=meta;
+  }
   return state;
 }
 
 async function upsertMembers(supabase:any,user:any,platoonId:string,snapshot:any,allowRoleChanges:boolean){
   const incoming=Array.isArray(snapshot?.members)?snapshot.members:[];
+  const emailCol=await inviteEmailColumnSupported(supabase);
+  const selectCols=emailCol
+    ?"id,user_id,display_name,nickname,role,status,client_key,invite_email"
+    :"id,user_id,display_name,nickname,role,status,client_key";
   const {data:existing,error}=await supabase.from("golfrecon_platoon_members")
-    .select("id,user_id,display_name,nickname,role,status,client_key").eq("platoon_id",platoonId);
+    .select(selectCols).eq("platoon_id",platoonId);
   if(error)throw error;
   const byKey=new Map((existing||[]).filter((m:any)=>m.client_key).map((m:any)=>[m.client_key,m]));
   const chiefRow=(existing||[]).find((m:any)=>m.role==="chief");
@@ -493,16 +604,18 @@ async function upsertMembers(supabase:any,user:any,platoonId:string,snapshot:any
     const patch:any={display_name:text(chiefIncoming.name)||chiefRow.display_name,client_key:keyFor(chiefIncoming.id,chiefRow.client_key||"chief")};
     const aliasInput=memberAliasInput(chiefIncoming);
     if(aliasInput.present)patch.nickname=nicknameFor(aliasInput.aliases);
+    if(emailCol)patch.invite_email=normEmail(chiefIncoming.email)||null;
     await supabase.from("golfrecon_platoon_members").update(patch).eq("id",chiefRow.id);
   }
   for(const m of incoming){
     const clientKey=keyFor(m?.id,`member-${crypto.randomUUID()}`);
     if(m?.role==="chief")continue;
     const found=byKey.get(clientKey);
-    const role=allowRoleChanges?(m?.role==="co_chief"?"co_chief":(m?.linked?"member":"cadet")):(found?.role||"cadet");
+    const role=allowRoleChanges?(m?.role==="co_chief"?"co_chief":((m?.linked||found?.user_id)?"member":"cadet")):(found?.role||"cadet");
     const row:any={display_name:text(m?.name)||"Cadet",client_key:clientKey,status:"active",role};
     const aliasInput=memberAliasInput(m);
     if(aliasInput.present)row.nickname=nicknameFor(aliasInput.aliases);
+    if(emailCol)row.invite_email=normEmail(m?.email)||null;
     if(found)await supabase.from("golfrecon_platoon_members").update(row).eq("id",found.id);
     else await supabase.from("golfrecon_platoon_members").insert({platoon_id:platoonId,user_id:null,nickname:aliasInput.present?nicknameFor(aliasInput.aliases):null,...row});
   }
@@ -576,15 +689,21 @@ async function bootstrapState(supabase:any,user:any,snapshot:any){
 async function saveState(supabase:any,user:any,snapshot:any){
   const {membership}=await ensurePlatoon(supabase,user,snapshot||{});
   if(!["chief","co_chief"].includes(membership.role))throw new Error("PLATOON_ADMIN_REQUIRED");
+  const emails=rosterEmailsFromSnapshot(snapshot||{});
+  const emailVals=Object.values(emails);
+  if(new Set(emailVals).size!==emailVals.length)throw new Error("ROSTER_EMAIL_DUPLICATE");
   const update:any={
     name:text(snapshot?.name)||"Platoon",motto:text(snapshot?.motto)||null,season_year:safeYear(snapshot?.season),
     visibility:text(snapshot?.visibility).toLowerCase().includes("invite")?"invite_only":"private",
     logo_data_url:text(snapshot?.logoData)||null,updated_at:new Date().toISOString()
   };
   // Persist HQ meta when the v4 column exists; never fail the whole save if it does not.
-  if(snapshot?.hqMeta&&typeof snapshot.hqMeta==="object"){
-    const probe=await readHqMetaColumn(supabase,membership.platoon_id);
-    if(probe.supported)update.hq_meta=snapshot.hqMeta;
+  // Always mirror rosterEmails into hq_meta so claim-by-email works before v5 migration.
+  const probe=await readHqMetaColumn(supabase,membership.platoon_id);
+  if(probe.supported){
+    const meta={...((snapshot?.hqMeta&&typeof snapshot.hqMeta==="object")?snapshot.hqMeta:(probe.hqMeta||{}))};
+    meta.rosterEmails=emails;
+    update.hq_meta=meta;
   }
   const {error}=await supabase.from("golfrecon_platoons").update(update).eq("id",membership.platoon_id);
   if(error)throw error;
@@ -609,7 +728,7 @@ Deno.serve(async(req)=>{
     throw new Error("Unsupported Platoon action.");
   }catch(e:any){
     const msg=String(e?.message||e||"Unknown error");
-    const status=msg==="AUTH_REQUIRED"?401:msg==="PLATOON_ADMIN_REQUIRED"?403:400;
+    const status=msg==="AUTH_REQUIRED"?401:msg==="PLATOON_ADMIN_REQUIRED"||msg==="ROSTER_EMAIL_ALREADY_LINKED"?403:400;
     return response({error:msg},status);
   }
 });

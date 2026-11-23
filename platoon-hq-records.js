@@ -41,8 +41,19 @@ function defaultHqMeta(){
     eagleDetails:[],
     suppressedAuto:[],
     constitution:'',
-    guestPool:[]
+    guestPool:[],
+    rosterEmails:{}
   };
+}
+function normalizeRosterEmails(raw){
+  const out={};
+  if(!raw||typeof raw!=='object')return out;
+  for(const [id,email] of Object.entries(raw)){
+    const key=String(id||'').trim();
+    const em=String(email||'').trim().toLowerCase();
+    if(key&&em.includes('@'))out[key]=em;
+  }
+  return out;
 }
 function normalizeHqMeta(raw){
   const d=defaultHqMeta(),x=(raw&&typeof raw==='object')?raw:{};
@@ -54,6 +65,7 @@ function normalizeHqMeta(raw){
   d.suppressedAuto=Array.isArray(x.suppressedAuto)?x.suppressedAuto.filter(s=>s&&s.fingerprint):[];
   d.constitution=String(x.constitution||'').trim();
   d.guestPool=Array.isArray(x.guestPool)?x.guestPool.map(normalizeGuestPoolEntry).filter(Boolean):[];
+  d.rosterEmails=normalizeRosterEmails(x.rosterEmails);
   return d;
 }
 function normalizeGuestPoolEntry(g){
@@ -194,7 +206,7 @@ function mergeHqMetaPreserve(serverP,localP){
   }else{
     serverP.hqMeta=serverMeta;
   }
-  // Always preserve Constitution + Guest Pool text/lists (do not wipe on lagging server).
+  // Always preserve Constitution + Guest Pool + roster emails (do not wipe on lagging server).
   const out=normalizeHqMeta(serverP.hqMeta);
   if(localMeta){
     if((localMeta.constitution||'').length>=(out.constitution||'').length)out.constitution=localMeta.constitution||out.constitution;
@@ -207,6 +219,7 @@ function mergeHqMetaPreserve(serverP,localP){
       }else byId.set(g.id,g);
     }
     out.guestPool=[...byId.values()];
+    out.rosterEmails={...(localMeta.rosterEmails||{}),...(out.rosterEmails||{})};
   }
   serverP.hqMeta=out;
   return serverP;
