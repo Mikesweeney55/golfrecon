@@ -232,6 +232,28 @@ assert(friday.results[0].net===70, 'readOnlyMission does not mutate official res
 const badReopen = w.grReopenMissionDraft(p, friday.id);
 assert(!badReopen.ok, 'completed mission cannot reopen to draft');
 
+/* Limited Mission totals still become claimable scorecard seeds */
+const limitedMission = {
+  id:'mission-limited-totals',title:'Totals Only',date:'2026-05-01',
+  type:'battle',status:'completed',locationName:'MyTime Masters',
+  participants:['chief','sully'],
+  results:[
+    {player_name:'Mike Sweeney',net:91,raw_points:18,finish_position:3},
+    {player_name:'Ryan Sweeney',net:87,raw_points:24,finish_position:2},
+    {player_name:'Nobody',net:null,gross:null,raw_points:null}
+  ]
+};
+const limitedPlatoon = {id:'t',name:'My Time',members,missions:[structuredClone(limitedMission)]};
+w.grAttachScorecardSeeds(limitedPlatoon.missions[0], limitedPlatoon);
+const mikeSeed = limitedPlatoon.missions[0].results[0].scorecard_seed;
+const sullySeed = limitedPlatoon.missions[0].results[1].scorecard_seed;
+const nobodySeed = limitedPlatoon.missions[0].results[2].scorecard_seed;
+assert(!!mikeSeed?.fingerprint && mikeSeed.limited===true && mikeSeed.net===91, 'limited seed for Mike from net/points');
+assert(!!sullySeed?.fingerprint && sullySeed.member_id==='sully' && sullySeed.limited===true, 'limited seed for Sully');
+assert(!nobodySeed, 'no seed when result has no totals');
+const ensured = w.grEnsurePlatoonScorecardSeeds(limitedPlatoon);
+assert(ensured.seeded>=2, 'ensurePlatoonScorecardSeeds counts limited seeds');
+
 const summary = {
   ok: failures.length===0,
   passed: passes.length,

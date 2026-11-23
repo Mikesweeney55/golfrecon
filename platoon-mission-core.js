@@ -248,30 +248,56 @@ function missionRoundFingerprint(mission,memberId,gross){
   ].join('|');
 }
 
-/** Attach claimable scorecard seeds onto mission result rows (for personal DB merge). */
+/**
+ * Attach claimable scorecard seeds onto mission result rows (for personal DB merge).
+ * Seeds from whatever official totals exist — hole-by-hole when present, otherwise
+ * limited gross/net/points so Mission results can still land in personal Rounds.
+ */
 function attachScorecardSeeds(mission,p){
   if(!mission||!Array.isArray(mission.results))return mission;
+  if(mission.type==='war'||mission.status==='cancelled')return mission;
   for(const r of mission.results){
     const member=r.hole_detail_canonical_id
       ? (p?.members||[]).find(m=>String(m.id)===String(r.hole_detail_canonical_id))
       : canon(p,r.player_name);
-    if(!member?.id||!Array.isArray(r.holes)||!r.holes.length)continue;
+    if(!member?.id)continue;
+    const holes=Array.isArray(r.holes)?cleanHoles(r.holes):[];
+    const priorHoles=Array.isArray(r.scorecard_seed?.holes)?cleanHoles(r.scorecard_seed.holes):[];
+    const mergedHoles=holes.length?holes:priorHoles;
+    const hasTotals=finite(r.gross)||finite(r.net)||finite(r.raw_points)||mergedHoles.length>0;
+    if(!hasTotals)continue;
+    const scoreKey=finite(r.gross)?Number(r.gross):(finite(r.net)?Number(r.net):(finite(r.raw_points)?Number(r.raw_points):''));
     r.scorecard_seed={
       member_id:member.id,
       member_name:member.name||r.player_name,
       mission_id:mission.id,
+      mission_title:mission.title||mission.locationName||'Mission',
       date:mission.date||'',
       course_name:cleanCourse(mission.locationName||''),
       course_id:mission.courseId||'',
-      gross:r.gross,
-      net:r.net,
-      holes:cleanHoles(r.holes),
+      gross:finite(r.gross)?Number(r.gross):null,
+      net:finite(r.net)?Number(r.net):null,
+      raw_points:finite(r.raw_points)?Number(r.raw_points):null,
+      finish_position:finite(r.finish_position)?Number(r.finish_position):null,
+      holes:mergedHoles,
+      limited:!mergedHoles.length,
       source:'mission_import',
-      fingerprint:missionRoundFingerprint(mission,member.id,r.gross),
+      fingerprint:missionRoundFingerprint(mission,member.id,scoreKey),
       updated_at:new Date().toISOString()
     };
   }
   return mission;
+}
+
+/** Ensure every non-war Mission has claimable seeds from current official results. */
+function ensurePlatoonScorecardSeeds(p){
+  let seeded=0;
+  for(const m of (p?.missions||[])){
+    if(!m||m.type==='war')continue;
+    attachScorecardSeeds(m,p);
+    seeded+=(m.results||[]).filter(r=>r?.scorecard_seed?.fingerprint).length;
+  }
+  return {seeded};
 }
 
 /**
@@ -283,6 +309,8 @@ function resolveCurrentPlatoonMemberId(p){
     try{const id=window.grResolveCurrentPlatoonMemberId(p);if(id)return id}catch{}
   }
   const members=p?.members||[];
+  const linked=members.find(m=>m.linked);
+  if(linked?.id)return linked.id;
   const chief=members.find(m=>m.role==='chief');
   return chief?.id||null;
 }
@@ -290,13 +318,16 @@ function resolveCurrentPlatoonMemberId(p){
 /**
  * Claim matching mission scorecard seeds into the signed-in user's personal db.rounds.
  * Only the current member's seeds are claimed — never the whole league into one phone.
+ * Limited totals (gross/net/points) are enough; hole detail is optional enrichment.
  * Never overwrites richer personal data — fills blanks only.
  */
 function claimMissionScorecardsIntoPersonalDb(p,{currentMemberId=null}={}){
   if(typeof window.grMergeMissionSeedIntoPersonal!=='function')return {claimed:0};
   const selfId=currentMemberId||resolveCurrentPlatoonMemberId(p);
   if(!selfId)return {claimed:0,skipped:'no-member'};
+  ensurePlatoonScorecardSeeds(p);
   let claimed=0;
+  const created=[];
   for(const m of (p?.missions||[])){
     if(m?.type==='war')continue;
     for(const r of (m.results||[])){
@@ -306,10 +337,11 @@ function claimMissionScorecardsIntoPersonalDb(p,{currentMemberId=null}={}){
       if(out?.claimed||out?.merged){
         claimed++;
         if(out.roundId)r.personal_round_id=String(out.roundId);
+        if(out.created&&out.parsed)created.push({seed,parsed:out.parsed,roundId:out.roundId});
       }
     }
   }
-  return {claimed,memberId:selfId};
+  return {claimed,memberId:selfId,created};
 }
 
 /**
@@ -682,6 +714,7 @@ window.grSetOfficialResults=setOfficialResults;
 window.grLockOfficialResults=lockOfficialResults;
 window.grMergeHoleDetailsOntoOfficial=mergeHoleDetailsOntoOfficial;
 window.grAttachScorecardSeeds=attachScorecardSeeds;
+window.grEnsurePlatoonScorecardSeeds=ensurePlatoonScorecardSeeds;
 window.grClaimMissionScorecardsIntoPersonalDb=claimMissionScorecardsIntoPersonalDb;
 window.grMissionRoundFingerprint=missionRoundFingerprint;
 window.grBuildCompletedMissionFromImport=buildCompletedMissionFromImport;

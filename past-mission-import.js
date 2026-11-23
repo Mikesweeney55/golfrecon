@@ -600,10 +600,13 @@ async function openImport(){
         if(typeof window.grUpsertMission==='function')window.grUpsertMission(p,mission);
         else{p.missions=p.missions||[];p.missions.push(mission)}
         if(typeof window.grWriteMissionPhotosSide==='function')window.grWriteMissionPhotosSide(p,mission.id,photos);
-        // Hole seeds → After Action / birdie-eagle tracking + personal claim (blank fields only).
+        // Seeds from totals (and hole detail when present) → personal Rounds for the signed-in member.
         if(typeof window.grAttachScorecardSeeds==='function')window.grAttachScorecardSeeds(mission,p);
         let claimed=0;
-        if(typeof window.grClaimMissionScorecardsIntoPersonalDb==='function'){
+        if(typeof window.grClaimAndPersistMissionRounds==='function'){
+          const claim=await window.grClaimAndPersistMissionRounds(p);
+          claimed=Number(claim?.claimed||0)||0;
+        }else if(typeof window.grClaimMissionScorecardsIntoPersonalDb==='function'){
           const claim=window.grClaimMissionScorecardsIntoPersonalDb(p);
           claimed=Number(claim?.claimed||0)||0;
         }
@@ -614,7 +617,7 @@ async function openImport(){
           close();
           setTimeout(()=>{if(typeof window.render==='function')window.render();else location.reload()},50);
           const holePlayers=(mission.results||[]).filter(r=>Array.isArray(r.holes)&&r.holes.length).length;
-          alert(`Created completed Mission: ${title}${holePlayers?`\nHole-by-hole saved for ${holePlayers} player${holePlayers===1?'':'s'}.`:''}${claimed?`\nSeeded ${claimed} personal round${claimed===1?'':'s'} (blank fields only).`:''}`);
+          alert(`Created completed Mission: ${title}${holePlayers?`\nHole-by-hole saved for ${holePlayers} player${holePlayers===1?'':'s'}.`:''}${claimed?`\nAdded ${claimed} personal round${claimed===1?'':'s'} from Mission totals (fills blanks only).`:''}`);
         }catch(e){
           if(session!==pastImportSession)return;
           p.missions=p.missions.filter(x=>x.id!==mission.id);
