@@ -238,7 +238,7 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .direction-viz{position:relative;width:min(100%,300px);aspect-ratio:1/1;margin:0 auto}
 .direction-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:58%;height:58%;border-radius:50%;border:16px solid rgba(110,160,230,.12);box-sizing:border-box}
 .direction-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36%;height:36%;border-radius:50%;background:#4f73ff;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:900}
-.direction-center .check{font-size:var(--fs-title);line-height:1}.direction-center .pct{font-size:var(--fs-subtitle);line-height:1.1;margin-top:3px}
+.direction-center .pct{font-size:var(--fs-subtitle);line-height:1}.direction-center .check{font-size:var(--fs-data);line-height:1.1;margin-top:3px;letter-spacing:.06em;opacity:.92;text-transform:uppercase}
 .dir-label{position:absolute;font-size:var(--fs-data);line-height:1.2;text-align:center;color:var(--text);min-width:62px}
 .dir-label strong{display:block;font-size:var(--fs-data)}
 .dir-top{left:50%;top:3%;transform:translateX(-50%)}.dir-bottom{left:50%;bottom:2%;transform:translateX(-50%)}
@@ -504,7 +504,18 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .preview-read-card{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-top:1px;flex:1;min-height:92px;overflow:hidden}
 .preview-read-card .eyebrow{font-size:var(--fs-data)}.preview-read-card p{font-size:var(--fs-data);line-height:1.35;margin:6px 0 0;color:#dce6e1}
 .hole-preview-panel{display:flex;flex-direction:column;gap:12px;min-width:0}
-.hole-preview-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:7px}
+.hole-play-call{background:linear-gradient(160deg,rgba(28,42,34,.98),rgba(14,22,18,.98));border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.hole-play-call .eyebrow{margin-bottom:4px}
+.hole-play-call-line{font-size:clamp(1.05rem,2.4vw,1.35rem);font-weight:900;line-height:1.25;letter-spacing:-.01em;color:var(--text);margin:0 0 6px}
+.hole-play-call-meta{font-size:var(--fs-data);color:var(--muted);line-height:1.4}
+.hole-score-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.hole-strike-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+@media(max-width:520px){.hole-score-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hole-stat{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:10px 11px;min-width:0}
+.hole-stat strong{display:block;font-size:var(--fs-subtitle);line-height:1.1}
+.hole-stat span{display:block;margin-top:4px;font-size:var(--fs-data);color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.hole-stat.is-warn strong{color:#ff8a84}
+.hole-stat.is-good strong{color:#9ef0b4}
 .hole-preview-block{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:11px 12px}
 .hole-preview-block .eyebrow{margin-bottom:8px}
 .hole-recent-strip{display:flex;flex-wrap:wrap;gap:6px}
@@ -514,38 +525,18 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .hole-recent-pip.double,.hole-recent-pip.worse{background:rgba(239,100,97,.14);border-color:rgba(239,100,97,.35);color:#ff8a84}
 .hole-dir-grid{display:grid;grid-template-columns:1fr;gap:10px}
 @media(min-width:560px){.hole-dir-grid{grid-template-columns:1fr 1fr}}
-.direction-card.is-compact .direction-viz{width:min(100%,220px)}
-.hole-landing-visual{background:rgba(10,18,14,.96);border:1px solid var(--line);border-radius:16px;padding:12px;overflow:hidden}
-.hlv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}
-.hlv-head strong{display:block;font-size:var(--fs-subtitle);margin-top:2px}
-.hlv-meta{font-size:var(--fs-data);color:var(--muted);text-align:right;max-width:46%}
-.hlv-svg{display:block;width:100%;height:auto;max-height:420px}
-.hlv-rough{fill:#163225;stroke:rgba(255,255,255,.06);stroke-width:1}
-.hlv-fw-strip{fill:#2f7a4a;stroke:rgba(184,234,104,.22);stroke-width:1.2}
-.hlv-tee{fill:#c9b27a;stroke:rgba(0,0,0,.25);stroke-width:.5}
-.hlv-fw-left,.hlv-fw-right,.hlv-fw-short,.hlv-fw-long,.hlv-g-left,.hlv-g-right,.hlv-g-short,.hlv-g-long{fill:#ef6461;pointer-events:none}
-.hlv-apron{fill:#24583a;stroke:rgba(255,255,255,.06);stroke-width:1}
-.hlv-green-pad{fill:#3d9a5c;stroke:rgba(184,234,104,.28);stroke-width:1.2}
-.hlv-cup{fill:#0c1511}
-.hlv-flag{stroke:#f2f2f2;stroke-width:1.5}
-.hlv-flag-cloth{fill:#ef6461}
-.hlv-hit{fill:#f4fff7;font-size:15px;font-weight:900;paint-order:stroke;stroke:rgba(8,16,12,.55);stroke-width:3px}
-.hlv-hit-sub{fill:rgba(244,255,247,.82);font-size:9px;font-weight:800;letter-spacing:.08em}
-.hlv-pct{fill:rgba(255,210,206,.92);font-size:8.5px;font-weight:800}
-.hlv-label{fill:rgba(220,230,225,.7);font-size:8px;font-weight:800;letter-spacing:.06em}
-.hlv-label.is-muted{fill:rgba(220,230,225,.45)}
-.hlv-empty-note{font-size:var(--fs-data);color:var(--muted);margin-top:8px;line-height:1.35}
-.hlv-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:var(--fs-data);color:var(--muted)}
-.hlv-legend span{display:inline-flex;align-items:center;gap:6px}
-.hlv-swatch{display:inline-block;width:10px;height:10px;border-radius:3px}
-.hlv-swatch.is-hit{background:#3d9a5c}
-.hlv-swatch.is-miss{background:#ef6461;opacity:.65}
+.direction-card.is-compact .direction-viz{width:min(100%,240px)}
+.direction-card .dir-label.is-hot{color:#ffb0ab}
+.direction-card .dir-label.is-hot strong{color:#ff8a84;font-size:calc(var(--fs-data) + 1px)}
+.direction-card .dir-wedge.is-hot{background:rgba(239,100,97,.42)}
+.direction-bias{margin-top:8px;font-size:var(--fs-data);color:var(--muted);text-align:center}
+.direction-bias strong{color:#ffb0ab;font-weight:900}
 .mapbox-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 9px;font-size:var(--fs-data);color:var(--muted)}
 .mapbox-row button{border:1px solid var(--line);background:#13211b;color:var(--text);border-radius:999px;padding:5px 9px;font-size:var(--fs-data);font-weight:800}
 .mapbox-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;background:var(--warning)}.mapbox-dot.ready{background:var(--good)}
 .mapbox-missing{border:1px solid rgba(255,212,0,.32);background:rgba(255,212,0,.06);border-radius:12px;padding:8px 10px;font-size:var(--fs-data);color:#eadf9d;margin-bottom:9px}
 .satellite-stack.mapbox-live:after{content:'MAPBOX SATELLITE';position:absolute;left:10px;bottom:10px;z-index:2;background:rgba(5,12,9,.72);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:4px 7px;color:#fff;font-size:var(--fs-data);font-weight:900;letter-spacing:.04em;backdrop-filter:blur(5px)}
-@media(max-width:760px){.preview-hero-grid,.preview-hero-grid-wide{grid-template-columns:1fr}.preview-stats-column:not(.preview-stats-rich){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.preview-read-card{grid-column:1/-1}.preview-side-card{min-height:48px}.course-preview-map,.course-preview-map svg,.preview-map-empty{min-height:390px;height:390px}.hlv-svg{max-height:340px}}
+@media(max-width:760px){.preview-hero-grid,.preview-hero-grid-wide{grid-template-columns:1fr}.preview-stats-column:not(.preview-stats-rich){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.preview-read-card{grid-column:1/-1}.preview-side-card{min-height:48px}.course-preview-map,.course-preview-map svg,.preview-map-empty{min-height:390px;height:390px}}
 
 
 /* v13.1 Interactive Course Preview */
@@ -2111,18 +2102,31 @@ function directionGraphic(title,d,isGir=false,{compact=false,emptyHint=null}={})
   const bottom=d.missShortPct||0;
   const left=d.missLeftPct||0,right=d.missRightPct||0,hit=d.hitPct||0;
   const sample=d.rounds||d.samples||0;
-  const wedge=(cls,v)=>v>0?`<div class="dir-wedge ${cls}" style="opacity:${Math.max(.16,Math.min(.75,v/45))}"></div>`:'';
+  const hot=dominantMissLabel(d,{minPct:18});
+  const hotSide=hot?.side||null;
+  const wedge=(cls,side,v)=>{
+    if(!(v>0))return '';
+    const isHot=hotSide===side;
+    return `<div class="dir-wedge ${cls}${isHot?' is-hot':''}" style="opacity:${Math.max(.18,Math.min(.82,v/(isHot?38:52)))}"></div>`;
+  };
+  const label=(cls,side,v,name)=>{
+    const isHot=hotSide===side&&v>=18;
+    return `<div class="dir-label ${cls}${isHot?' is-hot':''}"><strong>${v.toFixed(0)}%</strong>${name}</div>`;
+  };
   const unit=isGir?'approach':'tee shot';
-  return `<div class="direction-card ${compact?'is-compact':''}"><div class="direction-title">${title}</div><div class="direction-sub">${sample} ${unit}${sample===1?'':'s'} with miss data</div>
+  const hitLabel=isGir?'GIR':'FH';
+  const bias=hot?`<div class="direction-bias">Miss bias · <strong>${hot.side}</strong> (${hot.pct.toFixed(0)}%)</div>`:`<div class="direction-bias">No strong miss bias yet</div>`;
+  return `<div class="direction-card ${compact?'is-compact':''}"><div class="direction-title">${title}</div><div class="direction-sub">${sample} ${unit}${sample===1?'':'s'} tracked</div>
     <div class="direction-viz">
-      ${wedge('top',top)}${wedge('right',right)}${wedge('bottom',bottom)}${wedge('left',left)}
+      ${wedge('top','long',top)}${wedge('right','right',right)}${wedge('bottom','short',bottom)}${wedge('left','left',left)}
       <div class="direction-ring"></div>
-      <div class="direction-center"><div class="check">✓</div><div class="pct">${hit.toFixed(0)}%</div></div>
-      <div class="dir-label dir-top"><strong>${top.toFixed(0)}%</strong>Long</div>
-      <div class="dir-label dir-right"><strong>${right.toFixed(0)}%</strong>Right</div>
-      <div class="dir-label dir-bottom"><strong>${bottom.toFixed(0)}%</strong>Short</div>
-      <div class="dir-label dir-left"><strong>${left.toFixed(0)}%</strong>Left</div>
-    </div></div>`;
+      <div class="direction-center"><div class="pct">${hit.toFixed(0)}%</div><div class="check">${hitLabel}</div></div>
+      ${label('dir-top','long',top,'Long')}
+      ${label('dir-right','right',right,'Right')}
+      ${label('dir-bottom','short',bottom,'Short')}
+      ${label('dir-left','left',left,'Left')}
+    </div>
+    ${bias}</div>`;
 }
 /** Aggregate hit/left/right/short/long for one hole index across rounds. */
 function holeDirectionBreakdown(rounds,index,{directionsKey,hitKey}={}){
@@ -2336,138 +2340,69 @@ function holeReconRead(h){
   else if(h.strategy)parts.push(h.strategy);
   return parts.join(' ')||usefulHoleInsight(h)||'More history will sharpen the hole-specific read.';
 }
-/** Opacity heat from a miss % (0–100). */
-function missHeat(pct){
-  const v=Math.max(0,Number(pct)||0);
-  if(v<=0)return 0;
-  return Math.max(.12,Math.min(.78,v/55));
-}
-/**
- * Schematic fairway corridor + green with miss-heat overlays for the selected hole.
- * Par 3 skips the fairway strip and shows green-only.
- */
-function holeLandingVisualHtml(h,{yardageText=''}={}){
-  if(!h){
-    return `<div class="hole-landing-visual"><div class="hlv-head"><div><div class="eyebrow">LANDING MAP</div><strong>Fairway &amp; green</strong></div></div><div class="hlv-empty-note">Play this hole (or import a scorecard) to light up miss heat on the fairway and green.</div></div>`;
+/** One-line play call a golfer can absorb in a second. */
+function holePlayCall(h){
+  if(!h)return {line:'No history on this hole yet.',meta:'Play it once (or import a scorecard) to unlock the read.'};
+  const bits=[];
+  const teeMiss=h.par===3?null:dominantMissLabel(h.fwDir,{minPct:22});
+  const greenMiss=dominantMissLabel(h.girDir,{minPct:22});
+  if(teeMiss)bits.push(`Miss ${teeMiss.side} off the tee`);
+  if(greenMiss)bits.push(`Miss ${greenMiss.side} of the green`);
+  const over=Number.isFinite(h.avgScore)&&Number.isFinite(h.par)?h.avgScore-h.par:null;
+  if(!bits.length){
+    if(h.doubleRate>=40)bits.push('Protect against the double');
+    else if(over!=null&&over>=1)bits.push(`Playing ${over>=0?'+':''}${over.toFixed(1)} vs par`);
+    else if(h.strategy)bits.push(h.strategy.replace(/\.$/,''));
+    else bits.push('Still learning this hole');
   }
-  const par=h.par??4;
-  const isPar3=par===3;
-  const fw=h?.fwDir||null;
-  const gir=h?.girDir||null;
-  const fwHit=fw?Math.round(fw.hitPct):null;
-  const girHit=gir?Math.round(gir.hitPct):(h?.gir!=null?Math.round(h.gir):null);
-  const fwLeft=missHeat(fw?.missLeftPct);
-  const fwRight=missHeat(fw?.missRightPct);
-  const fwShort=missHeat(fw?.missShortPct);
-  const fwLong=missHeat(fw?.missLongPct);
-  const gLeft=missHeat(gir?.missLeftPct);
-  const gRight=missHeat(gir?.missRightPct);
-  const gShort=missHeat(gir?.missShortPct);
-  const gLong=missHeat(gir?.missLongPct);
-  const label=(x,y,text,cls='')=>`<text class="hlv-label ${cls}" x="${x}" y="${y}" text-anchor="middle">${text}</text>`;
-  const pctLbl=(x,y,pct,side)=>pct>0?`<text class="hlv-pct" x="${x}" y="${y}" text-anchor="middle">${Math.round(pct)}% ${side}</text>`:'';
-  const fairwaySvg=isPar3?'':`
-    <g class="hlv-fairway" aria-label="Fairway miss map">
-      <rect class="hlv-rough" x="18" y="118" width="204" height="210" rx="18"/>
-      <rect class="hlv-fw-left" x="18" y="128" width="52" height="190" rx="10" style="opacity:${fwLeft}"/>
-      <rect class="hlv-fw-right" x="170" y="128" width="52" height="190" rx="10" style="opacity:${fwRight}"/>
-      <rect class="hlv-fw-short" x="78" y="288" width="84" height="32" rx="8" style="opacity:${fwShort}"/>
-      <rect class="hlv-fw-long" x="78" y="118" width="84" height="28" rx="8" style="opacity:${fwLong}"/>
-      <path class="hlv-fw-strip" d="M96 318 C90 250 90 180 96 140 L144 140 C150 180 150 250 144 318 Z"/>
-      <rect class="hlv-tee" x="104" y="322" width="32" height="14" rx="3"/>
-      ${label(120,348,'TEE','is-muted')}
-      ${fwHit!=null?`<text class="hlv-hit" x="120" y="236" text-anchor="middle">${fwHit}%</text><text class="hlv-hit-sub" x="120" y="252" text-anchor="middle">FH</text>`:''}
-      ${pctLbl(44,228,fw?.missLeftPct||0,'L')}
-      ${pctLbl(196,228,fw?.missRightPct||0,'R')}
-      ${pctLbl(120,308,fw?.missShortPct||0,'Short')}
-      ${pctLbl(120,136,fw?.missLongPct||0,'Long')}
-    </g>`;
-  const greenY=isPar3?168:58;
-  const greenSvg=`
-    <g class="hlv-green" transform="translate(0,${isPar3?40:0})" aria-label="Green miss map">
-      <ellipse class="hlv-apron" cx="120" cy="${greenY}" rx="78" ry="52"/>
-      <ellipse class="hlv-g-long" cx="120" cy="${greenY-34}" rx="46" ry="18" style="opacity:${gLong}"/>
-      <ellipse class="hlv-g-short" cx="120" cy="${greenY+34}" rx="46" ry="18" style="opacity:${gShort}"/>
-      <ellipse class="hlv-g-left" cx="58" cy="${greenY}" rx="20" ry="34" style="opacity:${gLeft}"/>
-      <ellipse class="hlv-g-right" cx="182" cy="${greenY}" rx="20" ry="34" style="opacity:${gRight}"/>
-      <ellipse class="hlv-green-pad" cx="120" cy="${greenY}" rx="48" ry="32"/>
-      <circle class="hlv-cup" cx="120" cy="${greenY}" r="3.5"/>
-      <line class="hlv-flag" x1="120" y1="${greenY}" x2="120" y2="${greenY-28}"/>
-      <path class="hlv-flag-cloth" d="M120 ${greenY-28} L138 ${greenY-22} L120 ${greenY-16} Z"/>
-      ${girHit!=null?`<text class="hlv-hit" x="120" y="${greenY+6}" text-anchor="middle">${girHit}%</text><text class="hlv-hit-sub" x="120" y="${greenY+20}" text-anchor="middle">GIR</text>`:''}
-      ${pctLbl(120,greenY-48,gir?.missLongPct||0,'Long')}
-      ${pctLbl(120,greenY+56,gir?.missShortPct||0,'Short')}
-      ${pctLbl(42,greenY+4,gir?.missLeftPct||0,'L')}
-      ${pctLbl(198,greenY+4,gir?.missRightPct||0,'R')}
-    </g>`;
-  const height=isPar3?280:360;
-  const emptyNote=(!fw&&!gir)?`<div class="hlv-empty-note">Miss heat lights up after scorecard imports with fairway / GIR arrows.</div>`:'';
-  const titleBits=[`Par ${par}`];
-  if(yardageText)titleBits.push(yardageText);
-  if(h?.played)titleBits.push(`${h.played} round${h.played===1?'':'s'}`);
-  const gradId=`hlvGrass-${h?.hole??'x'}-${isPar3?3:par}`;
-  return `
-    <div class="hole-landing-visual ${isPar3?'is-par3':''}" role="img" aria-label="Hole ${h?.hole??''} fairway and green miss map">
-      <div class="hlv-head">
-        <div><div class="eyebrow">LANDING MAP</div><strong>Hole ${h?.hole??'—'} · Fairway &amp; green</strong></div>
-        <span class="hlv-meta">${safeText(titleBits.join(' · '))}</span>
-      </div>
-      <svg class="hlv-svg" viewBox="0 0 240 ${height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-          <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#1a3a28"/><stop offset="100%" stop-color="#0e1f16"/>
-          </linearGradient>
-        </defs>
-        <rect class="hlv-sky" x="0" y="0" width="240" height="${height}" rx="18" fill="url(#${gradId})"/>
-        ${fairwaySvg}
-        ${greenSvg}
-      </svg>
-      ${emptyNote}
-      <div class="hlv-legend">
-        <span><i class="hlv-swatch is-hit"></i> Hit</span>
-        <span><i class="hlv-swatch is-miss"></i> Miss heat (brighter = more often)</span>
-      </div>
-    </div>`;
+  const meta=[];
+  if(over!=null)meta.push(`${over>=0?'+':''}${over.toFixed(1)} avg · ${h.played} round${h.played===1?'':'s'}`);
+  if(h.risk)meta.push(riskLabel(h));
+  if(h.doubleRate>=30)meta.push(`${h.doubleRate}% doubles`);
+  return {line:bits.join(' · '),meta:meta.join(' · ')};
 }
 /** Shared Hole Preview / Hole Insights stats panel. */
 function holePreviewStatsHtml(c,hole,h,last,{showDirections=true,yardageText=''}={}){
-  const avgScore=h?.avgScore;
   const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
-  const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
+  const call=holePlayCall(h);
+  const stat=(label,value,cls='')=>`<div class="hole-stat ${cls}"><strong>${value}</strong><span>${label}</span></div>`;
   const recent=(h?.recent||[]).slice(0,8);
   const recentHtml=recent.length
-    ?`<div class="hole-recent-strip" aria-label="Recent scores">${recent.map((s,i)=>{
+    ?`<div class="hole-recent-strip" aria-label="Recent scores">${recent.map(s=>{
         const cls=scoreClass(s,h.par);
         return `<span class="hole-recent-pip ${cls}" title="Newer scores on the left">${s}</span>`;
       }).join('')}</div>`
     :`<div class="muted" style="font-size:var(--fs-data)">No scored history on this hole yet.</div>`;
   const dirGrid=showDirections?`<div class="hole-dir-grid">
-      ${h?.par===3?'':directionGraphic('Fairway compass',h?.fwDir,false,{compact:true,emptyHint:'Import scorecard screenshots with fairway arrows to unlock tee miss trends.'})}
-      ${directionGraphic('Green compass',h?.girDir,true,{compact:true,emptyHint:'Import scorecard screenshots with GIR arrows to unlock green miss trends.'})}
+      ${h?.par===3?'':directionGraphic('Off the tee',h?.fwDir,false,{compact:true,emptyHint:'Import a scorecard with fairway arrows to unlock tee miss trends.'})}
+      ${directionGraphic('Approach',h?.girDir,true,{compact:true,emptyHint:'Import a scorecard with GIR arrows to unlock green miss trends.'})}
     </div>`:'';
+  const metaBits=[`Hole ${hole}`];
+  if(h?.par)metaBits.push(`Par ${h.par}`);
+  if(yardageText)metaBits.push(yardageText);
   return `
     <div class="hole-preview-panel">
-      ${holeLandingVisualHtml(h,{yardageText})}
-      <div class="hole-preview-kpis">
-        ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
-        ${stat('Rounds',h?.played??'—')}
-        ${stat('Avg',avgScore==null?'—':avgScore.toFixed(1))}
-        ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`)}
-        ${stat('Birdie',h?.birdieRate==null?'—':h.birdieRate+'%')}
-        ${stat('Bogey+',h?.bogeyPlusRate==null?'—':h.bogeyPlusRate+'%')}
-        ${stat('Double+',h?.doubleRate==null?'—':h.doubleRate+'%')}
-        ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'))}
-        ${stat('GIR',h?.gir==null?'—':h.gir+'%')}
-        ${stat('Putts',h?.putts==null?'—':h.putts.toFixed(1))}
-        ${stat('Last',last?.score??'—')}
-        ${stat('Best',h?.best??'—')}
-        ${stat('Worst',h?.worst??'—')}
+      <div class="hole-play-call">
+        <div class="eyebrow">PLAY CALL</div>
+        <p class="hole-play-call-line">${safeText(call.line)}</p>
+        <div class="hole-play-call-meta">${safeText([call.meta,metaBits.join(' · ')].filter(Boolean).join(' · '))}</div>
       </div>
+      <div class="hole-score-row">
+        ${stat('Avg',h?.avgScore==null?'—':h.avgScore.toFixed(1))}
+        ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`,over!=null&&over>=1?'is-warn':over!=null&&over<=0?'is-good':'')}
+        ${stat('Last',last?.score??'—')}
+        ${stat('Doubles',h?.doubleRate==null?'—':h.doubleRate+'%',h?.doubleRate>=40?'is-warn':'')}
+      </div>
+      <div class="hole-strike-row">
+        ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'),h?.par!==3&&h?.fw!=null&&h.fw<=30?'is-warn':'')}
+        ${stat('GIR',h?.gir==null?'—':h.gir+'%',h?.gir!=null&&h.gir<=25?'is-warn':'')}
+        ${stat('Putts',h?.putts==null?'—':h.putts.toFixed(1),h?.putts!=null&&h.putts>=2.3?'is-warn':'')}
+      </div>
+      ${dirGrid}
       <div class="hole-preview-block">
         <div class="eyebrow">RECENT SCORES</div>
         ${recentHtml}
       </div>
-      ${dirGrid}
       <div class="preview-read-card"><div class="eyebrow">RECON READ</div><p>${safeText(holeReconRead(h))}</p></div>
     </div>`;
 }
