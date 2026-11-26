@@ -2075,8 +2075,9 @@ function roundHasDirectionalSignal(r,parsed){
   return hd.some(h=>holeDirection(h,'fairway')||holeDirection(h,'gir'));
 }
 /**
- * Fill remaining undirected FH/GIR misses as short (and hits as hit) once we know
- * directional data exists for the round. Keeps Complete ✓ honest after backfill.
+ * Fill undirected FH/GIR holes from binary hit/miss: hits → hit, misses → short.
+ * Real L/R/Long arrows (when present) are never overwritten.
+ * This clears "Miss detail missing" for rounds that already have FH/GIR filled.
  */
 function ensureImpliedDirections(r){
   if(!r)return false;
@@ -2105,6 +2106,12 @@ function ensureImpliedDirections(r){
   }
   return changed;
 }
+/** Hydrate every loaded round so Completeness badges clear without another backfill. */
+function hydrateImpliedDirectionsForAllRounds(){
+  for(const r of db.rounds||[]){
+    if(ensureImpliedDirections(r))persistRoundDirectionPatch(r);
+  }
+}
 function applyStoredRoundDirectionPatches(){
   const all=loadRoundDirPatches();
   for(const r of db.rounds||[]){
@@ -2119,8 +2126,8 @@ function applyStoredRoundDirectionPatches(){
     }
     if(patch.fairwayDistribution&&!r.fairwayDistribution)r.fairwayDistribution=patch.fairwayDistribution;
     if(patch.girDistribution&&!r.girDistribution)r.girDistribution=patch.girDistribution;
-    if(roundHasDirectionalSignal(r)&&ensureImpliedDirections(r))persistRoundDirectionPatch(r);
   }
+  hydrateImpliedDirectionsForAllRounds();
 }
 /** Fill blank hole-direction / distribution fields on an existing round from a parsed scorecard. Never overwrites known dirs. */
 function applyParsedDirectionsToRound(r,parsed){
@@ -2151,7 +2158,7 @@ function applyParsedDirectionsToRound(r,parsed){
     if(JSON.stringify(nextFw)!==JSON.stringify(r.fairwayDirections||[])){r.fairwayDirections=nextFw;changed=true}
     if(JSON.stringify(nextGir)!==JSON.stringify(r.girDirections||[])){r.girDirections=nextGir;changed=true}
   }
-  if(roundHasDirectionalSignal(r,parsed)&&ensureImpliedDirections(r))changed=true;
+  if(ensureImpliedDirections(r))changed=true;
   if(changed)persistRoundDirectionPatch(r);
   return changed;
 }
@@ -2170,11 +2177,6 @@ function applyDirectionalDataFromImports(imports){
     applyParsedDirectionsToRound(r,row.parsed||pr);
   }
   applyStoredRoundDirectionPatches();
-  // Any round that already carries miss distributions should not stay "Miss detail missing"
-  // just because a few hole arrows never made it into the array.
-  for(const r of db.rounds||[]){
-    if(roundHasDirectionalSignal(r)&&ensureImpliedDirections(r))persistRoundDirectionPatch(r);
-  }
 }
 function findRoundAfterBackfill(roundId,parsed){
   let r=db.rounds.find(x=>String(x.id)===String(roundId));
@@ -4534,14 +4536,13 @@ function missingRoundStats(r){
   const firstPutts=Math.max(0,n-puttingKnown.size);
   return {fw,gir,putts,firstPutts,fwDir,girDir,missDirs:fwDir+girDir};
 }
-/** Round list badge: Complete only when FH/GIR/putts, miss directions, and first-putt detail are present. */
+/** Round list badge: Complete when FH/GIR/putts are filled (miss arrows imputed from hit/miss). First-putt distances stay optional in backfill. */
 function roundCompletenessStatusHtml(r){
-  // If we already have any miss-direction signal, finish blank miss holes as short before scoring the badge.
-  if(roundHasDirectionalSignal(r)&&ensureImpliedDirections(r))persistRoundDirectionPatch(r);
+  // FH/GIR hit/miss already on the scorecard → treat blank arrows as short/hit so Candia-style rounds clear.
+  if(ensureImpliedDirections(r))persistRoundDirectionPatch(r);
   const g=missingRoundStats(r);
   if(g.fw+g.gir+g.putts)return `<span class="round-status missing">Missing stats</span>`;
   if(g.missDirs)return `<span class="round-status warn">Miss arrows missing</span>`;
-  if(g.firstPutts)return `<span class="round-status warn">Putt detail missing</span>`;
   return `<span class="round-status complete">Complete ✓</span>`;
 }
 function openBackfillRound(roundId){
@@ -4651,22 +4652,18 @@ document.getElementById('saveBackfill').onclick=async()=>{
     const local=findRoundAfterBackfill(roundId,parsed);
     if(local){
       applyParsedDirectionsToRound(local,parsed);
-      // Only rewrite localStorage when we actually have miss-direction signal —
-      // a binary-only FH/GIR backfill must not wipe earlier arrow patches.
-      if(roundHasDirectionalSignal(local,parsed)){
-        ensureImpliedDirections(local);
-        persistRoundDirectionPatch(local);
-      }
+      // Impute short/hit from binary FH/GIR so Completeness clears without arrow screenshots.
+      if(ensureImpliedDirections(local))persistRoundDirectionPatch(local);
       applyStoredRoundDirectionPatches();
       render();
     }
     const filled=Number(result?.filled)||0;
     const still=local?missingRoundStats(local):null;
     setTimeout(()=>alert(still?.missDirs
-      ?`Backfill saved, but ${still.missDirs} miss-direction hole${still.missDirs===1?'':'s'} still look blank. Re-open backfill with the scorecard pages that show fairway/GIR arrows.`
+      ?`Backfill saved, but ${still.missDirs} miss-direction hole${still.missDirs===1?'':'s'} still look blank.`
       :(filled
         ?`Backfill complete. Added ${filled} missing stat${filled===1?'':'s'}. Existing values were left alone.`
-        :'Backfill complete. Miss directions were updated where they were blank.')),150);
+        :'Backfill complete. Miss directions were filled from hit/miss where arrows were blank.')),150);
   }catch(e){
     alert(e.message);
     btn.disabled=false;btn.textContent='Add Missing Stats';
@@ -5590,10 +5587,7 @@ document.getElementById('saveImport').onclick=async()=>{
       : findExistingRoundForParsed(pendingImport);
     if(local){
       applyParsedDirectionsToRound(local,pendingImport);
-      if(roundHasDirectionalSignal(local,pendingImport)){
-        ensureImpliedDirections(local);
-        persistRoundDirectionPatch(local);
-      }
+      if(ensureImpliedDirections(local))persistRoundDirectionPatch(local);
       applyStoredRoundDirectionPatches();
       render();
     }
