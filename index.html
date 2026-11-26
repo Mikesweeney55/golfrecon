@@ -3772,8 +3772,11 @@ async function syncPlatoonFromServer(){
     if(out?.platoon){
       let merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,localBefore):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore.hqMeta});
       if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,localBefore);
+      if(typeof window.grHydrateAllScorecardSeeds==='function')window.grHydrateAllScorecardSeeds(merged);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
+      // Cadet just claimed (or already linked): pull their mission scorecards into THEIR personal rounds.
+      try{await persistClaimedPersonalRoundsFromPlatoon(merged)}catch(e){console.warn('Personal mission claim failed',e)}
     }
     platoonSyncError='';
     if(state.view==='groups')render();
@@ -5325,29 +5328,36 @@ function fillBlankArray(dst,src){
   src.forEach((v,i)=>{if((out[i]==null||out[i]==='')&&v!=null&&v!=='')out[i]=v});
   return out;
 }
+/** Build a golfiq-import-compatible parsed payload from a mission scorecard seed. */
+function parsedFromMissionSeed(seed){
+  const holeRows=Array.isArray(seed?.holes)?seed.holes:[];
+  return {
+    confidence:1,
+    round:{
+      date:seed.date,
+      course_name:seed.course_name,
+      course_id:seed.course_id,
+      gross_score:seed.gross,
+      net_score:seed.net,
+      holes:holeRows.length||18,
+      holes_detail:holeRows.map(h=>({
+        hole:h.hole,par:h.par,score:h.score,
+        putts:h.putts,fairway_hit:h.fairway_hit,gir:h.gir,
+        chips:h.chips,sand:h.sand,penalties:h.penalties,
+        fairway_direction:h.fairway_direction,gir_direction:h.gir_direction,
+        first_putt_distance_ft:h.first_putt_distance_ft
+      })),
+      source_app:'Mission Import',
+      missionFingerprint:seed.fingerprint||null,
+      mission_id:seed.mission_id||null
+    }
+  };
+}
 /** Merge a mission scorecard seed into this device's personal rounds (blanks-only). */
 function mergeMissionSeedIntoPersonal(seed,resultRow){
   if(!seed||typeof db==='undefined'||!Array.isArray(db.rounds))return {claimed:false};
   try{
-    const fakeParsed={
-      confidence:1,
-      round:{
-        date:seed.date,
-        course_name:seed.course_name,
-        course_id:seed.course_id,
-        gross_score:seed.gross,
-        net_score:seed.net,
-        holes:Array.isArray(seed.holes)?seed.holes.length:18,
-        holes_detail:(seed.holes||[]).map(h=>({
-          hole:h.hole,par:h.par,score:h.score,
-          putts:h.putts,fairway_hit:h.fairway_hit,gir:h.gir,
-          chips:h.chips,sand:h.sand,penalties:h.penalties,
-          fairway_direction:h.fairway_direction,gir_direction:h.gir_direction,
-          first_putt_distance_ft:h.first_putt_distance_ft
-        })),
-        source_app:'Mission Import'
-      }
-    };
+    const fakeParsed=parsedFromMissionSeed(seed);
     let existing=findPersonalRoundForMissionSeed(seed);
     if(!existing){
       const created=mergeImportedRound(fakeParsed,null);
@@ -5356,13 +5366,13 @@ function mergeMissionSeedIntoPersonal(seed,resultRow){
         existing.missionFingerprint=seed.fingerprint;
         existing.missionId=seed.mission_id;
         existing.source=existing.source||'Mission Import';
-        if(typeof save==='function')save();
-        return {claimed:true,merged:true,roundId:existing.id};
+        if(resultRow)resultRow.personal_round_id=String(existing.id);
+        return {claimed:true,merged:true,roundId:existing.id,parsed:fakeParsed,created:true};
       }
       // duplicate path — locate again
       existing=findExistingRoundForParsed(fakeParsed)||findPersonalRoundForMissionSeed(seed);
     }
-    if(!existing)return {claimed:false};
+    if(!existing)return {claimed:false,parsed:fakeParsed};
     // Fill blanks only onto the existing personal round.
     const hd=fakeParsed.round.holes_detail||[];
     const holes=existing.holes||hd.length||18;
@@ -5379,13 +5389,64 @@ function mergeMissionSeedIntoPersonal(seed,resultRow){
     existing.missionFingerprint=seed.fingerprint||existing.missionFingerprint;
     existing.missionId=seed.mission_id||existing.missionId;
     if(resultRow)resultRow.personal_round_id=String(existing.id);
-    if(typeof save==='function')save();
-    return {claimed:true,merged:true,roundId:existing.id};
+    return {claimed:true,merged:true,roundId:existing.id,parsed:fakeParsed,created:false};
   }catch(e){
     console.warn('Mission scorecard claim failed',e);
     return {claimed:false,error:String(e?.message||e)};
   }
 }
+/**
+ * After a cadet claims their My Time seat, push their mission scorecard seeds into
+ * their own golfiq-import account so Rounds survive refresh/bootstrap.
+ */
+async function persistClaimedPersonalRoundsFromPlatoon(p){
+  if(!p||typeof window.grClaimMissionScorecardsIntoPersonalDb!=='function')return {claimed:0,saved:0};
+  const claim=window.grClaimMissionScorecardsIntoPersonalDb(p);
+  let saved=0;
+  for(const item of (claim.seeds||[])){
+    const parsed=item.parsed||parsedFromMissionSeed(item.seed);
+    if(!parsed?.round?.date)continue;
+    try{
+      const existing=(item.roundId&&db.rounds.find(r=>String(r.id)===String(item.roundId)))
+        ||findPersonalRoundForMissionSeed(item.seed)
+        ||findExistingRoundForParsed(parsed);
+      // Already owned by this account on the server — leave alone after first claim.
+      if(existing?.supabaseImportId)continue;
+      const result=await callImportFunction({action:'save',parsed});
+      if(result?.duplicate){
+        const hit=findExistingRoundForParsed(parsed)||existing;
+        if(hit){
+          if(item.seed){
+            hit.missionFingerprint=item.seed.fingerprint||hit.missionFingerprint;
+            hit.missionId=item.seed.mission_id||hit.missionId;
+          }
+          if(Array.isArray(item.seed?.holes)&&item.seed.holes.length){
+            try{await callImportFunction({action:'backfill',round_id:hit.id,parsed})}catch{}
+          }
+          saved++;
+        }
+      }else{
+        const id=result?.id||result?.import_id||result?.round_id||null;
+        if(id)mergeImportedRound(parsed,id);
+        const local=findExistingRoundForParsed(parsed)||(item.roundId&&db.rounds.find(r=>String(r.id)===String(item.roundId)))||db.rounds[db.rounds.length-1];
+        if(local&&item.seed){
+          local.missionFingerprint=item.seed.fingerprint||local.missionFingerprint;
+          local.missionId=item.seed.mission_id||local.missionId;
+          if(id)local.supabaseImportId=local.supabaseImportId||id;
+        }
+        saved++;
+      }
+    }catch(e){
+      console.warn('Could not persist claimed mission round',item?.seed?.fingerprint,e);
+    }
+  }
+  if(saved){
+    try{await syncSupabaseRounds()}catch(e){console.warn('Claimed rounds re-sync failed',e)}
+    try{if(typeof render==='function')render()}catch{}
+  }
+  return {claimed:claim.claimed||0,saved,memberId:claim.memberId||null};
+}
+window.grPersistClaimedPersonalRoundsFromPlatoon=persistClaimedPersonalRoundsFromPlatoon;
 function sessionEmailFromAuth(){
   try{
     const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
@@ -5709,9 +5770,9 @@ initializeAuth();
 
 </script>
   <script src="platoon-recap-shared.js?v=206"></script>
-  <script src="platoon-mission-core.js?v=196"></script>
+  <script src="platoon-mission-core.js?v=197"></script>
   <script src="platoon-hq-records.js?v=199"></script>
-  <script src="platoons-v15-real.js?v=203"></script>
+  <script src="platoons-v15-real.js?v=204"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>

@@ -847,7 +847,7 @@ window.grOpenSetup=()=>{
     </div>
     <div id="grGuestPoolRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
     <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
-      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Full name + email claims the My Time seat on first login. Alias matches scorecards. Display name is what shows on boards — players can change theirs later in Account.</div></div>
+      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Put each player's real email here, then Save. They create a Golf Recon account with that same email → claim this seat, join My Time, and pull their Mission rounds into their own Rounds history. Alias matches scorecards. Display name is what boards show (they can change it in Account).</div></div>
       <button class="button secondary" id="grAddRoster" type="button">+ Player</button>
     </div>
     <div id="grRosterRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>

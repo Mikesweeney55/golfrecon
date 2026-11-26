@@ -255,23 +255,42 @@ function attachScorecardSeeds(mission,p){
     const member=r.hole_detail_canonical_id
       ? (p?.members||[]).find(m=>String(m.id)===String(r.hole_detail_canonical_id))
       : canon(p,r.player_name);
-    if(!member?.id||!Array.isArray(r.holes)||!r.holes.length)continue;
-    r.scorecard_seed={
+    if(!member?.id)continue;
+    const holes=Array.isArray(r.holes)&&r.holes.length?cleanHoles(r.holes):[];
+    // Always keep a seed when we can match a roster seat — even leaderboard-only rows
+    // (gross/net/date/course) so claiming cadets get a personal round history starter.
+    if(!holes.length&&!finite(r.gross)&&!finite(r.net))continue;
+    const next={
       member_id:member.id,
-      member_name:member.name||r.player_name,
+      member_name:(typeof window.grMemberLabel==='function'?window.grMemberLabel(member):null)||member.name||r.player_name,
       mission_id:mission.id,
       date:mission.date||'',
       course_name:cleanCourse(mission.locationName||''),
       course_id:mission.courseId||'',
       gross:r.gross,
       net:r.net,
-      holes:cleanHoles(r.holes),
+      holes,
       source:'mission_import',
       fingerprint:missionRoundFingerprint(mission,member.id,r.gross),
       updated_at:new Date().toISOString()
     };
+    const prev=r.scorecard_seed&&typeof r.scorecard_seed==='object'?r.scorecard_seed:null;
+    // Prefer richer hole detail when re-attaching.
+    if(prev&&Array.isArray(prev.holes)&&prev.holes.length&&!holes.length)continue;
+    r.scorecard_seed=next;
   }
   return mission;
+}
+
+/** Ensure every completed mission has claimable seeds for matched roster players. */
+function hydrateAllScorecardSeeds(p){
+  if(!p)return p;
+  for(const m of (p.missions||[])){
+    if(!m||m.type==='war')continue;
+    if(!Array.isArray(m.results)||!m.results.length)continue;
+    attachScorecardSeeds(m,p);
+  }
+  return p;
 }
 
 /**
@@ -293,10 +312,12 @@ function resolveCurrentPlatoonMemberId(p){
  * Never overwrites richer personal data — fills blanks only.
  */
 function claimMissionScorecardsIntoPersonalDb(p,{currentMemberId=null}={}){
-  if(typeof window.grMergeMissionSeedIntoPersonal!=='function')return {claimed:0};
+  if(typeof window.grMergeMissionSeedIntoPersonal!=='function')return {claimed:0,seeds:[]};
+  hydrateAllScorecardSeeds(p);
   const selfId=currentMemberId||resolveCurrentPlatoonMemberId(p);
-  if(!selfId)return {claimed:0,skipped:'no-member'};
+  if(!selfId)return {claimed:0,skipped:'no-member',seeds:[]};
   let claimed=0;
+  const seeds=[];
   for(const m of (p?.missions||[])){
     if(m?.type==='war')continue;
     for(const r of (m.results||[])){
@@ -306,10 +327,11 @@ function claimMissionScorecardsIntoPersonalDb(p,{currentMemberId=null}={}){
       if(out?.claimed||out?.merged){
         claimed++;
         if(out.roundId)r.personal_round_id=String(out.roundId);
+        seeds.push({seed,roundId:out.roundId||null,parsed:out.parsed||null});
       }
     }
   }
-  return {claimed,memberId:selfId};
+  return {claimed,memberId:selfId,seeds};
 }
 
 /**
@@ -682,6 +704,7 @@ window.grSetOfficialResults=setOfficialResults;
 window.grLockOfficialResults=lockOfficialResults;
 window.grMergeHoleDetailsOntoOfficial=mergeHoleDetailsOntoOfficial;
 window.grAttachScorecardSeeds=attachScorecardSeeds;
+window.grHydrateAllScorecardSeeds=hydrateAllScorecardSeeds;
 window.grClaimMissionScorecardsIntoPersonalDb=claimMissionScorecardsIntoPersonalDb;
 window.grMissionRoundFingerprint=missionRoundFingerprint;
 window.grBuildCompletedMissionFromImport=buildCompletedMissionFromImport;
