@@ -339,7 +339,7 @@ function blogView(){
         <textarea id="grBlogBody" name="body" rows="3" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…">${E(draft)}</textarea>
         ${preview}
         <div class="gr-blog-composer-actions">
-          <label class="gr-logo-upload gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}" style="margin:0;cursor:pointer"><strong>📷 ${blogPhotoBusy?'Working…':'Photo'}</strong><input id="grBlogPhoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}></label>
+          <label class="button secondary gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}">📷 ${blogPhotoBusy?'Working…':'Photo'}<input id="grBlogPhoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}></label>
           <button class="button primary" type="submit" ${blogPhotoBusy?'disabled':''}>${blogPhotoBusy?'Wait…':'Post'}</button>
         </div>
       </form>
