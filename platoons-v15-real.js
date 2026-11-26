@@ -339,7 +339,8 @@ function blogView(){
         <textarea id="grBlogBody" name="body" rows="3" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…">${E(draft)}</textarea>
         ${preview}
         <div class="gr-blog-composer-actions">
-          <label class="button secondary gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}">📷 ${blogPhotoBusy?'Working…':'Photo'}<input id="grBlogPhoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}></label>
+          <label for="grBlogPhoto" class="button secondary gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}">📷 ${blogPhotoBusy?'Working…':'Photo'}</label>
+          <input id="grBlogPhoto" class="gr-blog-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}>
           <button class="button primary" type="submit" ${blogPhotoBusy?'disabled':''}>${blogPhotoBusy?'Wait…':'Post'}</button>
         </div>
       </form>
@@ -2015,19 +2016,25 @@ if(!document.body.dataset.grPlatoonShellBound){
   document.addEventListener('input',e=>{
     if(e.target&&e.target.id==='grBlogBody')blogPendingBody=String(e.target.value||'');
   });
-  document.addEventListener('change',async e=>{
-    if(!e.target||e.target.id!=='grBlogPhoto')return;
-    const f=e.target.files&&e.target.files[0];
-    e.target.value='';
-    if(!f)return;
+  const attachLockerPhoto=async(file)=>{
+    if(!file||blogPhotoBusy)return;
     const ta=document.getElementById('grBlogBody');
     if(ta)blogPendingBody=String(ta.value||'');
     const attachId=Date.now();
     blogPhotoBusy=attachId;
     blogPendingPhoto=null;
+    // Snapshot bytes immediately — iOS can invalidate the live File after UI re-render.
+    let snapshot=file;
+    try{
+      const buf=await file.arrayBuffer();
+      snapshot=new File([buf],file.name||'photo.jpg',{type:file.type||'application/octet-stream',lastModified:file.lastModified||Date.now()});
+    }catch{/* keep original File */}
     renderGroups();
     try{
-      const dataUrl=await compressImageFile(f,{max:720,quality:.55});
+      // Warm HEIC converters while we start decode (iPhone Photos often sends HEIC).
+      try{loadHeicTo()}catch{}
+      try{loadHeic2Any()}catch{}
+      const dataUrl=await compressImageFile(snapshot,{max:720,quality:.55});
       if(!dataUrl||!String(dataUrl).startsWith('data:'))throw new Error('Photo decode failed.');
       if(blogPhotoBusy!==attachId)return; // a newer attach started
       blogPendingPhoto=dataUrl;
@@ -2038,7 +2045,18 @@ if(!document.body.dataset.grPlatoonShellBound){
       if(blogPhotoBusy===attachId)blogPhotoBusy=false;
       renderGroups();
     }
-  });
+  };
+  const onLockerPhotoPick=e=>{
+    if(!e.target||e.target.id!=='grBlogPhoto')return;
+    const f=e.target.files&&e.target.files[0];
+    // Reset so picking the same photo again still fires.
+    try{e.target.value=''}catch{}
+    if(!f)return;
+    attachLockerPhoto(f);
+  };
+  document.addEventListener('change',onLockerPhotoPick);
+  // iOS Safari sometimes surfaces the pick on input instead of change.
+  document.addEventListener('input',onLockerPhotoPick);
 }
 
 /* App-wide: date/time open native picker; block keyboard typing (no readonly — that breaks pickers) */
