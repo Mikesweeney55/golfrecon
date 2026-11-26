@@ -4021,23 +4021,18 @@ function openMissionImport(id){
       const member=roster.find(x=>x.id===memberId);
       const name=member?.name||String(tr.querySelector('[data-name]')?.value||'').trim();
       if(!name)continue;
+      const payload={
+        player_name:name,
+        handicap:numOrNull(tr.querySelector('[data-hcp]')?.value),
+        gross:numOrNull(tr.querySelector('[data-gross]')?.value),
+        net:numOrNull(tr.querySelector('[data-net]')?.value),
+        finish_position:numOrNull(tr.querySelector('[data-pos]')?.value),
+        raw_points:numOrNull(tr.querySelector('[data-pts]')?.value),
+        eagle_count:numOrNull(tr.querySelector('[data-eagles]')?.value)
+      };
       reviewed.push(typeof window.grNormalizeOfficialResultRow==='function'
-        ? window.grNormalizeOfficialResultRow({
-            player_name:name,
-            gross:numOrNull(tr.querySelector('[data-gross]')?.value),
-            net:numOrNull(tr.querySelector('[data-net]')?.value),
-            finish_position:numOrNull(tr.querySelector('[data-pos]')?.value),
-            raw_points:numOrNull(tr.querySelector('[data-pts]')?.value),
-            eagle_count:numOrNull(tr.querySelector('[data-eagles]')?.value)
-          })
-        : {
-            player_name:name,
-            gross:numOrNull(tr.querySelector('[data-gross]')?.value),
-            net:numOrNull(tr.querySelector('[data-net]')?.value),
-            finish_position:numOrNull(tr.querySelector('[data-pos]')?.value),
-            raw_points:numOrNull(tr.querySelector('[data-pts]')?.value),
-            eagle_count:numOrNull(tr.querySelector('[data-eagles]')?.value)
-          });
+        ? window.grNormalizeOfficialResultRow(payload)
+        : payload);
     }
     return reviewed;
   };
@@ -4081,13 +4076,16 @@ function openMissionImport(id){
     btn.disabled=true;btn.textContent='Parsing…';out.innerHTML='<div class="platoon-notice">Reading Mission results…</div>';
     try{
       const images=[];for(const f of files)images.push(await platoonFilePayload(f));
-      const parsed=await callPlatoonFunction({action:'parse_results',mission:{date:m.date,locationName:m.locationName,title:m.title},images});
-      const rows=parsed.results||[];
+      const parsed=await callPlatoonFunction({action:'parse_results',mission:{date:m.date,locationName:m.locationName,title:m.title,format:m.format},images});
+      const rows=(parsed.results||[]).map(r=>{
+        const norm=typeof window.grNormalizeOfficialResultRow==='function'?window.grNormalizeOfficialResultRow(r):r;
+        return {...r,...norm};
+      });
       out.innerHTML=`<div class="platoon-notice">Confidence ${Math.round(100*(parsed.confidence||0))}%${(parsed.warnings||[]).length?` · ${safeText(parsed.warnings.join(' · '))}`:''}</div>
         <div class="eyebrow" style="margin-top:10px">REVIEW BEFORE SAVE</div>
-        <table class="platoon-results-table gr-import-review"><thead><tr><th>Player</th><th>Match</th><th>Gross</th><th>Net</th><th>Pos</th><th>Pts</th><th>Eagles</th></tr></thead><tbody>${rows.map((r,i)=>{
+        <table class="platoon-results-table gr-import-review"><thead><tr><th>Player</th><th>Match</th><th>HCP</th><th>Gross</th><th>Net</th><th>Pos</th><th>Pts</th><th>Eagles</th></tr></thead><tbody>${rows.map((r,i)=>{
           const hit=typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,r.player_name):null;
-          return `<tr data-import-row="${i}"><td><input data-name value="${safeText(r.player_name||'')}"></td><td><select data-match><option value="">—</option>${roster.map(x=>`<option value="${safeText(x.id)}" ${hit?.id===x.id?'selected':''}>${safeText(x.name)}</option>`).join('')}</select></td><td><input data-gross inputmode="decimal" value="${r.gross??''}"></td><td><input data-net inputmode="decimal" value="${r.net??''}"></td><td><input data-pos inputmode="numeric" value="${r.finish_position??''}"></td><td><input data-pts inputmode="decimal" value="${r.raw_points??''}"></td><td><input data-eagles inputmode="numeric" value="${r.eagle_count??''}"></td></tr>`;
+          return `<tr data-import-row="${i}"><td><input data-name value="${safeText(r.player_name||'')}"></td><td><select data-match><option value="">—</option>${roster.map(x=>`<option value="${safeText(x.id)}" ${hit?.id===x.id?'selected':''}>${safeText(x.name)}</option>`).join('')}</select></td><td><input data-hcp inputmode="decimal" value="${r.handicap??''}"></td><td><input data-gross inputmode="decimal" value="${r.gross??''}"></td><td><input data-net inputmode="decimal" value="${r.net??''}"></td><td><input data-pos inputmode="numeric" value="${r.finish_position??''}"></td><td><input data-pts inputmode="decimal" value="${r.raw_points??''}"></td><td><input data-eagles inputmode="numeric" value="${r.eagle_count??''}"></td></tr>`;
         }).join('')}</tbody></table>
         <div class="dialog-actions sticky-actions"><button class="button secondary" id="discardParsedMissionResults" type="button">Discard</button><button class="button primary" id="saveParsedMissionResults" type="button">Save Official Results</button></div>`;
       out.querySelector('#discardParsedMissionResults').onclick=()=>{out.innerHTML=''};
@@ -5874,10 +5872,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=206"></script>
-  <script src="platoon-mission-core.js?v=197"></script>
+  <script src="platoon-recap-shared.js?v=207"></script>
+  <script src="platoon-mission-core.js?v=198"></script>
   <script src="platoon-hq-records.js?v=214"></script>
-  <script src="platoons-v15-real.js?v=214"></script>
+  <script src="platoons-v15-real.js?v=215"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
