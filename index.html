@@ -433,8 +433,34 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .auth-foot{font-size:var(--fs-data);color:var(--muted);text-align:center;margin-top:18px}.auth-message{display:none;margin-top:14px;padding:9px 10px;border-radius:10px;font-size:var(--fs-data)}
 .auth-message.error{display:block;background:rgba(255,59,48,.10);color:#ff9b96;border:1px solid rgba(255,59,48,.2)}
 .auth-message.ok{display:block;background:rgba(35,197,82,.08);color:#8ee8aa;border:1px solid rgba(35,197,82,.2)}
-.user-tools{display:flex;align-items:center;gap:7px}.user-chip{font-size:var(--fs-data);font-weight:850;color:var(--accent);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-tools{display:flex;align-items:center;gap:7px}
+.user-chip{font-size:var(--fs-data);font-weight:850;color:var(--accent);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini-link{border:0;background:none;color:var(--muted);font-size:var(--fs-data);font-weight:800;padding:2px;cursor:pointer}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.user-menu{position:relative;z-index:6}
+.user-menu-btn{
+  display:inline-flex;align-items:center;gap:6px;max-width:160px;
+  border:1px solid rgba(212,175,106,.28);background:rgba(20,17,14,.55);
+  color:var(--text);border-radius:999px;padding:6px 10px 6px 12px;
+  font:inherit;cursor:pointer;line-height:1.1
+}
+.user-menu-btn:hover,.user-menu-btn[aria-expanded="true"]{border-color:rgba(212,175,106,.5);background:rgba(42,34,24,.7)}
+.user-menu-btn .user-chip{max-width:92px;color:var(--accent)}
+.user-menu-gear{font-size:15px;opacity:.9;line-height:1}
+.user-menu-panel{
+  position:absolute;right:0;top:calc(100% + 6px);min-width:168px;
+  display:grid;gap:2px;padding:6px;
+  border:1px solid rgba(212,175,106,.28);border-radius:12px;
+  background:rgba(18,15,12,.97);box-shadow:0 12px 28px rgba(0,0,0,.45);
+}
+.user-menu-panel[hidden]{display:none!important}
+.user-menu-panel button{
+  border:0;background:transparent;color:var(--text);text-align:left;
+  font:inherit;font-size:var(--fs-data);font-weight:800;padding:10px 11px;border-radius:8px;cursor:pointer
+}
+.user-menu-panel button:hover{background:rgba(212,175,106,.12);color:var(--accent)}
+.user-menu-panel .user-menu-signout{color:#ffb4ae}
+.user-menu-panel .user-menu-signout:hover{background:rgba(255,90,80,.12);color:#ffd0cc}
 .swing-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .swing-card{padding:14px}.swing-card h3{margin:0 0 4px;font-size:var(--fs-data)}.swing-card p{margin:0 0 9px;font-size:var(--fs-data);color:var(--muted)}
 .swing-card textarea{width:100%;min-height:86px;resize:vertical;border:1px solid var(--line);background:#0d1713;color:var(--text);border-radius:11px;padding:10px;font:inherit;font-size:var(--fs-data);line-height:1.45;outline:none}
@@ -443,7 +469,14 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .game-keys-card{margin:12px 0}.game-key-group{padding:10px 0;border-bottom:1px solid var(--line)}.game-key-group:last-child{border-bottom:0}
 .game-key-group strong{font-size:var(--fs-subtitle)}.game-key-list{margin-top:5px;display:flex;gap:6px;flex-wrap:wrap}.game-key-pill{font-size:var(--fs-data);border:1px solid rgba(184,234,104,.22);background:rgba(184,234,104,.05);padding:6px 10px;border-radius:999px;text-transform:capitalize}
 .groups-hero{padding:20px}.groups-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.group-feature{padding:14px}.group-feature h3{font-size:var(--fs-data);margin:5px 0}.coming-badge{display:inline-block;border:1px solid rgba(184,234,104,.25);color:var(--accent);border-radius:999px;padding:4px 7px;font-size:var(--fs-data);font-weight:900}
-@media(max-width:640px){.swing-grid,.groups-grid{grid-template-columns:1fr}.user-chip{display:none}.user-tools{gap:3px}.mini-link{font-size:var(--fs-data)}}
+@media(max-width:640px){
+  .swing-grid,.groups-grid{grid-template-columns:1fr}
+  .user-tools{gap:3px}
+  .mini-link{font-size:var(--fs-data)}
+  .topbar-right{gap:6px}
+  .user-menu-btn{padding:6px 8px;max-width:132px}
+  .user-menu-btn .user-chip{max-width:72px}
+}
 
 .gr-brand{display:flex;align-items:center;gap:10px;justify-self:start}.gr-mark{width:48px;height:48px;border:2px solid var(--accent);border-radius:50%;display:grid;place-items:center;position:relative;background:#102019;box-shadow:inset 0 0 0 3px #102019,0 0 0 1px rgba(184,234,104,.2)}.gr-mark:before,.gr-mark:after{content:"";position:absolute;background:var(--accent);opacity:.55}.gr-mark:before{width:1px;height:100%;left:50%}.gr-mark:after{height:1px;width:100%;top:50%}.gr-cross{font-size:var(--fs-subtitle);font-weight:950;letter-spacing:-.06em;color:#f5f7f6;z-index:1}.gr-flag{position:absolute;font-size:var(--fs-data);color:var(--accent);right:4px;top:4px;z-index:2}.gr-word{display:grid;line-height:1}.gr-word strong{font-size:var(--fs-subtitle);letter-spacing:.08em}.gr-word small{font-size:var(--fs-data);letter-spacing:.12em;color:var(--accent);margin-top:5px;font-weight:850}@media(max-width:520px){.gr-word small{display:none}.gr-word strong{font-size:var(--fs-data)}.gr-mark{width:42px;height:42px}}
 
@@ -1746,12 +1779,17 @@ body::before,body::after{opacity:0!important}
       </div>
 
       <div class="topbar-right">
-        <div class="user-tools">
-          <span id="userChip" class="user-chip"></span>
-          <button id="accountSettingsBtn" class="mini-link" type="button">Account</button>
-          <button id="logoutBtn" class="mini-link" type="button">Sign out</button>
-        </div>
         <button id="importBtn" class="button secondary">Import Round</button>
+        <div class="user-menu" id="userMenu">
+          <button id="userMenuBtn" class="user-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Account menu">
+            <span id="userChip" class="user-chip">Player</span>
+            <span class="user-menu-gear" aria-hidden="true">⚙</span>
+          </button>
+          <div id="userMenuPanel" class="user-menu-panel" role="menu" hidden>
+            <button type="button" id="accountSettingsBtn" role="menuitem">Account settings</button>
+            <button type="button" id="logoutBtn" class="user-menu-signout" role="menuitem">Sign out</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -4737,7 +4775,35 @@ document.getElementById('authForm').addEventListener('submit',async e=>{
     btn.textContent=authMode==='recovery'?'Update password':authMode==='signup'?'Create account':'Sign in';
   }
 });
+function setUserMenuOpen(open){
+  const btn=document.getElementById('userMenuBtn');
+  const panel=document.getElementById('userMenuPanel');
+  if(!btn||!panel)return;
+  btn.setAttribute('aria-expanded',open?'true':'false');
+  panel.hidden=!open;
+}
+function setTopbarDisplayName(label){
+  const chip=document.getElementById('userChip');
+  if(!chip)return;
+  const clean=String(label||'').trim().replace(/^@+/,'');
+  chip.textContent=clean||'Player';
+  chip.title=clean||'Player';
+}
+document.getElementById('userMenuBtn').onclick=e=>{
+  e.stopPropagation();
+  const open=document.getElementById('userMenuBtn')?.getAttribute('aria-expanded')==='true';
+  setUserMenuOpen(!open);
+};
+document.addEventListener('click',e=>{
+  const menu=document.getElementById('userMenu');
+  if(!menu||menu.contains(e.target))return;
+  setUserMenuOpen(false);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')setUserMenuOpen(false);
+});
 document.getElementById('logoutBtn').onclick=async()=>{
+  setUserMenuOpen(false);
   try{
     if(authSession?.access_token)await authRequest('logout',{},authSession.access_token);
   }catch{}
@@ -4746,6 +4812,7 @@ document.getElementById('logoutBtn').onclick=async()=>{
   showAuth('signin','Signed out.','ok');
 };
 document.getElementById('accountSettingsBtn').onclick=()=>{
+  setUserMenuOpen(false);
   if(typeof window.grOpenAccountSettings==='function')window.grOpenAccountSettings();
   else alert('Account settings load with Platoons. Open the Platoons tab once, then try again.');
 };
@@ -5137,8 +5204,7 @@ async function bootstrapGolfRecon(){
       applyStoredRoundDirectionPatches();
     }
     applyStoredRoundDirectionPatches();
-    const userChip=document.getElementById('userChip');
-    if(userChip)userChip.textContent='@'+(db.player.username||db.player.name||'golfer');
+    setTopbarDisplayName(db.player.username||db.player.name||'golfer');
 
     let savedCourse=null;
     try{savedCourse=localStorage.getItem('golfreconSelectedCourseId')}catch{}
@@ -5162,8 +5228,7 @@ async function bootstrapGolfRecon(){
         const meId=typeof resolveCurrentPlatoonMemberId==='function'?resolveCurrentPlatoonMemberId(p):null;
         const me=(p?.members||[]).find(m=>String(m.id)===String(meId));
         const label=(typeof window.grMemberLabel==='function'&&me)?window.grMemberLabel(me):'';
-        const chip=document.getElementById('userChip');
-        if(chip&&label&&label!=='Player')chip.textContent=label.startsWith('@')?label:('@'+label.replace(/^@/,''));
+        if(label&&label!=='Player')setTopbarDisplayName(label);
       }catch{}
     }).catch(e=>console.warn('Platoon seat claim deferred',e))}catch(e){console.warn('Platoon seat claim deferred',e)}
     return data;
