@@ -335,3 +335,8 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
   .gr-blog-reply-form{grid-template-columns:1fr; }
   .gr-blog-reply-form .button{width:100%}
 }
+
+.gr-blog-photo-btn input[type="file"]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)}
+.gr-blog-photo-btn{position:relative;overflow:hidden}
+.gr-blog-photo-btn.is-busy,.gr-blog-composer-actions .button:disabled{opacity:.65;pointer-events:none}
+.gr-blog-pending.is-busy{padding:12px 0;font-weight:700}
