@@ -3675,7 +3675,12 @@ async function pushPlatoonServer(p){
     platoonSyncError='';
     if(state.view==='groups')render();
   }catch(e){
-    platoonSyncError=String(e?.message||e||'Platoon sync unavailable');
+    const msg=String(e?.message||e||'Platoon sync unavailable');
+    platoonSyncError=msg==='ROSTER_EMAIL_DUPLICATE'
+      ?'Each roster email must be unique.'
+      :msg==='ROSTER_EMAIL_ALREADY_LINKED'
+        ?'That email is already linked to another Golf Recon account.'
+        :msg;
     if(state.view==='groups')render();
   }
 }
@@ -5586,8 +5591,8 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=205"></script>
   <script src="platoon-mission-core.js?v=196"></script>
-  <script src="platoon-hq-records.js?v=197"></script>
-  <script src="platoons-v15-real.js?v=200"></script>
+  <script src="platoon-hq-records.js?v=198"></script>
+  <script src="platoons-v15-real.js?v=202"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>

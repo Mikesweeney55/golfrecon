@@ -718,6 +718,17 @@ function preserveClientPlatoonFields(serverP,localP){
     if(side.length)serverP.clubhousePhotos=side;
   }
   if(!serverP.logoData&&localP?.logoData)serverP.logoData=localP.logoData;
+  // Keep locally entered roster emails when the server row has none yet.
+  const localMembers=Array.isArray(localP?.members)?localP.members:[];
+  for(const sm of (serverP.members||[])){
+    if(!sm||sm.email)continue;
+    const lm=localMembers.find(x=>String(x.id)===String(sm.id));
+    if(lm?.email)sm.email=String(lm.email).trim().toLowerCase();
+  }
+  if(serverP.hqMeta&&typeof serverP.hqMeta==='object'){
+    const localEmails=(localP?.hqMeta&&typeof localP.hqMeta==='object'&&localP.hqMeta.rosterEmails)||{};
+    serverP.hqMeta.rosterEmails={...(localEmails||{}),...(serverP.hqMeta.rosterEmails||{})};
+  }
   preserveMissionPhotosOnSync(serverP,localP);
   if(typeof window.grPreserveMyTimeMasters2026==='function'){
     try{window.grPreserveMyTimeMasters2026(serverP,localP)}catch{}
@@ -762,6 +773,10 @@ window.grOpenSetup=()=>{
   let pendingLogo=p.logoData||'';
   let logoCleared=false;
   p.members=Array.isArray(p.members)?p.members:[];
+  const hqEmails=(p.hqMeta&&typeof p.hqMeta==='object'&&p.hqMeta.rosterEmails&&typeof p.hqMeta.rosterEmails==='object')?p.hqMeta.rosterEmails:{};
+  for(const m of p.members){
+    if(!m.email&&hqEmails[m.id])m.email=String(hqEmails[m.id]||'').trim().toLowerCase();
+  }
   const coOptions=['<option value="">No Co-Chief selected</option>',...(p.members||[]).filter(m=>m.role!=='chief').map(m=>`<option value="${E(m.id)}" ${String(p.coChief||'')===String(m.id)?'selected':''}>${E(m.name||'Cadet')}</option>`)].join('');
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <label>Name<input id="grPName" value="${E(p.name||'')}"></label>
@@ -795,7 +810,7 @@ window.grOpenSetup=()=>{
     </div>
     <div id="grGuestPoolRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
     <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
-      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Names used for screenshot recognition. Recognition names can be comma-separated.</div></div>
+      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Full name + email claim their seat on first Golf Recon login. Recognition names can be comma-separated.</div></div>
       <button class="button secondary" id="grAddRoster" type="button">+ Player</button>
     </div>
     <div id="grRosterRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
@@ -811,7 +826,18 @@ window.grOpenSetup=()=>{
     clearBtn.hidden=!photos.length;
   };
   const drawRoster=()=>{
-    roster.innerHTML=(p.members||[]).map((m,i)=>`<div class="gr155-roster-row" data-i="${i}" style="display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px"><label style="margin-top:0">Name<input data-name value="${E(m.name||'')}"></label><label style="margin-top:0">Recognize as<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label></div>`).join('');
+    roster.innerHTML=(p.members||[]).map((m,i)=>{
+      const linked=!!m.linked;
+      const status=linked
+        ? '<span class="linked-pill" style="align-self:end;margin-bottom:8px">Linked</span>'
+        : '<span class="muted" style="align-self:end;margin-bottom:10px;font-size:var(--fs-data)">Waiting</span>';
+      return `<div class="gr155-roster-row" data-i="${i}" style="display:grid;grid-template-columns:minmax(110px,.9fr) minmax(150px,1.1fr) minmax(160px,1.2fr) auto;gap:8px;align-items:end">
+        <label style="margin-top:0">Full name<input data-name value="${E(m.name||'')}" placeholder="Ryan Sweeney" autocomplete="name"></label>
+        <label style="margin-top:0">Email<input data-email type="email" value="${E(m.email||'')}" placeholder="ryan@email.com" autocomplete="off"></label>
+        <label style="margin-top:0">Recognize as<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label>
+        ${status}
+      </div>`;
+    }).join('');
   };
   let guestPool=(typeof window.grGuestPoolOf==='function'?window.grGuestPoolOf(p):[]).map(g=>({...g,aliases:[...(g.aliases||[])]}));
   const guestRows=d.querySelector('#grGuestPoolRows');
@@ -822,7 +848,7 @@ window.grOpenSetup=()=>{
   drawRoster();
   drawGuestPool();
   d.querySelector('#grAddRoster').onclick=()=>{
-    p.members.push({id:'cadet-'+Date.now(),name:'New Player',role:'cadet',linked:false,aliases:[]});
+    p.members.push({id:'cadet-'+Date.now(),name:'New Player',role:'cadet',linked:false,aliases:[],email:''});
     drawRoster();
   };
   d.querySelector('#grAddGuestPool').onclick=()=>{
@@ -953,12 +979,27 @@ window.grOpenSetup=()=>{
     else if(pendingLogo)p.logoData=pendingLogo;
     p.clubhousePhotos=photos.slice(0,8);
     writeClubhousePhotosSide(p,p.clubhousePhotos);
-    [...roster.querySelectorAll('.gr155-roster-row')].forEach(row=>{
-      const m=p.members[Number(row.dataset.i)];if(!m)return;
+    const emails=[];
+    for(const row of [...roster.querySelectorAll('.gr155-roster-row')]){
+      const m=p.members[Number(row.dataset.i)];if(!m)continue;
       m.name=row.querySelector('[data-name]').value.trim()||m.name;
+      m.email=(row.querySelector('[data-email]')?.value||'').trim().toLowerCase();
       m.aliases=row.querySelector('[data-alias]').value.split(',').map(x=>x.trim()).filter(Boolean);
       m.nickname=m.aliases.join(', ');
-    });
+      if(m.email){
+        if(!m.email.includes('@')){
+          alert(`Check the email for ${m.name||'this player'}.`);
+          return;
+        }
+        emails.push(m.email);
+      }
+    }
+    if(emails.length&&new Set(emails).size!==emails.length){
+      alert('Each player needs a unique email — the same address is on more than one roster seat.');
+      return;
+    }
+    p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+    p.hqMeta.rosterEmails=Object.fromEntries((p.members||[]).filter(m=>m.id&&m.email).map(m=>[m.id,m.email]));
     savePlatoonLocal(p);
     if(typeof window.grRefreshAtmos==='function')window.grRefreshAtmos();
     closeModal();
