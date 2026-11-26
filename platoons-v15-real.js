@@ -148,6 +148,72 @@ function rememberBlogPhoto(p,postId,dataUrl){
   map[postId]=dataUrl;
   writeBlogPhotosSide(p,map);
 }
+/** Re-attach locker photo bytes after sync (server hq_meta never keeps reliable data-URLs). */
+function hydrateBlogPhotos(p){
+  if(!p)return p;
+  p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+  if(!Array.isArray(p.hqMeta.blogPosts))p.hqMeta.blogPosts=[];
+  const map=readBlogPhotosSide(p);
+  let sideDirty=false;
+  for(const post of p.hqMeta.blogPosts){
+    if(!post||typeof post!=='object')continue;
+    const id=String(post.photoId||post.id||'');
+    if(post.photoData&&String(post.photoData).startsWith('data:')){
+      if(id&&map[id]!==post.photoData){map[id]=post.photoData;sideDirty=true}
+      post.hasPhoto=true;
+      if(id)post.photoId=id;
+      continue;
+    }
+    if(id&&map[id]){
+      post.photoData=map[id];
+      post.hasPhoto=true;
+      post.photoId=id;
+    }
+  }
+  if(sideDirty){
+    try{writeBlogPhotosSide(p,map)}catch(e){console.warn('Locker photo hydrate save failed',e)}
+  }
+  return p;
+}
+/** Persist photo bytes to side storage and strip them from the object we stringify into the main platoon key. */
+function preparePlatoonForLocalWrite(p){
+  if(!p)return p;
+  hydrateBlogPhotos(p);
+  let copy;
+  try{copy=JSON.parse(JSON.stringify(p))}catch{return p}
+  const posts=copy?.hqMeta?.blogPosts;
+  if(Array.isArray(posts)){
+    for(const post of posts){
+      if(!post)continue;
+      if(post.photoData&&String(post.photoData).startsWith('data:')){
+        try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(e){console.warn(e)}
+      }
+      delete post.photoData;
+    }
+  }
+  return copy;
+}
+/** Server snapshot: never ship multi-hundred-KB data URLs in hq_meta. */
+function snapshotPlatoonForServer(p){
+  hydrateBlogPhotos(p);
+  let copy;
+  try{copy=JSON.parse(JSON.stringify(p))}catch{return p}
+  const posts=copy?.hqMeta?.blogPosts;
+  if(Array.isArray(posts)){
+    for(const post of posts){
+      if(!post)continue;
+      if(post.photoData&&String(post.photoData).startsWith('data:')){
+        try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch{}
+      }
+      delete post.photoData;
+      // Keep hasPhoto + photoId so other devices know a photo exists (bytes stay local for now).
+    }
+  }
+  return copy;
+}
+window.grHydrateBlogPhotos=hydrateBlogPhotos;
+window.grPreparePlatoonForLocalWrite=preparePlatoonForLocalWrite;
+window.grSnapshotPlatoonForServer=snapshotPlatoonForServer;
 function relativeBlogTime(iso){
   const t=Date.parse(iso||'');
   if(!Number.isFinite(t))return '';
@@ -182,6 +248,7 @@ function canModerateBlog(p,post){
 }
 function blogToneLabel(tone){return (BLOG_TONES.find(t=>t.id===tone)||BLOG_TONES[4]).label}
 function blogPostsSorted(p){
+  hydrateBlogPhotos(p);
   const posts=typeof window.grBlogPostsOf==='function'?window.grBlogPostsOf(p):(p?.hqMeta?.blogPosts||[]);
   return (posts||[]).slice().sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
 }
@@ -189,6 +256,16 @@ function saveBlogPosts(p,posts,{push=true}={}){
   p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
   p.hqMeta.blogPosts=posts;
   if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
+  // Ensure side storage has every photo before sync can rewrite hqMeta without bytes.
+  for(const post of (p.hqMeta.blogPosts||[])){
+    if(post?.photoData&&String(post.photoData).startsWith('data:')){
+      try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(err){
+        alert(err?.message||'Could not save photo.');
+        return;
+      }
+    }
+  }
+  hydrateBlogPhotos(p);
   if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,push);
   else if(typeof writePlatoonLocal==='function'){writePlatoonLocal(p);renderGroups()}
   else renderGroups();
@@ -982,12 +1059,21 @@ function preserveClientPlatoonFields(serverP,localP){
       ?window.grMergeBlogPosts(serverBlog,localBlog)
       :[...serverBlog,...localBlog];
   }
-  // Blog photo bytes live in side storage — keep local map across sync.
+  // Blog photo bytes live in side storage — keep local map across sync, then rehydrate posts.
   try{
     const localMap=readBlogPhotosSide(localP||serverP);
     const serverMap=readBlogPhotosSide(serverP);
     writeBlogPhotosSide(serverP,{...serverMap,...localMap});
   }catch{}
+  try{
+    // Also harvest any photoData still on the local posts before server snapshot wins.
+    for(const post of (localP?.hqMeta?.blogPosts||[])){
+      if(post?.photoData&&String(post.photoData).startsWith('data:')){
+        try{rememberBlogPhoto(serverP,post.photoId||post.id,post.photoData)}catch{}
+      }
+    }
+  }catch{}
+  hydrateBlogPhotos(serverP);
   hydrateRosterProfiles(serverP);
   preserveMissionPhotosOnSync(serverP,localP);
   if(typeof window.grPreserveMyTimeMasters2026==='function'){

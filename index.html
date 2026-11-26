@@ -3791,9 +3791,17 @@ function loadPlatoonLocal(){
       }
     }catch{}
   }
+  if(typeof window.grHydrateBlogPhotos==='function'){
+    try{window.grHydrateBlogPhotos(p)}catch{}
+  }
   return p;
 }
-function writePlatoonLocal(p){try{localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(p))}catch{}}
+function writePlatoonLocal(p){
+  try{
+    const toStore=typeof window.grPreparePlatoonForLocalWrite==='function'?window.grPreparePlatoonForLocalWrite(p):p;
+    localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(toStore));
+  }catch(e){console.warn('writePlatoonLocal failed',e)}
+}
 function savePlatoonLocal(p,push=true){writePlatoonLocal(p);render();if(push)queuePlatoonServerSave(p)}
 function queuePlatoonServerSave(p){
   if(window.grTestEnvActive){console.warn('[gr-test-env] Platoon server save skipped (TEST build)');return}
@@ -3802,10 +3810,12 @@ function queuePlatoonServerSave(p){
 async function pushPlatoonServer(p){
   if(window.grTestEnvActive){console.warn('[gr-test-env] Platoon server push skipped (TEST build)');return}
   try{
-    const out=await callPlatoonFunction({action:'save_state',snapshot:p});
+    const snapshot=typeof window.grSnapshotPlatoonForServer==='function'?window.grSnapshotPlatoonForServer(p):p;
+    const out=await callPlatoonFunction({action:'save_state',snapshot});
     if(out?.platoon){
       let merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,p):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||p.hqMeta});
       if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,p);
+      if(typeof window.grHydrateBlogPhotos==='function')window.grHydrateBlogPhotos(merged);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
     }
@@ -3830,6 +3840,7 @@ async function syncPlatoonFromServer(){
     if(out?.platoon){
       let merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,localBefore):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore.hqMeta});
       if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,localBefore);
+      if(typeof window.grHydrateBlogPhotos==='function')window.grHydrateBlogPhotos(merged);
       if(typeof window.grHydrateAllScorecardSeeds==='function')window.grHydrateAllScorecardSeeds(merged);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
@@ -5865,8 +5876,8 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=206"></script>
   <script src="platoon-mission-core.js?v=197"></script>
-  <script src="platoon-hq-records.js?v=210"></script>
-  <script src="platoons-v15-real.js?v=210"></script>
+  <script src="platoon-hq-records.js?v=211"></script>
+  <script src="platoons-v15-real.js?v=211"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
