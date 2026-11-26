@@ -4446,7 +4446,14 @@ function render(){
  }
  const globalCourseBar=document.querySelector('.global-course-bar');
  if(globalCourseBar)globalCourseBar.style.display=['pregame','groups'].includes(state.view)?'none':'grid';
- app.innerHTML=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():myGame();
+ let viewHtml='';
+ try{
+   viewHtml=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():myGame();
+ }catch(e){
+   console.error('View render failed',state.view,e);
+   viewHtml=`<div class="card bootstrap-card"><strong>Could not open this screen.</strong><div class="bootstrap-error">${safeText(e?.message||e)}</div><div class="muted" style="margin-top:10px">Try another tab, or refresh. If it keeps failing, tell Chief which tab broke.</div></div>`;
+ }
+ app.innerHTML=viewHtml;
  document.querySelectorAll('[data-hole-preview]').forEach(b=>b.addEventListener('click',e=>{
    e.preventDefault();e.stopPropagation();openHolePreview(Number(b.dataset.holePreview),state.selectedCourseId);
  }));
@@ -4520,7 +4527,7 @@ function render(){
  });
 
 }
-window.setView = v => {state.view=v; render();};
+window.setView = v => {state.view=v; try{render()}catch(e){console.error('setView render failed',v,e)}};
 
 window.openCourseMemory=()=>{
   state.roundCourseId=state.selectedCourseId;
@@ -4528,7 +4535,12 @@ window.openCourseMemory=()=>{
   render();
   requestAnimationFrame(()=>document.getElementById('courseMemorySection')?.scrollIntoView({behavior:'smooth',block:'start'}));
 };
-document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>{setView(b.dataset.view);if(b.dataset.view==='groups')syncPlatoonFromServer()}));
+document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>{
+  const view=b.dataset.view;
+  setView(view);
+  // Never block navigation on sync — fire and forget after the screen paints.
+  if(view==='groups')Promise.resolve().then(()=>syncPlatoonFromServer()).catch(e=>console.warn('Platoon sync after nav failed',e));
+}));
 
 const globalCourseSelect=document.getElementById('globalCourseSelect');
 if(globalCourseSelect)globalCourseSelect.addEventListener('change',()=>setGlobalCourse(globalCourseSelect.value));
@@ -5837,7 +5849,7 @@ initializeAuth();
   <script src="platoon-recap-shared.js?v=206"></script>
   <script src="platoon-mission-core.js?v=197"></script>
   <script src="platoon-hq-records.js?v=199"></script>
-  <script src="platoons-v15-real.js?v=205"></script>
+  <script src="platoons-v15-real.js?v=207"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>

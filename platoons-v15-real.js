@@ -217,7 +217,8 @@ function warEndOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR_END:([^\]]*)\
 function composeNotes(base,guests=[],warId='',warEnd=''){let s=cleanNotes(base);if(guests.length)s+=`${s?'\n':''}[[GR_GUESTS:${JSON.stringify(guests)}]]`;if(warId)s+=`${s?'\n':''}[[GR_WAR:${warId}]]`;if(warEnd)s+=`${s?'\n':''}[[GR_WAR_END:${warEnd}]]`;return s}
 function membersOf(p){return (p.members||[]).filter(m=>m.status!=='inactive')}
 function memberLabel(m){
-  if(typeof window.grMemberLabel==='function')return window.grMemberLabel(m);
+  // Do NOT call window.grMemberLabel here — this function is assigned to it below.
+  // Delegating caused infinite recursion and broke every nav click after display-name work shipped.
   const show=String(m?.displayName||'').trim();
   return show||String(m?.name||'').trim()||'Player';
 }
