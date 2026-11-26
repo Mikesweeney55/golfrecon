@@ -1879,7 +1879,7 @@ body::before,body::after{opacity:0!important}
           <span>Scorecard, stats, putting, or miss-pattern screens</span>
         </label>
         <div id="backfillFileList" class="file-list"></div>
-        <div class="backfill-note">GolfRecon will only fill fields that are currently blank. Existing round data will not be replaced.</div>
+        <div class="backfill-note">GolfRecon will only fill fields that are currently blank — including hole-by-hole fairway/green miss arrows when those screenshots show them. Existing scores and stats are not replaced.</div>
         <div id="backfillStatus" class="import-status"></div>
         <div class="dialog-actions">
           <button id="analyzeBackfill" class="button primary" type="button">Analyze Screenshots</button>
@@ -2020,6 +2020,34 @@ function puttingForCourse(c){
 function puttingCourseOptions(){
   return [...new Set(db.puttingDetails.map(p=>p.course))].sort((a,b)=>a.localeCompare(b));
 }
+/** Fill blank hole-direction / distribution fields on an existing round from a parsed scorecard. Never overwrites. */
+function applyParsedDirectionsToRound(r,parsed){
+  if(!r||!parsed)return false;
+  const pr=parsed.round||parsed;
+  const hd=pr.holes_detail||pr.hole_details||[];
+  let changed=false;
+  const fd=pr.fairway_distribution;
+  if(fd&&!r.fairwayDistribution){
+    r.fairwayDistribution={hitPct:Number(fd.hit_pct)||0,missLeftPct:Number(fd.left_pct)||0,missRightPct:Number(fd.right_pct)||0,missShortPct:Number(fd.short_pct)||0,missLongPct:Number(fd.long_pct)||0,missFairwaysHitPct:Number(fd.other_pct)||0};
+    changed=true;
+  }
+  const gd=pr.gir_distribution;
+  if(gd&&!r.girDistribution){
+    r.girDistribution={hitPct:Number(gd.hit_pct)||0,missShortPct:Number(gd.short_pct)||0,missLeftPct:Number(gd.left_pct)||0,missRightPct:Number(gd.right_pct)||0,missLongPct:Number(gd.long_pct)||0,missGirPct:Number(gd.other_pct)||0,noChancePct:Number(gd.no_chance_pct)||0};
+    changed=true;
+  }
+  if(hd.length){
+    const cc=course(r.courseId);
+    const nums=cc?.holeNumbers||Array.from({length:r.holes||hd.length},(_,i)=>i+1);
+    const fwDirs=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'fairway'));
+    const girDirs=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'gir'));
+    const nextFw=fillBlankArray(r.fairwayDirections,fwDirs);
+    const nextGir=fillBlankArray(r.girDirections,girDirs);
+    if(JSON.stringify(nextFw)!==JSON.stringify(r.fairwayDirections||[])){r.fairwayDirections=nextFw;changed=true}
+    if(JSON.stringify(nextGir)!==JSON.stringify(r.girDirections||[])){r.girDirections=nextGir;changed=true}
+  }
+  return changed;
+}
 function applyDirectionalDataFromImports(imports){
   for(const row of (imports||[])){
     const pr=row?.parsed?.round||row?.parsed;
@@ -2032,17 +2060,7 @@ function applyDirectionalDataFromImports(imports){
       });
     }
     if(!r)continue;
-    const fd=pr.fairway_distribution;
-    if(fd)r.fairwayDistribution={hitPct:Number(fd.hit_pct)||0,missLeftPct:Number(fd.left_pct)||0,missRightPct:Number(fd.right_pct)||0,missShortPct:Number(fd.short_pct)||0,missLongPct:Number(fd.long_pct)||0,missFairwaysHitPct:Number(fd.other_pct)||0};
-    const gd=pr.gir_distribution;
-    if(gd)r.girDistribution={hitPct:Number(gd.hit_pct)||0,missShortPct:Number(gd.short_pct)||0,missLeftPct:Number(gd.left_pct)||0,missRightPct:Number(gd.right_pct)||0,missLongPct:Number(gd.long_pct)||0,missGirPct:Number(gd.other_pct)||0,noChancePct:Number(gd.no_chance_pct)||0};
-    const hd=pr.holes_detail||pr.hole_details||[];
-    if(hd.length){
-      const cc=course(r.courseId);
-      const nums=cc?.holeNumbers||Array.from({length:r.holes||hd.length},(_,i)=>i+1);
-      r.fairwayDirections=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'fairway'));
-      r.girDirections=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'gir'));
-    }
+    applyParsedDirectionsToRound(r,row.parsed||pr);
   }
 }
 
@@ -4043,8 +4061,7 @@ function roundsView(){
  const selectedCourse=state.roundCourseId==='all'?null:course(state.roundCourseId);
  const list=sorted.map(r=>{
    const c=course(r.courseId),diff=scoreDifferential(r),sel=String(state.selectedRoundId)===String(r.id);
-   const g=missingRoundStats(r),basicMissing=g.fw+g.gir+g.putts;
-   const status=basicMissing?`<span class="round-status missing">Missing stats</span>`:g.firstPutts?`<span class="round-status warn">Putt detail missing</span>`:`<span class="round-status complete">Complete ✓</span>`;
+   const status=roundCompletenessStatusHtml(r);
    const expand=sel?`<div class="round-scorecard-expand" data-round-expand="${r.id}">${personalRoundScorecardHtml(r)}</div>`:'';
    return `<div class="round-block ${sel?'is-open':''}">
      <div class="round-row round-summary has-edit ${sel?'selected':''}" data-round-row="${r.id}" role="button" tabindex="0" aria-expanded="${sel?'true':'false'}" aria-label="${safeText(c?.name||'Round')} ${fmtDate(r.date)}, score ${r.gross}">
@@ -4367,15 +4384,34 @@ function missingRoundStats(r){
   const c=course(r.courseId);
   const n=r.holes||c?.holeNumbers?.length||0;
   const pars=c?.pars||[];
-  let fw=0,gir=0,putts=0;
+  let fw=0,gir=0,putts=0,fwDir=0,girDir=0;
   for(let i=0;i<n;i++){
     if(pars[i]!==3 && !validBinaryStat(r.fairways?.[i]))fw++;
     if(!validBinaryStat(r.gir?.[i]))gir++;
     if(!validCountStat(r.putts?.[i]))putts++;
+    // Miss directions: hit is implied by FH/GIR ✓; a miss needs L/R/Short/Long.
+    if(pars[i]!==3 && validBinaryStat(r.fairways?.[i])){
+      const hit=binaryStatValue(r.fairways[i])===1;
+      const d=normalizeDirection(r.fairwayDirections?.[i]);
+      if(!hit && !d)fwDir++;
+    }
+    if(validBinaryStat(r.gir?.[i])){
+      const hit=binaryStatValue(r.gir[i])===1;
+      const d=normalizeDirection(r.girDirections?.[i]);
+      if(!hit && !d)girDir++;
+    }
   }
   const puttingKnown=new Set(db.puttingDetails.filter(p=>p.date===r.date && normalizeCourseName(p.course)===normalizeCourseName(c?.name) && Number.isFinite(Number(p.distance))).map(p=>Number(p.hole)));
   const firstPutts=Math.max(0,n-puttingKnown.size);
-  return {fw,gir,putts,firstPutts};
+  return {fw,gir,putts,firstPutts,fwDir,girDir,missDirs:fwDir+girDir};
+}
+/** Round list badge: Complete only when FH/GIR/putts, miss directions, and first-putt detail are present. */
+function roundCompletenessStatusHtml(r){
+  const g=missingRoundStats(r);
+  if(g.fw+g.gir+g.putts)return `<span class="round-status missing">Missing stats</span>`;
+  if(g.missDirs)return `<span class="round-status warn">Miss detail missing</span>`;
+  if(g.firstPutts)return `<span class="round-status warn">Putt detail missing</span>`;
+  return `<span class="round-status complete">Complete ✓</span>`;
 }
 function openBackfillRound(roundId){
   const r=db.rounds.find(x=>String(x.id)===String(roundId));
@@ -4390,6 +4426,8 @@ function openBackfillRound(roundId){
       <span class="backfill-gap">${g.fw} FH gaps</span>
       <span class="backfill-gap">${g.gir} GIR gaps</span>
       <span class="backfill-gap">${g.putts} putt gaps</span>
+      <span class="backfill-gap">${g.fwDir} FH miss-dir gaps</span>
+      <span class="backfill-gap">${g.girDir} GIR miss-dir gaps</span>
       <span class="backfill-gap">${g.firstPutts} first-putt gaps</span>
     </div>`;
   backfillFiles.value='';
@@ -4431,9 +4469,17 @@ document.getElementById('analyzeBackfill').onclick=async()=>{
       action:'parse',
       mode:'backfill',
       source:'18Birdies',
-      note:`Backfill target only: ${c.name}; date ${target.date}; tees ${c.tees}; gross ${target.gross}; ${target.holes} holes. Extract only data actually visible in the screenshots.`,
+      note:`Backfill target only: ${c.name}; date ${target.date}; tees ${c.tees}; gross ${target.gross}; ${target.holes} holes. Extract only data actually visible in the screenshots. Prefer hole-by-hole fairway_direction and gir_direction (hit/left/right/short/long) when miss arrows are visible.`,
       images
     });
+    normalizeParsedRound(result);
+    try{
+      backfillStatus.textContent='Reading hole-by-hole miss directions…';
+      const directional=await callPlatoonFunction({action:'parse_personal_round_directions',images});
+      mergeHoleDirectionsIntoParsed(result,directional);
+    }catch(e){
+      console.warn('Directional hole parser unavailable during backfill; continuing with standard parse.',e);
+    }
     pendingBackfill=result;
     backfillReview.innerHTML=reviewHtml(result);
     backfillUploadStep.style.display='none';
@@ -4455,9 +4501,13 @@ document.getElementById('saveBackfill').onclick=async()=>{
     const result=await callImportFunction({action:'backfill',round_id:roundId,parsed:pendingBackfill});
     btn.textContent='Added ✓';
     await bootstrapGolfRecon();
+    const local=db.rounds.find(x=>String(x.id)===String(roundId));
+    if(local&&applyParsedDirectionsToRound(local,pendingBackfill)){
+      try{if(typeof save==='function')save()}catch{}
+    }
     backfillDlg.close();
     if(result?.filled){
-      setTimeout(()=>alert(`Backfill complete. Added ${result.filled} missing stat${result.filled===1?'':'s'}.`),150);
+      setTimeout(()=>alert(`Backfill complete. Added ${result.filled} missing stat${result.filled===1?'':'s'}. Existing values were left alone.`),150);
     }
   }catch(e){
     alert(e.message);
@@ -5327,6 +5377,7 @@ document.getElementById('saveImport').onclick=async()=>{
   const btn=document.getElementById('saveImport');
   try{
     btn.disabled=true;
+    let targetId=existing?.id||null;
     if(existing){
       btn.textContent='Updating…';
       await callImportFunction({action:'backfill',round_id:existing.id,parsed:pendingImport});
@@ -5337,6 +5388,7 @@ document.getElementById('saveImport').onclick=async()=>{
       if(result.duplicate){
         const nowExisting=findExistingRoundForParsed(pendingImport);
         if(nowExisting){
+          targetId=nowExisting.id;
           btn.textContent='Updating…';
           await callImportFunction({action:'backfill',round_id:nowExisting.id,parsed:pendingImport});
           btn.textContent='Updated ✓';
@@ -5346,6 +5398,10 @@ document.getElementById('saveImport').onclick=async()=>{
       }else btn.textContent='Saved ✓';
     }
     await bootstrapGolfRecon();
+    const local=targetId?db.rounds.find(x=>String(x.id)===String(targetId)):findExistingRoundForParsed(pendingImport);
+    if(local&&applyParsedDirectionsToRound(local,pendingImport)){
+      try{if(typeof save==='function')save()}catch{}
+    }
     setTimeout(()=>{dlg.close()},400);
   }catch(e){
     alert(e.message);
