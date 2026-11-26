@@ -171,6 +171,31 @@ function rosterEmailsFromSnapshot(snapshot:any){
   }
   return out;
 }
+function rosterProfilesFromSnapshot(snapshot:any){
+  const out:Record<string,{fullName:string,displayName:string}>={};
+  for(const m of (Array.isArray(snapshot?.members)?snapshot.members:[])){
+    const id=keyFor(m?.id,"");
+    if(!id)continue;
+    const fullName=text(m?.name);
+    const displayName=text(m?.displayName)||text(m?.display_name);
+    if(fullName||displayName)out[id]={fullName,displayName};
+  }
+  const fromMeta=(snapshot?.hqMeta&&typeof snapshot.hqMeta==="object"&&snapshot.hqMeta.rosterProfiles&&typeof snapshot.hqMeta.rosterProfiles==="object")
+    ?snapshot.hqMeta.rosterProfiles:{};
+  for(const [id,prof] of Object.entries(fromMeta||{})){
+    const key=keyFor(id,"");
+    if(!key||!prof||typeof prof!=="object")continue;
+    const fullName=text((prof as any).fullName||(prof as any).name)||out[key]?.fullName||"";
+    const displayName=text((prof as any).displayName)||out[key]?.displayName||"";
+    if(fullName||displayName)out[key]={fullName,displayName};
+  }
+  return out;
+}
+function publicDisplayName(m:any,profiles?:Record<string,{fullName:string,displayName:string}>){
+  const id=keyFor(m?.id||m?.client_key,"");
+  const prof=id&&profiles?profiles[id]:null;
+  return text(m?.displayName)||text(m?.display_name)||text(prof?.displayName)||text(m?.name)||text(prof?.fullName)||"Cadet";
+}
 function schemaError(error:any){
   const m=String(error?.message||"");
   return error?.code==="42P01" || /does not exist/i.test(m) || /column .* does not exist/i.test(m);
@@ -559,15 +584,20 @@ async function readPlatoonState(supabase:any,platoonId:string){
   const co=(members||[]).find((m:any)=>m.role==="co_chief");
   const hqEmails=(hq.hqMeta&&typeof hq.hqMeta==="object"&&hq.hqMeta.rosterEmails&&typeof hq.hqMeta.rosterEmails==="object")
     ? hq.hqMeta.rosterEmails:{};
+  const hqProfiles=(hq.hqMeta&&typeof hq.hqMeta==="object"&&hq.hqMeta.rosterProfiles&&typeof hq.hqMeta.rosterProfiles==="object")
+    ? hq.hqMeta.rosterProfiles:{};
   const state:any={
     id:p.id,serverId:p.id,name:p.name,motto:p.motto||"",season:p.season_year,
     visibility:p.visibility==="invite_only"?"Invite only":"Private",logoData:p.logo_data_url||"",
-    chief:chief?.display_name||"",coChief:co?.client_key||co?.id||"",
+    chief:publicDisplayName(chief,hqProfiles)||chief?.display_name||"",coChief:co?.client_key||co?.id||"",
     members:(members||[]).map((m:any)=>{
       const id=m.client_key||m.id;
       const email=normEmail(m.invite_email)||normEmail(hqEmails[id])||"";
+      const prof=hqProfiles[id]||{};
+      const fullName=text(prof.fullName)||text(m.display_name);
+      const displayName=text(prof.displayName)||(text(prof.fullName)?text(m.display_name):"");
       return {
-        id,serverId:m.id,name:m.display_name,nickname:m.nickname||"",aliases:aliasesFor(m.nickname),
+        id,serverId:m.id,name:fullName,displayName,nickname:m.nickname||"",aliases:aliasesFor(m.nickname),
         email,linked:!!m.user_id,role:m.role
       };
     }),
@@ -583,6 +613,7 @@ async function readPlatoonState(supabase:any,platoonId:string){
   if(hq.supported){
     const meta={...(hq.hqMeta||{})};
     meta.rosterEmails=rosterEmailsFromSnapshot(state);
+    meta.rosterProfiles=rosterProfilesFromSnapshot(state);
     state.hqMeta=meta;
   }
   return state;
@@ -600,8 +631,13 @@ async function upsertMembers(supabase:any,user:any,platoonId:string,snapshot:any
   const byKey=new Map((existing||[]).filter((m:any)=>m.client_key).map((m:any)=>[m.client_key,m]));
   const chiefRow=(existing||[]).find((m:any)=>m.role==="chief");
   const chiefIncoming=incoming.find((m:any)=>m.role==="chief")||incoming.find((m:any)=>m.linked);
+  const profiles=rosterProfilesFromSnapshot(snapshot||{});
   if(chiefRow&&chiefIncoming){
-    const patch:any={display_name:text(chiefIncoming.name)||chiefRow.display_name,client_key:keyFor(chiefIncoming.id,chiefRow.client_key||"chief")};
+    const chiefKey=keyFor(chiefIncoming.id,chiefRow.client_key||"chief");
+    const patch:any={
+      display_name:publicDisplayName(chiefIncoming,profiles)||chiefRow.display_name,
+      client_key:chiefKey
+    };
     const aliasInput=memberAliasInput(chiefIncoming);
     if(aliasInput.present)patch.nickname=nicknameFor(aliasInput.aliases);
     if(emailCol)patch.invite_email=normEmail(chiefIncoming.email)||null;
@@ -612,7 +648,7 @@ async function upsertMembers(supabase:any,user:any,platoonId:string,snapshot:any
     if(m?.role==="chief")continue;
     const found=byKey.get(clientKey);
     const role=allowRoleChanges?(m?.role==="co_chief"?"co_chief":((m?.linked||found?.user_id)?"member":"cadet")):(found?.role||"cadet");
-    const row:any={display_name:text(m?.name)||"Cadet",client_key:clientKey,status:"active",role};
+    const row:any={display_name:publicDisplayName(m,profiles)||"Cadet",client_key:clientKey,status:"active",role};
     const aliasInput=memberAliasInput(m);
     if(aliasInput.present)row.nickname=nicknameFor(aliasInput.aliases);
     if(emailCol)row.invite_email=normEmail(m?.email)||null;
@@ -703,12 +739,45 @@ async function saveState(supabase:any,user:any,snapshot:any){
   if(probe.supported){
     const meta={...((snapshot?.hqMeta&&typeof snapshot.hqMeta==="object")?snapshot.hqMeta:(probe.hqMeta||{}))};
     meta.rosterEmails=emails;
+    meta.rosterProfiles=rosterProfilesFromSnapshot(snapshot||{});
     update.hq_meta=meta;
   }
   const {error}=await supabase.from("golfrecon_platoons").update(update).eq("id",membership.platoon_id);
   if(error)throw error;
   await upsertMembers(supabase,user,membership.platoon_id,snapshot||{},true);
   await upsertMissions(supabase,user,membership.platoon_id,snapshot||{},true);
+  return readPlatoonState(supabase,membership.platoon_id);
+}
+
+/** Any linked member can update only their own full/display/alias names. */
+async function updateMySeat(supabase:any,user:any,body:any){
+  const membership=await activeMembership(supabase,user.id);
+  if(!membership)throw new Error("NO_PLATOON_MEMBERSHIP");
+  const fullName=text(body?.full_name)||text(body?.name);
+  const displayName=text(body?.display_name)||text(body?.displayName);
+  const aliases=aliasesFor(body?.aliases);
+  const patch:any={updated_at:new Date().toISOString()};
+  if(displayName||fullName)patch.display_name=displayName||fullName;
+  if(Array.isArray(body?.aliases)||typeof body?.aliases==="string")patch.nickname=nicknameFor(aliases);
+  if(Object.keys(patch).length>1){
+    const {error}=await supabase.from("golfrecon_platoon_members").update(patch).eq("id",membership.id);
+    if(error)throw error;
+  }
+  const probe=await readHqMetaColumn(supabase,membership.platoon_id);
+  if(probe.supported){
+    const meta={...(probe.hqMeta||{})};
+    const profiles=(meta.rosterProfiles&&typeof meta.rosterProfiles==="object")?{...meta.rosterProfiles}:{};
+    const clientKey=keyFor(membership.client_key,membership.id);
+    profiles[clientKey]={
+      fullName:fullName||text(profiles[clientKey]?.fullName),
+      displayName:displayName||text(profiles[clientKey]?.displayName)
+    };
+    meta.rosterProfiles=profiles;
+    const {error}=await supabase.from("golfrecon_platoons")
+      .update({hq_meta:meta,updated_at:new Date().toISOString()})
+      .eq("id",membership.platoon_id);
+    if(error&&!schemaError(error))throw error;
+  }
   return readPlatoonState(supabase,membership.platoon_id);
 }
 
@@ -725,6 +794,7 @@ Deno.serve(async(req)=>{
     if(body.action==="bootstrap")return response({platoon:await bootstrapState(supabase,user,body.snapshot||{})});
     if(body.action==="delete_mission")return response({platoon:await deleteMission(supabase,user,body.mission_id)});
     if(body.action==="save_state")return response({platoon:await saveState(supabase,user,body.snapshot||{})});
+    if(body.action==="update_my_seat")return response({platoon:await updateMySeat(supabase,user,body||{})});
     throw new Error("Unsupported Platoon action.");
   }catch(e:any){
     const msg=String(e?.message||e||"Unknown error");

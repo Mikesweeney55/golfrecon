@@ -216,7 +216,33 @@ function warIdOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR:([^\]]+)\]\]/)
 function warEndOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR_END:([^\]]*)\]\]/);return x?x[1]:''}
 function composeNotes(base,guests=[],warId='',warEnd=''){let s=cleanNotes(base);if(guests.length)s+=`${s?'\n':''}[[GR_GUESTS:${JSON.stringify(guests)}]]`;if(warId)s+=`${s?'\n':''}[[GR_WAR:${warId}]]`;if(warEnd)s+=`${s?'\n':''}[[GR_WAR_END:${warEnd}]]`;return s}
 function membersOf(p){return (p.members||[]).filter(m=>m.status!=='inactive')}
-function playersOf(p,m){const map=new Map(membersOf(p).map(x=>[x.id,x.name]));return (m.participants||[]).map(id=>map.get(id)).filter(Boolean)}
+function memberLabel(m){
+  if(typeof window.grMemberLabel==='function')return window.grMemberLabel(m);
+  const show=String(m?.displayName||'').trim();
+  return show||String(m?.name||'').trim()||'Player';
+}
+function playersOf(p,m){const map=new Map(membersOf(p).map(x=>[x.id,memberLabel(x)]));return (m.participants||[]).map(id=>map.get(id)).filter(Boolean)}
+function hydrateRosterProfiles(p){
+  const profiles=(p?.hqMeta&&typeof p.hqMeta==='object'&&p.hqMeta.rosterProfiles&&typeof p.hqMeta.rosterProfiles==='object')
+    ?p.hqMeta.rosterProfiles:{};
+  for(const m of (p?.members||[])){
+    const prof=profiles[m.id];
+    if(!prof)continue;
+    if(prof.fullName)m.name=prof.fullName;
+    if(prof.displayName)m.displayName=prof.displayName;
+  }
+  return p;
+}
+function rosterProfilesFromMembers(members){
+  const out={};
+  for(const m of (members||[])){
+    if(!m?.id)continue;
+    const fullName=String(m.name||'').trim();
+    const displayName=String(m.displayName||'').trim();
+    if(fullName||displayName)out[m.id]={fullName,displayName};
+  }
+  return out;
+}
 function peopleOf(p,m){return [...playersOf(p,m).map(name=>({name,guest:false})),...guestsOf(m).map(name=>({name,guest:true}))]}
 function isGuestPlayer(p,m,raw){
   const rawName=String(raw||'').trim();
@@ -285,7 +311,12 @@ function platoonStandings(p){
       .filter(r=>Number(r.played||0)>0)
       .map(r=>({name:r.name,points:r.points,played:r.played,totalPoints:r.totalPoints}));
   }
-  const members=membersOf(p),score=new Map(members.map(m=>[String(m.name||'').trim().toLowerCase(),{name:m.name,points:0,played:0,totalPoints:0}]));
+  const members=membersOf(p),score=new Map();
+  for(const m of members){
+    const entry={name:memberLabel(m),points:0,played:0,totalPoints:0};
+    const keys=[memberLabel(m),m.name,m.displayName,...setupAliasesOf(m)].map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+    for(const k of keys)if(!score.has(k))score.set(k,entry);
+  }
   for(const m of (p.missions||[])){
     if(m.type==='war'||m.status!=='completed')continue;
     if(m.league_points===false)continue;
@@ -440,7 +471,7 @@ function groupsV15(){
   return withSubNav(home);
 }
 
-function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=document.createElement('dialog');d.id='grPlatoonDialog';document.body.appendChild(d)}d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
+function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=document.createElement('dialog');d.id='grPlatoonDialog';document.body.appendChild(d)}d.className='';d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
 function closeModal(){document.getElementById('grPlatoonDialog')?.close()}
 window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW MISSION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-choice-grid"><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenMissionEditor()"><strong>Single Mission</strong><span class="muted">One competitive round — league night, Saturday game, outing</span></button><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenWarEditor()"><strong>War</strong><span class="muted">Multiple Missions under one season / league series</span></button></div>`)};
 window.grCloseModal=closeModal;
@@ -718,17 +749,23 @@ function preserveClientPlatoonFields(serverP,localP){
     if(side.length)serverP.clubhousePhotos=side;
   }
   if(!serverP.logoData&&localP?.logoData)serverP.logoData=localP.logoData;
-  // Keep locally entered roster emails when the server row has none yet.
+  // Keep locally entered roster emails / display names when the server row has none yet.
   const localMembers=Array.isArray(localP?.members)?localP.members:[];
   for(const sm of (serverP.members||[])){
-    if(!sm||sm.email)continue;
+    if(!sm)continue;
     const lm=localMembers.find(x=>String(x.id)===String(sm.id));
-    if(lm?.email)sm.email=String(lm.email).trim().toLowerCase();
+    if(!lm)continue;
+    if(!sm.email&&lm.email)sm.email=String(lm.email).trim().toLowerCase();
+    if(!sm.displayName&&lm.displayName)sm.displayName=lm.displayName;
+    if(lm.name&&(!sm.name||sm.name===sm.displayName))sm.name=lm.name;
   }
   if(serverP.hqMeta&&typeof serverP.hqMeta==='object'){
     const localEmails=(localP?.hqMeta&&typeof localP.hqMeta==='object'&&localP.hqMeta.rosterEmails)||{};
     serverP.hqMeta.rosterEmails={...(localEmails||{}),...(serverP.hqMeta.rosterEmails||{})};
+    const localProfiles=(localP?.hqMeta&&typeof localP.hqMeta==='object'&&localP.hqMeta.rosterProfiles)||{};
+    serverP.hqMeta.rosterProfiles={...(localProfiles||{}),...(serverP.hqMeta.rosterProfiles||{})};
   }
+  hydrateRosterProfiles(serverP);
   preserveMissionPhotosOnSync(serverP,localP);
   if(typeof window.grPreserveMyTimeMasters2026==='function'){
     try{window.grPreserveMyTimeMasters2026(serverP,localP)}catch{}
@@ -768,7 +805,7 @@ function setupAliasesOf(m){
 }
 
 window.grOpenSetup=()=>{
-  const p=loadPlatoonLocal();
+  const p=hydrateRosterProfiles(loadPlatoonLocal());
   let photos=clubhousePhotosOf(p).map(x=>({...x}));
   let pendingLogo=p.logoData||'';
   let logoCleared=false;
@@ -777,7 +814,7 @@ window.grOpenSetup=()=>{
   for(const m of p.members){
     if(!m.email&&hqEmails[m.id])m.email=String(hqEmails[m.id]||'').trim().toLowerCase();
   }
-  const coOptions=['<option value="">No Co-Chief selected</option>',...(p.members||[]).filter(m=>m.role!=='chief').map(m=>`<option value="${E(m.id)}" ${String(p.coChief||'')===String(m.id)?'selected':''}>${E(m.name||'Cadet')}</option>`)].join('');
+  const coOptions=['<option value="">No Co-Chief selected</option>',...(p.members||[]).filter(m=>m.role!=='chief').map(m=>`<option value="${E(m.id)}" ${String(p.coChief||'')===String(m.id)?'selected':''}>${E(memberLabel(m))}</option>`)].join('');
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <label>Name<input id="grPName" value="${E(p.name||'')}"></label>
     <label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label>
@@ -787,7 +824,7 @@ window.grOpenSetup=()=>{
       <label>Visibility<select id="grPVis"><option ${p.visibility==='Private'?'selected':''}>Private</option><option ${p.visibility==='Invite only'?'selected':''}>Invite only</option></select></label>
     </div>
     <div class="grid two">
-      <label>Platoon Chief<input value="${E((p.members||[]).find(m=>m.role==='chief')?.name||p.chief||'')}" disabled></label>
+      <label>Platoon Chief<input value="${E(memberLabel((p.members||[]).find(m=>m.role==='chief'))||p.chief||'')}" disabled></label>
       <label>Co-Chief<select id="grPCoChief">${coOptions}</select></label>
     </div>
     <div class="gr-logo-setup-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
@@ -810,11 +847,12 @@ window.grOpenSetup=()=>{
     </div>
     <div id="grGuestPoolRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
     <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
-      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Full name + email claim their seat on first Golf Recon login. Recognition names can be comma-separated.</div></div>
+      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Full name + email claims the My Time seat on first login. Alias matches scorecards. Display name is what shows on boards — players can change theirs later in Account.</div></div>
       <button class="button secondary" id="grAddRoster" type="button">+ Player</button>
     </div>
     <div id="grRosterRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
     <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);
+  d.classList.add('gr-setup-wide');
   const thumbs=d.querySelector('#grClubhouseThumbs');
   const roster=d.querySelector('#grRosterRows');
   const logoRemove=d.querySelector('#grPLogoRemove');
@@ -829,13 +867,14 @@ window.grOpenSetup=()=>{
     roster.innerHTML=(p.members||[]).map((m,i)=>{
       const linked=!!m.linked;
       const status=linked
-        ? '<span class="linked-pill" style="align-self:end;margin-bottom:8px">Linked</span>'
-        : '<span class="muted" style="align-self:end;margin-bottom:10px;font-size:var(--fs-data)">Waiting</span>';
-      return `<div class="gr155-roster-row" data-i="${i}" style="display:grid;grid-template-columns:minmax(110px,.9fr) minmax(150px,1.1fr) minmax(160px,1.2fr) auto;gap:8px;align-items:end">
+        ? '<span class="linked-pill">Linked · can edit own Account</span>'
+        : '<span class="muted" style="font-size:var(--fs-data)">Waiting to claim · same email + password signup</span>';
+      return `<div class="gr155-roster-row is-player" data-i="${i}">
         <label style="margin-top:0">Full name<input data-name value="${E(m.name||'')}" placeholder="Ryan Sweeney" autocomplete="name"></label>
         <label style="margin-top:0">Email<input data-email type="email" value="${E(m.email||'')}" placeholder="ryan@email.com" autocomplete="off"></label>
-        <label style="margin-top:0">Recognize as<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label>
-        ${status}
+        <label style="margin-top:0">Alias<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label>
+        <label style="margin-top:0">Display name<input data-display value="${E(m.displayName||'')}" placeholder="Sully" autocomplete="nickname"></label>
+        <div class="gr-roster-status">${status}</div>
       </div>`;
     }).join('');
   };
@@ -848,7 +887,7 @@ window.grOpenSetup=()=>{
   drawRoster();
   drawGuestPool();
   d.querySelector('#grAddRoster').onclick=()=>{
-    p.members.push({id:'cadet-'+Date.now(),name:'New Player',role:'cadet',linked:false,aliases:[],email:''});
+    p.members.push({id:'cadet-'+Date.now(),name:'New Player',role:'cadet',linked:false,aliases:[],email:'',displayName:''});
     drawRoster();
   };
   d.querySelector('#grAddGuestPool').onclick=()=>{
@@ -980,12 +1019,13 @@ window.grOpenSetup=()=>{
     p.clubhousePhotos=photos.slice(0,8);
     writeClubhousePhotosSide(p,p.clubhousePhotos);
     const emails=[];
-    for(const row of [...roster.querySelectorAll('.gr155-roster-row')]){
+    for(const row of [...roster.querySelectorAll('.gr155-roster-row.is-player')]){
       const m=p.members[Number(row.dataset.i)];if(!m)continue;
       m.name=row.querySelector('[data-name]').value.trim()||m.name;
       m.email=(row.querySelector('[data-email]')?.value||'').trim().toLowerCase();
       m.aliases=row.querySelector('[data-alias]').value.split(',').map(x=>x.trim()).filter(Boolean);
       m.nickname=m.aliases.join(', ');
+      m.displayName=(row.querySelector('[data-display]')?.value||'').trim();
       if(m.email){
         if(!m.email.includes('@')){
           alert(`Check the email for ${m.name||'this player'}.`);
@@ -1000,15 +1040,104 @@ window.grOpenSetup=()=>{
     }
     p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
     p.hqMeta.rosterEmails=Object.fromEntries((p.members||[]).filter(m=>m.id&&m.email).map(m=>[m.id,m.email]));
+    p.hqMeta.rosterProfiles=rosterProfilesFromMembers(p.members);
+    if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
     savePlatoonLocal(p);
     if(typeof window.grRefreshAtmos==='function')window.grRefreshAtmos();
     closeModal();
   };
 };
+function sessionEmailHint(){
+  try{
+    const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const direct=String(session?.user?.email||'').trim().toLowerCase();
+    if(direct.includes('@'))return direct;
+    const token=session?.access_token||'';
+    if(!token)return '';
+    const payload=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return String(payload.email||'').trim().toLowerCase();
+  }catch{return ''}
+}
+function findMyRosterSeat(p){
+  const email=sessionEmailHint();
+  const members=Array.isArray(p?.members)?p.members:[];
+  if(email){
+    const byEmail=members.find(m=>String(m.email||'').trim().toLowerCase()===email);
+    if(byEmail)return byEmail;
+  }
+  if(typeof window.grResolveCurrentPlatoonMemberId==='function'){
+    const id=window.grResolveCurrentPlatoonMemberId(p);
+    const hit=members.find(m=>String(m.id)===String(id));
+    if(hit)return hit;
+  }
+  return members.find(m=>m.linked)||null;
+}
+window.grOpenAccountSettings=()=>{
+  const p=hydrateRosterProfiles(loadPlatoonLocal());
+  const me=findMyRosterSeat(p);
+  const email=sessionEmailHint()||me?.email||'';
+  if(!me){
+    modal(`<div class="dialog-head"><div><div class="eyebrow">ACCOUNT</div><h2>My seat</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+      <p class="gr-account-note">No My Time roster seat is linked to this login yet. Ask your Chief to add your email in Platoon Setup, then sign up / sign in with that same email — Golf Recon claims the seat automatically.</p>
+      <label>Signed-in email<input value="${E(email||'—')}" disabled></label>
+      <div class="dialog-actions sticky-actions"><button class="button primary" onclick="grCloseModal()">Got it</button></div>`);
+    return;
+  }
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">ACCOUNT</div><h2>My seat</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+    <p class="gr-account-note">You can edit your own names. Email is your login — only the Chief can change roster emails in Setup.</p>
+    <label>Full name<input id="grAccFull" value="${E(me.name||'')}" placeholder="Ryan Sweeney" autocomplete="name"></label>
+    <label>Display name<input id="grAccDisplay" value="${E(me.displayName||'')}" placeholder="How you show on boards" autocomplete="nickname"></label>
+    <label>Alias<input id="grAccAlias" value="${E(setupAliasesOf(me).join(', '))}" placeholder="Scorecard names, comma-separated"></label>
+    <label>Email<input value="${E(email||me.email||'')}" disabled></label>
+    <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grAccSave">Save</button></div>`);
+  d.classList.add('gr-account-wide');
+  d.querySelector('#grAccSave').onclick=async()=>{
+    const full=d.querySelector('#grAccFull').value.trim()||me.name;
+    const display=d.querySelector('#grAccDisplay').value.trim();
+    const aliases=d.querySelector('#grAccAlias').value.split(',').map(x=>x.trim()).filter(Boolean);
+    me.name=full;
+    me.displayName=display;
+    me.aliases=aliases;
+    me.nickname=aliases.join(', ');
+    p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+    p.hqMeta.rosterProfiles=rosterProfilesFromMembers(p.members);
+    if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
+    const btn=d.querySelector('#grAccSave');
+    try{
+      btn.disabled=true;btn.textContent='Saving…';
+      if(typeof callPlatoonFunction==='function'){
+        const out=await callPlatoonFunction({
+          action:'update_my_seat',
+          full_name:full,
+          display_name:display,
+          aliases
+        });
+        if(out?.platoon){
+          const merged=typeof window.grPreserveClientPlatoonFields==='function'
+            ?window.grPreserveClientPlatoonFields(out.platoon,p)
+            :out.platoon;
+          if(typeof writePlatoonLocal==='function')writePlatoonLocal(merged);
+          else savePlatoonLocal(merged,false);
+        }else savePlatoonLocal(p,false);
+      }else savePlatoonLocal(p,false);
+      closeModal();
+      if(typeof render==='function')render();
+    }catch(e){
+      // Still keep the local edit so the player is not stuck.
+      savePlatoonLocal(p,false);
+      alert(e.message||'Saved on this device. Server sync will retry when you are Chief/online.');
+      closeModal();
+      if(typeof render==='function')render();
+    }
+  };
+};
+
 // Legacy index.html Setup/Mission entry points → canonical v15 dialogs (avoid dual UI wipe).
 window.openPlatoonSetup=()=>window.grOpenSetup();
 window.openMissionEditor=(date='',missionId='')=>window.grOpenMissionEditor(missionId||'','',date?{date}:{});
 window.grCompressImageFile=compressImageFile;
+window.grMemberLabel=memberLabel;
+window.grHydrateRosterProfiles=hydrateRosterProfiles;
 
 window.grOpenMissionEditor=(id='',warId='',opts={})=>{
   const p=loadPlatoonLocal();
@@ -1036,7 +1165,7 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     <div class="gr-date-quick"><button type="button" class="gr-time-chip" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-date-preset="sun">Next Sun</button></div>
     <label>Format${formatSelectMarkup(presetFormat)}</label>
     <label>Attach to War<select id="grMWar" class="gr-mission-select">${warOptions}</select></label>
-    <label>Cadets Playing<div class="gr-check-grid">${membersOf(p).map(x=>`<label class="gr-check"><input type="checkbox" data-member="${E(x.id)}" ${memberIds.includes(x.id)?'checked':''}>${E(x.name)}</label>`).join('')}</div></label>
+    <label>Cadets Playing<div class="gr-check-grid">${membersOf(p).map(x=>`<label class="gr-check"><input type="checkbox" data-member="${E(x.id)}" ${memberIds.includes(x.id)?'checked':''}>${E(memberLabel(x))}</label>`).join('')}</div></label>
     <label>Guests<span class="muted" style="font-weight:600;display:block;margin-top:2px">Guest pool keeps returning players without making them members.</span>
       <div class="gr-guest-pool-picks" id="grGuestPoolPicks"></div>
       <div class="gr-guest-add"><input id="grGuestName" placeholder="New guest name"><button class="button secondary" id="grAddGuest" type="button">Add guest</button></div>

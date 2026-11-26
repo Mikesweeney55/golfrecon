@@ -1688,7 +1688,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=196">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=197">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1730,7 +1730,7 @@ body::before,body::after{opacity:0!important}
 
       <button id="forgotPasswordBtn" class="auth-link auth-link-secondary" type="button">Forgot password?</button>
       <button id="authModeToggle" class="auth-link" type="button">New to Golf Recon? Create account</button>
-      <div class="auth-foot">Each Golf Recon account has its own private rounds, stats and game keys.</div>
+      <div class="auth-foot">My Time players: sign up with the roster email your Chief saved — that claims your seat. Each account keeps its own rounds and game keys.</div>
     </div>
   </div>
 
@@ -1748,6 +1748,7 @@ body::before,body::after{opacity:0!important}
       <div class="topbar-right">
         <div class="user-tools">
           <span id="userChip" class="user-chip"></span>
+          <button id="accountSettingsBtn" class="mini-link" type="button">Account</button>
           <button id="logoutBtn" class="mini-link" type="button">Sign out</button>
         </div>
         <button id="importBtn" class="button secondary">Import Round</button>
@@ -4034,7 +4035,10 @@ function groupsView(){
   }
   let n=1;while(cells.length%7)cells.push(`<div class="calendar-day muted-day">${n++}</div>`);
   const chief=(p.members||[]).find(m=>m.role==='chief'),co=(p.members||[]).find(m=>m.role==='co_chief');
-  const roster=(p.members||[]).map(m=>`<div class="roster-row"><div><div class="roster-name">${safeText(m.name)}</div><div class="roster-role">${m.linked?'Golf Recon linked':'Cadet profile'}</div></div><span class="platoon-role ${m.role}">${safeText(platoonRoleLabel(m.role))}</span></div>`).join('');
+  const roster=(p.members||[]).map(m=>{
+    const label=(typeof window.grMemberLabel==='function'?window.grMemberLabel(m):null)||m.displayName||m.name;
+    return `<div class="roster-row"><div><div class="roster-name">${safeText(label)}</div><div class="roster-role">${m.linked?'Golf Recon linked':'Cadet profile'}${m.name&&m.displayName&&m.name!==m.displayName?` · ${safeText(m.name)}`:''}</div></div><span class="platoon-role ${m.role}">${safeText(platoonRoleLabel(m.role))}</span></div>`;
+  }).join('');
   const missionCard=nextMission?`<section class="card mission-card"><div class="mission-banner"><span class="mission-tag ${nextMission.type}">${platoonMissionTypeLabel(nextMission.type)}</span></div><div class="mission-empty"><div class="mission-hero-line"><div><div class="mission-hero-title">${safeText(nextMission.title||nextMission.locationName)}</div><div class="mission-meta">${safeText(platoonMissionDate(nextMission.date))}${nextMission.teeTime?` · ${safeText(nextMission.teeTime)}`:''} · ${safeText(nextMission.locationName)}</div></div></div><div class="mission-actions"><button class="button primary" type="button" onclick="openMissionDetail('${safeText(nextMission.id)}')">Open Mission</button><button class="button secondary" type="button" onclick="openMissionEditor()">Create Mission</button></div></div></section>`:`<section class="card mission-card"><div class="mission-banner"><span class="mission-tag battle">MISSION CONTROL</span></div><div class="mission-empty"><strong>No upcoming mission scheduled.</strong><div class="mission-actions"><button class="button primary" type="button" onclick="openMissionEditor()">Create Mission</button></div></div></section>`;
   const resultCount=missions.filter(m=>Array.isArray(m.results)&&m.results.length).length;
   const syncMsg=platoonSyncError?`<div class="platoon-sync-error">${safeText(platoonSyncError)}</div>`:'';
@@ -4738,6 +4742,10 @@ document.getElementById('logoutBtn').onclick=async()=>{
   saveAuthSession(null);
   showAuth('signin','Signed out.','ok');
 };
+document.getElementById('accountSettingsBtn').onclick=()=>{
+  if(typeof window.grOpenAccountSettings==='function')window.grOpenAccountSettings();
+  else alert('Account settings load with Platoons. Open the Platoons tab once, then try again.');
+};
 
 const editDlg=document.getElementById('editRoundDialog');
 
@@ -5075,7 +5083,7 @@ function showAuth(mode='signin',message='',kind=''){
   document.getElementById('confirmPasswordWrap').style.display=(signup||recovery)?'grid':'none';
   document.getElementById('forgotPasswordBtn').style.display=mode==='signin'?'block':'none';
   document.getElementById('authTitle').textContent=recovery?'Choose a new password':signup?'Create your Golf Recon account':'Sign in';
-  document.getElementById('authSubtitle').textContent=recovery?'Set a new password for your account.':signup?'Pick a username for Platoons, events and leaderboards.':'Your golf memory, game plan and round history.';
+  document.getElementById('authSubtitle').textContent=recovery?'Set a new password for your account.':signup?'Use the email your Chief put on the My Time roster, then pick a username.':'Your golf memory, game plan and round history.';
   document.getElementById('authSubmit').textContent=recovery?'Update password':signup?'Create account':'Sign in';
   document.getElementById('authModeToggle').textContent=recovery?'Back to sign in':signup?'Already have an account? Sign in':'New to Golf Recon? Create account';
   document.getElementById('authPassword').setAttribute('autocomplete',(signup||recovery)?'new-password':'current-password');
@@ -5367,19 +5375,34 @@ function mergeMissionSeedIntoPersonal(seed,resultRow){
     return {claimed:false,error:String(e?.message||e)};
   }
 }
+function sessionEmailFromAuth(){
+  try{
+    const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const direct=String(session?.user?.email||'').trim().toLowerCase();
+    if(direct.includes('@'))return direct;
+    const token=session?.access_token||'';
+    if(!token)return '';
+    const payload=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return String(payload.email||'').trim().toLowerCase();
+  }catch{return ''}
+}
 function resolveCurrentPlatoonMemberId(p){
   try{
     const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const members=p?.members||[];
+    const email=sessionEmailFromAuth();
+    if(email){
+      const byEmail=members.find(m=>String(m.email||'').trim().toLowerCase()===email);
+      if(byEmail)return byEmail.id;
+    }
     const meta=session?.user?.user_metadata||{};
     const names=[meta.username,meta.display_name,meta.full_name,p?.chief]
       .map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
-    const members=p?.members||[];
     for(const m of members){
-      const n=String(m.name||'').trim().toLowerCase();
-      if(!n)continue;
-      if(names.some(x=>x===n||n.includes(x)||x.includes(n)))return m.id;
+      const keys=[m.name,m.displayName].map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+      if(keys.some(n=>names.some(x=>x===n||n.includes(x)||x.includes(n))))return m.id;
     }
-    return members.find(m=>m.role==='chief')?.id||null;
+    return members.find(m=>m.linked)?.id||members.find(m=>m.role==='chief')?.id||null;
   }catch{return (p?.members||[]).find(m=>m.role==='chief')?.id||null}
 }
 window.grResolveCurrentPlatoonMemberId=resolveCurrentPlatoonMemberId;
@@ -5674,10 +5697,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=205"></script>
+  <script src="platoon-recap-shared.js?v=206"></script>
   <script src="platoon-mission-core.js?v=196"></script>
-  <script src="platoon-hq-records.js?v=198"></script>
-  <script src="platoons-v15-real.js?v=202"></script>
+  <script src="platoon-hq-records.js?v=199"></script>
+  <script src="platoons-v15-real.js?v=203"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
