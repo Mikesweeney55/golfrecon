@@ -176,41 +176,47 @@ function hydrateBlogPhotos(p){
   }
   return p;
 }
+function blogPostsWithoutPhotoBytes(posts){
+  return (Array.isArray(posts)?posts:[]).map(post=>{
+    if(!post||typeof post!=='object')return post;
+    const photoData=post.photoData;
+    const rest={...post};
+    delete rest.photoData;
+    if(photoData&&String(photoData).startsWith('data:')){
+      rest.hasPhoto=true;
+      if(!rest.photoId)rest.photoId=rest.id;
+    }
+    return rest;
+  });
+}
 /** Persist photo bytes to side storage and strip them from the object we stringify into the main platoon key. */
 function preparePlatoonForLocalWrite(p){
   if(!p)return p;
-  hydrateBlogPhotos(p);
-  let copy;
-  try{copy=JSON.parse(JSON.stringify(p))}catch{return p}
-  const posts=copy?.hqMeta?.blogPosts;
-  if(Array.isArray(posts)){
-    for(const post of posts){
-      if(!post)continue;
-      if(post.photoData&&String(post.photoData).startsWith('data:')){
+  // Move any in-memory bytes to side storage first — do NOT JSON.stringify posts while they still hold data-URLs.
+  const livePosts=p.hqMeta?.blogPosts;
+  if(Array.isArray(livePosts)){
+    for(const post of livePosts){
+      if(post?.photoData&&String(post.photoData).startsWith('data:')){
         try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(e){console.warn(e)}
       }
-      delete post.photoData;
     }
   }
-  return copy;
+  const slim={
+    ...p,
+    hqMeta:{
+      ...(p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{}),
+      blogPosts:blogPostsWithoutPhotoBytes(p.hqMeta?.blogPosts)
+    }
+  };
+  try{return JSON.parse(JSON.stringify(slim))}
+  catch(e){
+    console.warn('preparePlatoonForLocalWrite clone failed',e);
+    return slim;
+  }
 }
 /** Server snapshot: never ship multi-hundred-KB data URLs in hq_meta. */
 function snapshotPlatoonForServer(p){
-  hydrateBlogPhotos(p);
-  let copy;
-  try{copy=JSON.parse(JSON.stringify(p))}catch{return p}
-  const posts=copy?.hqMeta?.blogPosts;
-  if(Array.isArray(posts)){
-    for(const post of posts){
-      if(!post)continue;
-      if(post.photoData&&String(post.photoData).startsWith('data:')){
-        try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch{}
-      }
-      delete post.photoData;
-      // Keep hasPhoto + photoId so other devices know a photo exists (bytes stay local for now).
-    }
-  }
-  return copy;
+  return preparePlatoonForLocalWrite(p);
 }
 window.grHydrateBlogPhotos=hydrateBlogPhotos;
 window.grPreparePlatoonForLocalWrite=preparePlatoonForLocalWrite;
@@ -255,18 +261,15 @@ function blogPostsSorted(p){
 }
 function saveBlogPosts(p,posts,{push=true}={}){
   p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
-  p.hqMeta.blogPosts=posts;
-  if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
-  // Ensure side storage has every photo before sync can rewrite hqMeta without bytes.
-  for(const post of (p.hqMeta.blogPosts||[])){
+  // Persist any new bytes, but never abort the whole post if an old photo rewrite fails.
+  for(const post of (posts||[])){
     if(post?.photoData&&String(post.photoData).startsWith('data:')){
-      try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(err){
-        alert(err?.message||'Could not save photo.');
-        return;
-      }
+      try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(e){console.warn('Locker photo side-save',e)}
     }
   }
-  hydrateBlogPhotos(p);
+  // Keep flags in hqMeta; bytes stay in side storage so localStorage / sync stay small.
+  p.hqMeta.blogPosts=blogPostsWithoutPhotoBytes(posts);
+  if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
   if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,push);
   else if(typeof writePlatoonLocal==='function'){writePlatoonLocal(p);renderGroups()}
   else renderGroups();
@@ -336,7 +339,7 @@ function blogView(){
         <textarea id="grBlogBody" name="body" rows="3" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…">${E(draft)}</textarea>
         ${preview}
         <div class="gr-blog-composer-actions">
-          <label class="button secondary gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}">📷 ${blogPhotoBusy?'Working…':'Photo'}<input id="grBlogPhoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}></label>
+          <label class="gr-logo-upload gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}" style="margin:0;cursor:pointer"><strong>📷 ${blogPhotoBusy?'Working…':'Photo'}</strong><input id="grBlogPhoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}></label>
           <button class="button primary" type="submit" ${blogPhotoBusy?'disabled':''}>${blogPhotoBusy?'Wait…':'Post'}</button>
         </div>
       </form>
@@ -1860,17 +1863,18 @@ async function submitBlogComposer(form){
     tone:blogComposerTone||'trash',
     hasPhoto:!!photo,
     photoId:photo?id:'',
-    photoData:photo||'',
     createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString(),
     pinned:false,
     reactions:{fire:[],dead:[],salute:[],cap:[]},
     replies:[]
   };
-  const posts=blogPostsSorted(p);
-  posts.unshift(post);
+  // Don't use blogPostsSorted here — that hydrates every old photo into memory and can block the save.
+  const existing=typeof window.grBlogPostsOf==='function'?window.grBlogPostsOf(p):(p?.hqMeta?.blogPosts||[]);
+  const posts=[post,...(existing||[]).filter(x=>x&&x.id!==post.id)];
   blogPendingPhoto=null;
   blogPendingBody='';
+  blogPhotoBusy=false;
   saveBlogPosts(p,posts);
 }
 if(!document.body.dataset.grPlatoonShellBound){
@@ -2006,18 +2010,20 @@ if(!document.body.dataset.grPlatoonShellBound){
     if(!f)return;
     const ta=document.getElementById('grBlogBody');
     if(ta)blogPendingBody=String(ta.value||'');
-    blogPhotoBusy=true;
+    const attachId=Date.now();
+    blogPhotoBusy=attachId;
     blogPendingPhoto=null;
     renderGroups();
     try{
-      const dataUrl=await compressImageFile(f,{max:960,quality:.62});
+      const dataUrl=await compressImageFile(f,{max:720,quality:.55});
       if(!dataUrl||!String(dataUrl).startsWith('data:'))throw new Error('Photo decode failed.');
+      if(blogPhotoBusy!==attachId)return; // a newer attach started
       blogPendingPhoto=dataUrl;
     }catch(err){
-      blogPendingPhoto=null;
+      if(blogPhotoBusy===attachId)blogPendingPhoto=null;
       alert(err?.message||'Could not read that photo.');
     }finally{
-      blogPhotoBusy=false;
+      if(blogPhotoBusy===attachId)blogPhotoBusy=false;
       renderGroups();
     }
   });
