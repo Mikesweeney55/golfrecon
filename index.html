@@ -1963,7 +1963,11 @@ const stddev = arr => { if(!arr || !arr.length) return null; const m=avg(arr); r
 const sum = arr => (arr||[]).reduce((a,b)=>a+(Number(b)||0),0);
 const fmtDate = d => new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 const shortDate = d => new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'numeric',day:'numeric'});
-const courseShort = n => ({"Campbell's Scot. Highlands":"Campbell’s","Bill Flynn's Windham":"Windham","Birch Hill Country Club":"Birch Hill","Hidden Creek":"Hidden Crk","Hickory Hills":"Hickory","Passaconaway":"Passac.","Butter Brook":"Butter Brk","Four Oaks":"Four Oaks","Candia Woods":"Candia","Gold":"Kingswood"}[n] || n.split(' ').slice(0,2).join(' '));
+const courseShort = n => ({"Campbell's Scot. Highlands":"Campbell’s","Bill Flynn's Windham":"Windham","Birch Hill Country Club":"Birch Hill","Hidden Creek":"Hidden Crk","Hickory Hills":"Hickory","Passaconaway":"Passac.","Butter Brook":"Butter Brk","Four Oaks":"Four Oaks","Candia Woods":"Candia","Gold":"Kingswood - Gold","Kingswood - Gold":"Kingswood","Kingswood Golf Club":"Kingswood","Owl's Nest":"Owl's Nest","Owls Nest":"Owl's Nest"}[n] || n.split(' ').slice(0,2).join(' '));
+/** Tee-only course names that 18Birdies sometimes saves without the club. */
+const TEE_ONLY_COURSE_FIX={
+  gold:{club:'Kingswood',tees:'Gold',label:'Kingswood - Gold'}
+};
 
 const CALUSA_BLUE_TEE_RATINGS={
   'I':{rating:75.3,slope:143},
@@ -2434,8 +2438,17 @@ function scoreClass(score,par){const d=score-par; return d<=-2?'eagle':d===-1?'b
 
 
 function courseMenuLabel(c){
-  const dupes=db.courses.filter(x=>x.name===c.name);
-  return dupes.length>1 ? `${c.name} · ${c.tees}` : c.name;
+  if(!c)return 'Course';
+  const name=String(c.name||'').trim()||'Course';
+  const base=String(c.baseName||'').trim();
+  const tees=String(c.tees||'').trim();
+  const teeOk=tees&&!/^unknown$/i.test(tees);
+  const teeOnly=/^(blue|white|red|gold|black|green|championship|forward|member)$/i.test(name);
+  if(teeOnly&&base)return `${base} - ${teeOk?tees:name}`;
+  if(base&&teeOk&&(name===base||name===tees))return `${base} - ${tees}`;
+  if(base&&teeOk&&base!==name&&!name.toLowerCase().includes(tees.toLowerCase()))return `${name} - ${tees}`;
+  const dupes=(db.courses||[]).filter(x=>x&&x.name===c.name);
+  return dupes.length>1&&teeOk?`${name} · ${tees}`:name;
 }
 function courseDropdownOptions(selectedId,includeAll=false,allLabel='All courses'){
   const list=sortedCourses();
@@ -2493,6 +2506,8 @@ async function setGlobalCourse(id){
     db.puttingDetails=data.puttingDetails||db.puttingDetails;
     db.clubStats=data.clubStats||db.clubStats;
     try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){console.warn('Directional import hydration failed',e)}
+    repairKnownCourseLabels();
+    ensureCoursesForOrphanRounds();
     if(!db.courses.some(c=>c.id===id)) state.selectedCourseId=db.courses[0]?.id||null;
     if(state.gameCourseId!=='all') state.gameCourseId=state.selectedCourseId;
     if(state.roundCourseId!=='all') state.roundCourseId=state.selectedCourseId;
@@ -2607,7 +2622,10 @@ function holePreviewStatsHtml(c,hole,h,last,{showDirections=true,yardageText=''}
 }
 
 function sortedCourses(){
-  return db.courses.slice().sort((a,b)=>a.name.localeCompare(b.name)||a.tees.localeCompare(b.tees));
+  return (db.courses||[]).filter(c=>c&&c.id!=null&&c.id!=='').slice().sort((a,b)=>{
+    const an=courseMenuLabel(a),bn=courseMenuLabel(b);
+    return an.localeCompare(bn)||String(a.tees||'').localeCompare(String(b.tees||''))||String(a.id).localeCompare(String(b.id));
+  });
 }
 function parTypeSummary(courseId,limit=3){
   const c=course(courseId);
@@ -5246,6 +5264,8 @@ async function bootstrapGolfRecon(){
       applyStoredRoundDirectionPatches();
     }
     applyStoredRoundDirectionPatches();
+    repairKnownCourseLabels();
+    ensureCoursesForOrphanRounds();
     setTopbarDisplayName(db.player.username||db.player.name||'golfer');
 
     let savedCourse=null;
@@ -5285,15 +5305,86 @@ function slugify(s){
 function normalizeCourseName(s){
   return String(s||'')
     .toLowerCase()
+    .replace(/['’]/g,'') // Owl's Nest ≡ Owls Nest
     .replace(/&/g,' and ')
     .replace(/\bscottish\b/g,'scot')
     .replace(/\bcountry\s+club\b/g,'cc')
     .replace(/\bgolf\s+club\b/g,'')
     .replace(/\bgolf\s+course\b/g,'')
+    .replace(/\bgolf\s+links\b/g,'')
     .replace(/\bthe\b/g,'')
     .replace(/[^a-z0-9]+/g,' ')
     .trim()
     .replace(/\s+/g,' ');
+}
+/** Expand tee-only import names (e.g. "Gold") into club + tee. */
+function expandTeeOnlyCourseName(courseName,tees){
+  const raw=String(courseName||'').trim();
+  const teeRaw=String(tees||'').trim();
+  const key=normalizeCourseName(raw);
+  const hit=TEE_ONLY_COURSE_FIX[key];
+  if(hit){
+    return {
+      course_name:hit.label,
+      baseName:hit.club,
+      tees:teeRaw&&!/^unknown$/i.test(teeRaw)?teeRaw:hit.tees
+    };
+  }
+  // "Kingswood Golf Club" + Gold tees → keep club, label with tee
+  if(raw&&teeRaw&&!/^unknown$/i.test(teeRaw)&&!raw.toLowerCase().includes(teeRaw.toLowerCase())){
+    const club=raw.replace(/\s+Golf(?:\s+Club|\s+Course|\s+Links)?\s*$/i,'').trim()||raw;
+    if(/^(blue|white|red|gold|black|green)$/i.test(teeRaw)){
+      return {course_name:`${club} - ${teeRaw}`,baseName:club,tees:teeRaw};
+    }
+  }
+  return {course_name:raw,baseName:raw,tees:teeRaw||'Unknown'};
+}
+/** Fix already-saved tee-only courses (Gold → Kingswood - Gold) after bootstrap. */
+function repairKnownCourseLabels(){
+  let changed=false;
+  for(const c of (db.courses||[])){
+    if(!c)continue;
+    const expanded=expandTeeOnlyCourseName(c.name||c.baseName,c.tees);
+    const key=normalizeCourseName(c.name||'');
+    const baseKey=normalizeCourseName(c.baseName||'');
+    if(TEE_ONLY_COURSE_FIX[key]||TEE_ONLY_COURSE_FIX[baseKey]){
+      if(c.name!==expanded.course_name||c.baseName!==expanded.baseName||c.tees!==expanded.tees){
+        c.name=expanded.course_name;
+        c.baseName=expanded.baseName;
+        c.tees=expanded.tees;
+        changed=true;
+      }
+    }
+  }
+  return changed;
+}
+/** Rebuild stub courses for rounds whose courseId vanished from the course list. */
+function ensureCoursesForOrphanRounds(){
+  let added=0;
+  for(const r of (db.rounds||[])){
+    if(!r||r.courseId==null||r.courseId==='')continue;
+    if(course(r.courseId))continue;
+    const putt=db.puttingDetails.find(p=>p&&String(p.date||'')===String(r.date||'')&&p.course);
+    const guess=String(putt?.course||r.courseName||r.course_name||'Recovered course').trim()||'Recovered course';
+    const expanded=expandTeeOnlyCourseName(guess,r.tees||'');
+    const holes=Number(r.holes)||18;
+    const stub={
+      id:String(r.courseId),
+      name:expanded.course_name,
+      baseName:expanded.baseName||expanded.course_name,
+      tees:expanded.tees||'Unknown',
+      yardage:0,slope:null,rating:null,par:null,
+      pars:Array(holes).fill(null),
+      holeNumbers:Array.from({length:holes},(_,i)=>i+1),
+      handicaps:Array(holes).fill(null),
+      segment:holes===18?'18 holes':'9 holes',
+      imported:true,
+      recovered:true
+    };
+    db.courses.push(stub);
+    added++;
+  }
+  return added;
 }
 function normalizeTee(s){
   return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
@@ -5313,10 +5404,18 @@ function findCourseForImport(r){
     const exact=db.courses.find(c=>c.id===r.course_id);
     if(exact)return exact;
   }
-  const incoming=r.course_name||'';
-  const tee=normalizeTee(r.tees);
+  const expanded=expandTeeOnlyCourseName(r.course_name||'',r.tees);
+  const incoming=expanded.course_name||r.course_name||'';
+  const tee=normalizeTee(expanded.tees||r.tees);
   const ranked=db.courses.map(c=>{
-    const nameScore=Math.max(courseNameScore(incoming,c.name),courseNameScore(incoming,c.baseName));
+    const nameScore=Math.max(
+      courseNameScore(incoming,c.name),
+      courseNameScore(incoming,c.baseName),
+      courseNameScore(expanded.baseName,c.baseName),
+      courseNameScore(expanded.baseName,c.name),
+      courseNameScore(r.course_name,c.name),
+      courseNameScore(r.course_name,c.baseName)
+    );
     const teeScore=tee && normalizeTee(c.tees)===tee ? 12 : 0;
     return {c,score:nameScore+teeScore,nameScore,teeMatch:teeScore>0};
   }).filter(x=>x.nameScore>=58).sort((a,b)=>b.score-a.score);
@@ -5327,14 +5426,18 @@ function findCourseForImport(r){
   if(tee){
     const exactTee=ranked.find(x=>x.teeMatch);
     if(exactTee)return exactTee.c;
+    const byLabel=ranked.find(x=>normalizeCourseName(x.c.name)===normalizeCourseName(incoming));
+    if(byLabel)return byLabel.c;
     return null;
   }
   return ranked[0].c;
 }
 function createCourseFromImport(r){
   const hd=(r.holes_detail||r.hole_details||[]).slice().sort((a,b)=>Number(a.hole)-Number(b.hole));
-  const holes=Number(r.holes)||hd.length;
-  if(!r.course_name || !holes)return null;
+  // Default to 18 when the scorecard shell is missing — still keep the course in the dropdown.
+  const holes=Number(r.holes)||hd.length||18;
+  if(!r.course_name)return null;
+  const expanded=expandTeeOnlyCourseName(r.course_name,r.tees);
 
   const holeNumbers=hd.length?hd.map(h=>Number(h.hole)):Array.from({length:holes},(_,i)=>i+1);
   const pars=hd.length?hd.map(h=>h.par==null?null:Number(h.par)):Array(holes).fill(null);
@@ -5346,12 +5449,15 @@ function createCourseFromImport(r){
   const rating=Number.isFinite(Number(r.course_rating))?Number(r.course_rating):null;
   const slope=Number.isFinite(Number(r.course_slope))?Number(r.course_slope):null;
   const segment=holes===18?'18 holes':(holeNumbers[0]===1?'Front 9':'9 holes');
-  let id=slugify(`${r.course_name}-${r.tees||'tees'}-${segment}`);
+  let id=slugify(`${expanded.course_name}-${expanded.tees||'tees'}-${segment}`);
   let n=2,base=id;
   while(db.courses.some(c=>c.id===id))id=`${base}-${n++}`;
 
   const c={
-    id,name:r.course_name,baseName:r.course_name,tees:r.tees||'Unknown',
+    id,
+    name:expanded.course_name,
+    baseName:expanded.baseName||expanded.course_name,
+    tees:expanded.tees||'Unknown',
     yardage:0,slope,rating,par,pars,holeNumbers,handicaps,segment,imported:true
   };
   db.courses.push(c);
