@@ -5152,6 +5152,17 @@ async function bootstrapGolfRecon(){
     if(pill)pill.classList.add('ok');
     if(txt)txt.textContent='Synced';
     render();
+    // Claim My Time seat on login — don't wait until the player opens Platoons.
+    try{syncPlatoonFromServer().then(()=>{
+      try{
+        const p=loadPlatoonLocal();
+        const meId=typeof resolveCurrentPlatoonMemberId==='function'?resolveCurrentPlatoonMemberId(p):null;
+        const me=(p?.members||[]).find(m=>String(m.id)===String(meId));
+        const label=(typeof window.grMemberLabel==='function'&&me)?window.grMemberLabel(me):'';
+        const chip=document.getElementById('userChip');
+        if(chip&&label&&label!=='Player')chip.textContent=label.startsWith('@')?label:('@'+label.replace(/^@/,''));
+      }catch{}
+    }).catch(e=>console.warn('Platoon seat claim deferred',e))}catch(e){console.warn('Platoon seat claim deferred',e)}
     return data;
   }catch(e){
     if(pill)pill.classList.add('err');
