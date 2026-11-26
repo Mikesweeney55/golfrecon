@@ -724,6 +724,18 @@ function groupsV15(){
   // Drop sparse/null slots — server or local merges can leave holes that crash standings on .id
   if(Array.isArray(p.members))p.members=p.members.filter(m=>m&&typeof m==='object');
   if(Array.isArray(p.missions))p.missions=p.missions.filter(m=>m&&typeof m==='object');
+  // Recover blank NET cells from handicap / hole nets / net_score already on the row.
+  if(typeof window.grHydrateMissingOfficialNets==='function'){
+    let netsFixed=false;
+    for(const m of (p.missions||[])){
+      if(m&&m.type!=='war'&&Array.isArray(m.results)&&m.results.length){
+        if(window.grHydrateMissingOfficialNets(m))netsFixed=true;
+      }
+    }
+    if(netsFixed&&typeof savePlatoonLocal==='function'){
+      try{savePlatoonLocal(p,true)}catch(e){console.warn('net hydrate save',e)}
+    }
+  }
   const missions=(p.missions||[]).filter(m=>m.type!=='war'),wars=(p.missions||[]).filter(m=>m.type==='war'),standalone=missions.filter(m=>!warIdOf(m));
   const upcoming=standalone.filter(m=>m.status!=='completed').sort((a,b)=>{
     const ad=String(a.date||'9999'),bd=String(b.date||'9999');
