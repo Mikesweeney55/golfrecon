@@ -24,10 +24,15 @@ const resultSchema={
         type:"object",
         additionalProperties:false,
         properties:{
-          player_name:{type:"string"},gross:{type:["integer","null"]},net:{type:["integer","null"]},
-          finish_position:{type:["integer","null"]},raw_points:{type:["number","null"]},eagle_count:{type:["integer","null"]}
+          player_name:{type:"string"},
+          handicap:{type:["number","null"]},
+          gross:{type:["integer","null"]},
+          net:{type:["integer","null"]},
+          finish_position:{type:["integer","null"]},
+          raw_points:{type:["number","null"]},
+          eagle_count:{type:["integer","null"]}
         },
-        required:["player_name","gross","net","finish_position","raw_points","eagle_count"]
+        required:["player_name","handicap","gross","net","finish_position","raw_points","eagle_count"]
       }
     }
   },
@@ -222,11 +227,19 @@ Extract ONLY high-level event results that are actually visible. Never guess.
 
 For each visible player, return:
 - player_name exactly as shown
+- handicap: tournament handicap (T-HCP) when visible, else null
 - gross score if visible, else null
 - net score if visible, else null
 - finish_position if explicitly shown or unambiguously ranked in the visible table, else null
 - raw_points if event/league points are visible, else null
 - eagle_count only if the screenshot explicitly establishes an eagle count for that player, else null
+
+Leaderboard reading rules:
+- Gross (G) rows like +8(80) → gross 80
+- Net (N) rows like +2(73) → net 73 (the number in parentheses is the net score)
+- Stableford / points events: league or Stableford POINTS are raw_points. The net SCORE in parentheses is still net — do not leave net null just because the format is Stableford. Points and net are different fields.
+- Prefer Net (N) ranking for finish_position when that tab is visible.
+- Merge Gross + Net rows for the same player (name + T-HCP) across screenshots.
 
 Do NOT create hole-by-hole data. Do NOT create a Golf Recon personal round. This parser is only for a Platoon Mission leaderboard/result record.
 If the screenshots span multiple pages, merge duplicate player rows carefully and preserve only supported values.
@@ -234,7 +247,7 @@ If gross/net labels are ambiguous, leave the value null and add a warning.
 Use YYYY-MM-DD only when a date is visible; otherwise null.
 
 Selected Mission context for matching only (do not invent values from it):
-${JSON.stringify({date:mission.date||null,course:mission.locationName||null,title:mission.title||null})}`
+${JSON.stringify({date:mission.date||null,course:mission.locationName||null,title:mission.title||null,format:mission.format||null})}`
   }];
   for(const img of body.images){
     if(!img?.type||!img?.data)continue;
@@ -297,6 +310,7 @@ Important merging rules:
 - Merge Gross + Net for the same person when name + T-HCP match across tabs.
 - Merge abbreviations of the same visible player only when identity is clear from name + handicap + photo/context. Two "Kevi..." / "Kevin C." rows with DIFFERENT T-HCP values are DIFFERENT people — never merge them.
 - A score like +13(84) on Gross (G) means 84 gross; on Net (N) +2(73) means 73 net.
+- Stableford / points formats: raw_points are the points column; net is still the stroke net in parentheses when shown. Never leave net null when that parentheses score is visible.
 - Do not calculate missing net/gross from handicap unless the screenshot explicitly gives the score.
 - Preserve points exactly as shown.
 - Ignore "Out" / "In" total columns as hole numbers — only holes 1-18.

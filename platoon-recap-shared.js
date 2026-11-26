@@ -480,7 +480,8 @@ function standingsTableMarkup(p,m){
   const rows=missionStandingsRows(m);
   const body=rows.map((r,i)=>{
     const pos=finite(r.finish_position)?Number(r.finish_position):i+1;
-    const net=finite(r.net)?Number(r.net):'—';
+    const resolved=typeof window.grResolveOfficialNet==='function'?window.grResolveOfficialNet(r,r.holes||[]):null;
+    const net=finite(r.net)?Number(r.net):(finite(resolved)?Number(resolved):'—');
     const gross=finite(r.gross)?Number(r.gross):'—';
     const pts=finite(r.raw_points)?Number(r.raw_points):0;
     return `<div class="grstd-row"><div class="grstd-name"><b>${pos}</b><span>${esc(labeledName(p,m,r.player_name))}</span></div><div>${net}</div><div>${gross}</div><div>${pts}</div></div>`;
