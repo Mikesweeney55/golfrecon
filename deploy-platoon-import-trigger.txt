@@ -1,1 +1,1 @@
-deploy platoon-import roster invite emails + claim-by-email 2026-11-23T03:45:00Z
+deploy platoon-import update_my_seat account settings 2026-11-26T15:42:00Z

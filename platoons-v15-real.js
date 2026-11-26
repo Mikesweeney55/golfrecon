@@ -1105,27 +1105,46 @@ window.grOpenAccountSettings=()=>{
     const btn=d.querySelector('#grAccSave');
     try{
       btn.disabled=true;btn.textContent='Saving…';
+      let synced=false;
       if(typeof callPlatoonFunction==='function'){
-        const out=await callPlatoonFunction({
-          action:'update_my_seat',
-          full_name:full,
-          display_name:display,
-          aliases
-        });
-        if(out?.platoon){
-          const merged=typeof window.grPreserveClientPlatoonFields==='function'
-            ?window.grPreserveClientPlatoonFields(out.platoon,p)
-            :out.platoon;
-          if(typeof writePlatoonLocal==='function')writePlatoonLocal(merged);
-          else savePlatoonLocal(merged,false);
-        }else savePlatoonLocal(p,false);
-      }else savePlatoonLocal(p,false);
+        try{
+          const out=await callPlatoonFunction({
+            action:'update_my_seat',
+            full_name:full,
+            display_name:display,
+            aliases
+          });
+          if(out?.platoon){
+            const merged=typeof window.grPreserveClientPlatoonFields==='function'
+              ?window.grPreserveClientPlatoonFields(out.platoon,p)
+              :out.platoon;
+            if(typeof writePlatoonLocal==='function')writePlatoonLocal(merged);
+            else savePlatoonLocal(merged,false);
+            synced=true;
+          }
+        }catch(err){
+          const msg=String(err?.message||err||'');
+          // Older edge builds reject update_my_seat — Chief can still push via save_state.
+          if(/unsupported platoon action/i.test(msg)&&typeof savePlatoonLocal==='function'){
+            const role=String(me.role||'');
+            if(role==='chief'||role==='co_chief'){
+              savePlatoonLocal(p,true);
+              synced=true;
+            }else{
+              savePlatoonLocal(p,false);
+            }
+          }else throw err;
+        }
+      }
+      if(!synced)savePlatoonLocal(p,false);
+      if(typeof setTopbarDisplayName==='function')setTopbarDisplayName(display||full||me.name);
       closeModal();
       if(typeof render==='function')render();
     }catch(e){
       // Still keep the local edit so the player is not stuck.
       savePlatoonLocal(p,false);
-      alert(e.message||'Saved on this device. Server sync will retry when you are Chief/online.');
+      if(typeof setTopbarDisplayName==='function')setTopbarDisplayName(display||full||me.name);
+      alert('Saved on this device. Server sync will catch up after the Platoon backend redeploys.');
       closeModal();
       if(typeof render==='function')render();
     }
