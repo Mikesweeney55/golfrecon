@@ -87,18 +87,36 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
 .gr-course-meta{font-size:var(--fs-data);margin-top:6px}
 .grid.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 @media(max-width:700px){.grid.three{grid-template-columns:1fr 1fr 1fr}}
-.gr-cal-card{padding:14px}
-.gr-cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.gr-cal-card{padding:14px;overflow:hidden}
+.gr-cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px}
 .gr-cal-hint{font-size:var(--fs-data);margin:0 0 10px}
 .gr-cal-dows{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px;text-align:center;font-size:var(--fs-data);font-weight:800;opacity:.65}
 .gr-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
-.gr-cal-pad{min-height:88px;border:1px solid rgba(255,255,255,.06);border-radius:10px;opacity:.35}
-.gr-cal-day{min-height:88px;border:1px solid rgba(212,175,106,.18);border-radius:10px;padding:7px;background:rgba(14,12,10,.35);color:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit}
+.gr-cal-pad{min-height:88px;min-width:0;border:1px solid rgba(255,255,255,.06);border-radius:10px;opacity:.35}
+.gr-cal-day{min-height:88px;min-width:0;border:1px solid rgba(212,175,106,.18);border-radius:10px;padding:7px;background:rgba(14,12,10,.35);color:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit;overflow:hidden}
 .gr-cal-day.has-missions{border-color:rgba(212,175,106,.45);background:rgba(212,175,106,.08)}
 .gr-cal-day:hover,.gr-cal-day:focus-visible{outline:2px solid rgba(212,175,106,.45);outline-offset:1px}
-.gr-cal-daynum{font-weight:900;font-size:var(--fs-data)}
-.gr-cal-mission{display:block;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:2px 0;font-size:var(--fs-data);font-weight:700;line-height:1.15;cursor:pointer}
-.gr-cal-add{margin-top:auto;font-size:var(--fs-data);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#d4af6a);opacity:.85}
+.gr-cal-daynum{font-weight:900;font-size:var(--fs-data);flex:0 0 auto}
+.gr-cal-mission{display:flex;align-items:flex-start;gap:3px;width:100%;min-width:0;border:0;background:transparent;color:inherit;text-align:left;padding:2px 0;font-size:var(--fs-data);font-weight:700;line-height:1.15;cursor:pointer;overflow:hidden}
+.gr-cal-mission-ico{flex:0 0 auto;line-height:1.15}
+.gr-cal-mission-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;word-break:break-word}
+.gr-cal-more{font-size:var(--fs-data);font-weight:800;color:var(--accent,#d4af6a);opacity:.9}
+.gr-cal-add{margin-top:auto;font-size:var(--fs-data);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#d4af6a);opacity:.85;white-space:nowrap;overflow:hidden}
+.gr-cal-add-short{display:none}
+@media(max-width:700px){
+  .gr-cal-card{padding:10px}
+  .gr-cal-dows{gap:3px;font-size:10px;letter-spacing:.02em}
+  .gr-cal-grid{gap:3px}
+  .gr-cal-pad,.gr-cal-day{min-height:72px;border-radius:8px;padding:5px 4px;gap:2px}
+  .gr-cal-daynum{font-size:11px}
+  .gr-cal-mission{padding:1px 0;font-size:9px;line-height:1.1;gap:2px}
+  .gr-cal-mission-ico{display:none}
+  .gr-cal-mission-txt{-webkit-line-clamp:2}
+  .gr-cal-more{font-size:9px}
+  .gr-cal-add{letter-spacing:0;font-size:14px;line-height:1;text-align:center;align-self:center}
+  .gr-cal-add-full{display:none}
+  .gr-cal-add-short{display:inline}
+}
 
 /* Clubhouse landing — flash board hero */
 .gr-clubhouse-hero{
