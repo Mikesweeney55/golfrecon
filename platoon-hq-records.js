@@ -44,7 +44,50 @@ function defaultHqMeta(){
     constitution:'',
     guestPool:[],
     rosterEmails:{},
-    rosterProfiles:{}
+    rosterProfiles:{},
+    blogPosts:[]
+  };
+}
+const BLOG_TONES=new Set(['trash','flex','recap','prop','chatter']);
+function normalizeBlogReply(r){
+  if(!r||typeof r!=='object')return null;
+  const body=String(r.body||'').trim().slice(0,400);
+  if(!body)return null;
+  return {
+    id:String(r.id||uid('br')),
+    authorId:String(r.authorId||'').trim(),
+    authorName:String(r.authorName||'').trim()||'Cadet',
+    body,
+    createdAt:r.createdAt||new Date().toISOString()
+  };
+}
+function normalizeBlogReactions(raw){
+  const out={fire:[],dead:[],salute:[],cap:[]};
+  if(!raw||typeof raw!=='object')return out;
+  for(const key of Object.keys(out)){
+    const arr=Array.isArray(raw[key])?raw[key]:[];
+    out[key]=[...new Set(arr.map(x=>String(x||'').trim()).filter(Boolean))].slice(0,40);
+  }
+  return out;
+}
+function normalizeBlogPost(post){
+  if(!post||typeof post!=='object')return null;
+  const body=String(post.body||'').trim().slice(0,800);
+  const tone=BLOG_TONES.has(post.tone)?post.tone:'chatter';
+  const replies=Array.isArray(post.replies)?post.replies.map(normalizeBlogReply).filter(Boolean).slice(0,40):[];
+  return {
+    id:String(post.id||uid('bp')),
+    authorId:String(post.authorId||'').trim(),
+    authorName:String(post.authorName||'').trim()||'Cadet',
+    body,
+    tone,
+    hasPhoto:!!post.hasPhoto,
+    photoId:post.hasPhoto?String(post.photoId||post.id||''):'',
+    createdAt:post.createdAt||new Date().toISOString(),
+    updatedAt:post.updatedAt||post.createdAt||new Date().toISOString(),
+    pinned:!!post.pinned,
+    reactions:normalizeBlogReactions(post.reactions),
+    replies
   };
 }
 function normalizeRosterEmails(raw){
@@ -82,7 +125,20 @@ function normalizeHqMeta(raw){
   d.guestPool=Array.isArray(x.guestPool)?x.guestPool.map(normalizeGuestPoolEntry).filter(Boolean):[];
   d.rosterEmails=normalizeRosterEmails(x.rosterEmails);
   d.rosterProfiles=normalizeRosterProfiles(x.rosterProfiles);
+  d.blogPosts=Array.isArray(x.blogPosts)?x.blogPosts.map(normalizeBlogPost).filter(Boolean).slice(0,120):[];
   return d;
+}
+function blogPostsOf(p){return hqMetaOf(p).blogPosts||[]}
+function mergeBlogPosts(serverPosts,localPosts){
+  const byId=new Map();
+  for(const post of [...(serverPosts||[]),...(localPosts||[])]){
+    if(!post?.id)continue;
+    const prev=byId.get(post.id);
+    if(!prev||String(post.updatedAt||'')>=String(prev.updatedAt||''))byId.set(post.id,post);
+  }
+  return [...byId.values()]
+    .sort((a,b)=>Number(b.pinned)-Number(a.pinned)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')))
+    .slice(0,120);
 }
 function normalizeGuestPoolEntry(g){
   if(!g||typeof g!=='object')return null;
@@ -207,7 +263,7 @@ function writeHqMeta(p,meta){
 }
 function hqMetaWeight(meta){
   const m=normalizeHqMeta(meta);
-  return (m.eagleBalances?.length||0)+(m.eagleDetails?.length||0)+(m.records?.length||0);
+  return (m.eagleBalances?.length||0)+(m.eagleDetails?.length||0)+(m.records?.length||0)+(m.blogPosts?.length||0);
 }
 function mergeHqMetaPreserve(serverP,localP){
   if(!serverP)return localP||serverP;
@@ -222,7 +278,7 @@ function mergeHqMetaPreserve(serverP,localP){
   }else{
     serverP.hqMeta=serverMeta;
   }
-  // Always preserve Constitution + Guest Pool + roster emails (do not wipe on lagging server).
+  // Always preserve Constitution + Guest Pool + Blog + roster emails (do not wipe on lagging server).
   const out=normalizeHqMeta(serverP.hqMeta);
   if(localMeta){
     if((localMeta.constitution||'').length>=(out.constitution||'').length)out.constitution=localMeta.constitution||out.constitution;
@@ -235,6 +291,7 @@ function mergeHqMetaPreserve(serverP,localP){
       }else byId.set(g.id,g);
     }
     out.guestPool=[...byId.values()];
+    out.blogPosts=mergeBlogPosts(out.blogPosts,localMeta.blogPosts);
     out.rosterEmails={...(localMeta.rosterEmails||{}),...(out.rosterEmails||{})};
     out.rosterProfiles={...(localMeta.rosterProfiles||{}),...(out.rosterProfiles||{})};
   }
@@ -1144,6 +1201,9 @@ window.grUpsertGuestPool=upsertGuestPool;
 window.grConstitutionOf=constitutionOf;
 window.grSetConstitution=setConstitution;
 window.grOpenConstitutionEditor=openConstitutionEditor;
+window.grBlogPostsOf=blogPostsOf;
+window.grNormalizeBlogPost=normalizeBlogPost;
+window.grMergeBlogPosts=mergeBlogPosts;
 window.grHqRecordsReady=true;
 
 installStyles();

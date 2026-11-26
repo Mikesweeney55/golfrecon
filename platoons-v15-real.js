@@ -4,7 +4,7 @@ const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt
 let platoonSubpage='home',calendarCursor=null;
 function renderGroups(){try{if(typeof render==='function')render()}catch{}}
 function goSubpage(name){platoonSubpage=name||'home';renderGroups()}
-function subNav(){const tabs=[{id:'home',label:'Missions'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Blog'}];return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${E(t.label)}</button>`).join('')}</nav>`}
+function subNav(){const tabs=[{id:'home',label:'Missions'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Locker'}];return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${E(t.label)}</button>`).join('')}</nav>`}
 function withSubNav(html){return `<div class="gr-platoons-shell">${html||''}${subNav()}</div>`}
 function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${E(title)}</h2>${sub?`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">${E(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
 function monthStart(){if(calendarCursor)return new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);const now=new Date(),rows=(loadPlatoonLocal().missions||[]).filter(m=>m.date&&m.type!=='war').map(m=>new Date(m.date+'T12:00:00')).filter(d=>!isNaN(d));const next=rows.filter(d=>d>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a,b)=>a-b)[0];calendarCursor=new Date((next||now).getFullYear(),(next||now).getMonth(),1);return calendarCursor}
@@ -75,7 +75,184 @@ function calendarView(){
   const label=cur.toLocaleString(undefined,{month:'long',year:'numeric'});
   return `${subHead('Calendar',p.name||'My Time')}<div class="card gr-cal-card"><div class="gr-cal-nav"><button class="icon-button" type="button" data-cal-prev aria-label="Previous month">‹</button><strong>${E(label)}</strong><button class="icon-button" type="button" data-cal-next aria-label="Next month">›</button></div><p class="muted gr-cal-hint">Tap a day to schedule a Mission. Tap an existing Mission to open it.</p><div class="gr-cal-dows">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div>${x}</div>`).join('')}</div><div class="gr-cal-grid">${cells}</div></div>`;
 }
-function blogView(){const p=loadPlatoonLocal();return `${subHead('Blog',(p.name||'My Time')+' Clubhouse')}<div class="card"><div class="empty" style="padding:34px 12px">No posts yet.</div></div>`}
+const BLOG_PROMPTS=[
+  'That chip was 90% luck and 10% denial.',
+  'Buying drinks for the first birdie of the day.',
+  'Prop: someone three-putts 14 before noon.',
+  'Post your "this is fine" face after the last tee shot.',
+  'Who owed who a beer after last Mission?',
+  'Hottest take in the platoon — go.'
+];
+const BLOG_TONES=[
+  {id:'trash',label:'Trash'},
+  {id:'flex',label:'Flex'},
+  {id:'prop',label:'Prop'},
+  {id:'recap',label:'Recap'},
+  {id:'chatter',label:'Chatter'}
+];
+const BLOG_REACTS=[
+  {id:'fire',label:'🔥'},
+  {id:'dead',label:'💀'},
+  {id:'salute',label:'🫡'},
+  {id:'cap',label:'🧢'}
+];
+const BLOG_PHOTOS_KEY='golfreconPlatoonBlogPhotosV1';
+let blogComposerTone='trash';
+let blogPendingPhoto=null;
+function blogPhotosStorageKey(p){return BLOG_PHOTOS_KEY+':'+String(p?.id||p?.serverId||'local')}
+function readBlogPhotosSide(p){
+  try{
+    const raw=localStorage.getItem(blogPhotosStorageKey(p));
+    const obj=raw?JSON.parse(raw):{};
+    return obj&&typeof obj==='object'?obj:{};
+  }catch{return {}}
+}
+function writeBlogPhotosSide(p,map){
+  try{
+    const clean={};
+    for(const [id,dataUrl] of Object.entries(map||{})){
+      if(id&&typeof dataUrl==='string'&&dataUrl.startsWith('data:'))clean[id]=dataUrl;
+    }
+    localStorage.setItem(blogPhotosStorageKey(p),JSON.stringify(clean));
+  }catch{}
+}
+function blogPhotoOf(p,post){
+  if(!post?.hasPhoto)return '';
+  const map=readBlogPhotosSide(p);
+  return map[post.photoId||post.id]||'';
+}
+function relativeBlogTime(iso){
+  const t=Date.parse(iso||'');
+  if(!Number.isFinite(t))return '';
+  const mins=Math.round((Date.now()-t)/60000);
+  if(mins<1)return 'just now';
+  if(mins<60)return `${mins}m ago`;
+  const hrs=Math.round(mins/60);
+  if(hrs<24)return `${hrs}h ago`;
+  const days=Math.round(hrs/24);
+  if(days<14)return `${days}d ago`;
+  try{return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'})}catch{return ''}
+}
+function blogAuthorInitials(name){
+  const parts=String(name||'C').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length)return 'C';
+  if(parts.length===1)return parts[0].slice(0,2).toUpperCase();
+  return (parts[0][0]+parts[parts.length-1][0]).toUpperCase();
+}
+function currentBlogAuthor(p){
+  const meId=typeof window.grResolveCurrentPlatoonMemberId==='function'
+    ?window.grResolveCurrentPlatoonMemberId(p)
+    :(typeof resolveCurrentPlatoonMemberId==='function'?resolveCurrentPlatoonMemberId(p):null);
+  const me=(p.members||[]).find(m=>m&&String(m.id)===String(meId))||(p.members||[]).find(m=>m&&m.role==='chief')||null;
+  const name=me?memberLabel(me):(typeof db!=='undefined'?(db.player?.username||db.player?.name||'Cadet'):'Cadet');
+  return {id:me?.id||'local',name};
+}
+function canModerateBlog(p,post){
+  const me=currentBlogAuthor(p);
+  if(post&&String(post.authorId)===String(me.id))return true;
+  const member=(p.members||[]).find(m=>m&&String(m.id)===String(me.id));
+  return member&&(member.role==='chief'||member.role==='co_chief');
+}
+function blogToneLabel(tone){return (BLOG_TONES.find(t=>t.id===tone)||BLOG_TONES[4]).label}
+function blogPostsSorted(p){
+  const posts=typeof window.grBlogPostsOf==='function'?window.grBlogPostsOf(p):(p?.hqMeta?.blogPosts||[]);
+  return (posts||[]).slice().sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+}
+function saveBlogPosts(p,posts,{push=true}={}){
+  p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+  p.hqMeta.blogPosts=posts;
+  if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
+  if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,push);
+  else if(typeof writePlatoonLocal==='function'){writePlatoonLocal(p);renderGroups()}
+  else renderGroups();
+}
+function blogReactionCount(post,key){return (post?.reactions?.[key]||[]).length}
+function blogReactedByMe(post,key,meId){return (post?.reactions?.[key]||[]).some(id=>String(id)===String(meId))}
+function blogPostCard(p,post,me){
+  const photo=blogPhotoOf(p,post);
+  const tone=blogToneLabel(post.tone);
+  const reacts=BLOG_REACTS.map(r=>{
+    const n=blogReactionCount(post,r.id);
+    const on=blogReactedByMe(post,r.id,me.id);
+    return `<button type="button" class="gr-blog-react ${on?'is-on':''}" data-blog-react="${E(r.id)}" data-blog-post="${E(post.id)}" aria-pressed="${on?'true':'false'}" title="${E(r.id)}">${r.label}${n?`<span>${n}</span>`:''}</button>`;
+  }).join('');
+  const replies=(post.replies||[]).map(r=>`<div class="gr-blog-reply"><div class="gr-blog-reply-meta"><strong>${E(r.authorName)}</strong><span>${E(relativeBlogTime(r.createdAt))}</span></div><p>${E(r.body)}</p></div>`).join('');
+  const canDelete=canModerateBlog(p,post);
+  const canPin=canModerateBlog(p); // chief / co-chief only
+  const tools=(canPin||canDelete)?`<div class="gr-blog-post-tools">
+      ${canPin?`<button type="button" class="gr-blog-tool" data-blog-pin="${E(post.id)}" title="${post.pinned?'Unpin':'Pin'}">${post.pinned?'Unpin':'Pin'}</button>`:''}
+      ${canDelete?`<button type="button" class="gr-blog-tool danger" data-blog-delete="${E(post.id)}" title="Delete">Delete</button>`:''}
+    </div>`:'';
+  return `<article class="gr-blog-post ${post.pinned?'is-pinned':''} gr-blog-tone-${E(post.tone||'chatter')}" data-blog-post-id="${E(post.id)}">
+    <div class="gr-blog-post-head">
+      <div class="gr-blog-avatar" aria-hidden="true">${E(blogAuthorInitials(post.authorName))}</div>
+      <div class="gr-blog-post-meta">
+        <div class="gr-blog-post-by"><strong>${E(post.authorName)}</strong>${post.pinned?'<span class="gr-blog-pin-badge">Pinned</span>':''}<span class="gr-blog-tone-badge">${E(tone)}</span></div>
+        <div class="gr-blog-post-time">${E(relativeBlogTime(post.createdAt))}</div>
+      </div>
+      ${tools}
+    </div>
+    ${post.body?`<p class="gr-blog-body">${E(post.body)}</p>`:''}
+    ${photo?`<button type="button" class="gr-blog-photo" data-blog-open-photo="${E(post.id)}"><img src="${photo.replace(/"/g,'')}" alt="Locker photo from ${E(post.authorName)}"></button>`:''}
+    <div class="gr-blog-reacts">${reacts}</div>
+    ${replies?`<div class="gr-blog-replies">${replies}</div>`:''}
+    <form class="gr-blog-reply-form" data-blog-reply-form="${E(post.id)}">
+      <input name="reply" maxlength="400" placeholder="Reply with heat…" autocomplete="off">
+      <button class="button secondary" type="submit">Reply</button>
+    </form>
+  </article>`;
+}
+function blogView(){
+  const p=loadPlatoonLocal();
+  const me=currentBlogAuthor(p);
+  const posts=blogPostsSorted(p);
+  const prompts=BLOG_PROMPTS.map(t=>`<button type="button" class="gr-blog-prompt" data-blog-prompt="${E(t)}">${E(t)}</button>`).join('');
+  const tones=BLOG_TONES.map(t=>`<button type="button" class="gr-blog-tone ${blogComposerTone===t.id?'active':''}" data-blog-tone="${E(t.id)}">${E(t.label)}</button>`).join('');
+  const feed=posts.length
+    ? posts.map(post=>blogPostCard(p,post,me)).join('')
+    : `<div class="gr-blog-empty card"><strong>Locker’s quiet.</strong><span class="muted">Drop the first take — trash talk, a flex photo, or a prop bet. The platoon will answer.</span></div>`;
+  const preview=blogPendingPhoto?`<div class="gr-blog-pending"><img src="${String(blogPendingPhoto).replace(/"/g,'')}" alt="Pending upload"><button type="button" class="gr-blog-tool danger" data-blog-clear-photo>Remove photo</button></div>`:'';
+  return `${subHead('Locker Room',(p.name||'My Time')+' · trash talk · photos · props')}
+  <div class="gr-blog">
+    <section class="card gr-blog-composer">
+      <div class="gr-blog-composer-top">
+        <div class="gr-blog-avatar is-me" aria-hidden="true">${E(blogAuthorInitials(me.name))}</div>
+        <div>
+          <div class="eyebrow">POST TO THE LOCKER</div>
+          <div class="gr-blog-composer-as">as <strong>${E(me.name)}</strong></div>
+        </div>
+      </div>
+      <div class="gr-blog-tones" role="group" aria-label="Post tone">${tones}</div>
+      <form id="grBlogComposer">
+        <textarea id="grBlogBody" name="body" rows="3" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…"></textarea>
+        ${preview}
+        <div class="gr-blog-composer-actions">
+          <label class="button secondary gr-blog-photo-btn">📷 Photo<input id="grBlogPhoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" hidden></label>
+          <button class="button primary" type="submit">Post</button>
+        </div>
+      </form>
+      <div class="gr-blog-prompts-wrap">
+        <div class="gr-blog-prompts-label">Spark it</div>
+        <div class="gr-blog-prompts">${prompts}</div>
+      </div>
+    </section>
+    <section class="gr-blog-feed" aria-live="polite">
+      <div class="gr-section-head"><div><div class="eyebrow">THE BOARD</div><h2>${posts.length?`${posts.length} post${posts.length===1?'':'s'}`:'Waiting on a take'}</h2></div></div>
+      <div class="gr-blog-feed-list">${feed}</div>
+    </section>
+  </div>`;
+}
+function ensureBlogLightbox(){
+  let box=document.getElementById('grBlogLightbox');
+  if(box)return box;
+  box=document.createElement('dialog');
+  box.id='grBlogLightbox';
+  box.className='gr-blog-lightbox';
+  box.innerHTML=`<form method="dialog"><button class="gr-blog-lightbox-close" value="close" aria-label="Close">✕</button></form><img alt="Locker photo">`;
+  document.body.appendChild(box);
+  box.addEventListener('click',e=>{if(e.target===box)box.close()});
+  return box;
+}
 function courseMenuName(c){
   if(typeof courseMenuLabel==='function')return courseMenuLabel(c);
   const n=c?.baseName||c?.name||'Course';
@@ -769,7 +946,18 @@ function preserveClientPlatoonFields(serverP,localP){
     serverP.hqMeta.rosterEmails={...(localEmails||{}),...(serverP.hqMeta.rosterEmails||{})};
     const localProfiles=(localP?.hqMeta&&typeof localP.hqMeta==='object'&&localP.hqMeta.rosterProfiles)||{};
     serverP.hqMeta.rosterProfiles={...(localProfiles||{}),...(serverP.hqMeta.rosterProfiles||{})};
+    const localBlog=(localP?.hqMeta&&typeof localP.hqMeta==='object'&&localP.hqMeta.blogPosts)||[];
+    const serverBlog=Array.isArray(serverP.hqMeta.blogPosts)?serverP.hqMeta.blogPosts:[];
+    serverP.hqMeta.blogPosts=typeof window.grMergeBlogPosts==='function'
+      ?window.grMergeBlogPosts(serverBlog,localBlog)
+      :[...serverBlog,...localBlog];
   }
+  // Blog photo bytes live in side storage — keep local map across sync.
+  try{
+    const localMap=readBlogPhotosSide(localP||serverP);
+    const serverMap=readBlogPhotosSide(serverP);
+    writeBlogPhotosSide(serverP,{...serverMap,...localMap});
+  }catch{}
   hydrateRosterProfiles(serverP);
   preserveMissionPhotosOnSync(serverP,localP);
   if(typeof window.grPreserveMyTimeMasters2026==='function'){
@@ -1533,6 +1721,36 @@ window.grDeleteMission=async(id,btn)=>{
 };
 window.grRemoveMission=(id)=>window.grDeleteMission(id);
 
+async function submitBlogComposer(form){
+  const p=loadPlatoonLocal();
+  const me=currentBlogAuthor(p);
+  const body=String(form.querySelector('#grBlogBody')?.value||document.getElementById('grBlogBody')?.value||'').trim();
+  if(!body&&!blogPendingPhoto){alert('Write something or attach a photo.');return}
+  const id='bp-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const post={
+    id,
+    authorId:me.id,
+    authorName:me.name,
+    body,
+    tone:blogComposerTone||'trash',
+    hasPhoto:!!blogPendingPhoto,
+    photoId:blogPendingPhoto?id:'',
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString(),
+    pinned:false,
+    reactions:{fire:[],dead:[],salute:[],cap:[]},
+    replies:[]
+  };
+  if(blogPendingPhoto){
+    const map=readBlogPhotosSide(p);
+    map[id]=blogPendingPhoto;
+    writeBlogPhotosSide(p,map);
+  }
+  const posts=blogPostsSorted(p);
+  posts.unshift(post);
+  blogPendingPhoto=null;
+  saveBlogPosts(p,posts);
+}
 if(!document.body.dataset.grPlatoonShellBound){
   document.body.dataset.grPlatoonShellBound='1';
   document.addEventListener('click',e=>{
@@ -1545,6 +1763,113 @@ if(!document.body.dataset.grPlatoonShellBound){
     if(missionChip&&window.grViewMission){e.preventDefault();e.stopPropagation();window.grViewMission(missionChip.dataset.mission);return}
     const calDay=e.target.closest('[data-cal-iso]');
     if(calDay&&window.grOpenMissionEditor){e.preventDefault();window.grOpenMissionEditor('','',{date:calDay.dataset.calIso});return}
+
+    const toneBtn=e.target.closest('[data-blog-tone]');
+    if(toneBtn){blogComposerTone=toneBtn.getAttribute('data-blog-tone')||'trash';renderGroups();return}
+    const promptBtn=e.target.closest('[data-blog-prompt]');
+    if(promptBtn){
+      const ta=document.getElementById('grBlogBody');
+      if(ta){ta.value=promptBtn.getAttribute('data-blog-prompt')||'';ta.focus()}
+      return;
+    }
+    if(e.target.closest('[data-blog-clear-photo]')){blogPendingPhoto=null;renderGroups();return}
+    const openPhoto=e.target.closest('[data-blog-open-photo]');
+    if(openPhoto){
+      const p=loadPlatoonLocal();
+      const post=blogPostsSorted(p).find(x=>String(x.id)===String(openPhoto.getAttribute('data-blog-open-photo')));
+      const src=post?blogPhotoOf(p,post):'';
+      if(!src)return;
+      const box=ensureBlogLightbox();
+      const img=box.querySelector('img');
+      if(img)img.src=src;
+      try{box.showModal()}catch{}
+      return;
+    }
+    const reactBtn=e.target.closest('[data-blog-react]');
+    if(reactBtn){
+      const p=loadPlatoonLocal();
+      const me=currentBlogAuthor(p);
+      const postId=reactBtn.getAttribute('data-blog-post');
+      const key=reactBtn.getAttribute('data-blog-react');
+      const posts=blogPostsSorted(p);
+      const post=posts.find(x=>String(x.id)===String(postId));
+      if(!post||!key)return;
+      post.reactions=post.reactions||{fire:[],dead:[],salute:[],cap:[]};
+      const arr=Array.isArray(post.reactions[key])?post.reactions[key]:[];
+      post.reactions[key]=arr.some(id=>String(id)===String(me.id))
+        ?arr.filter(id=>String(id)!==String(me.id))
+        :[...arr,me.id];
+      post.updatedAt=new Date().toISOString();
+      saveBlogPosts(p,posts);
+      return;
+    }
+    const pinBtn=e.target.closest('[data-blog-pin]');
+    if(pinBtn){
+      const p=loadPlatoonLocal();
+      if(!canModerateBlog(p))return;
+      const posts=blogPostsSorted(p);
+      const post=posts.find(x=>String(x.id)===String(pinBtn.getAttribute('data-blog-pin')));
+      if(!post)return;
+      post.pinned=!post.pinned;
+      post.updatedAt=new Date().toISOString();
+      saveBlogPosts(p,posts);
+      return;
+    }
+    const delBtn=e.target.closest('[data-blog-delete]');
+    if(delBtn){
+      const p=loadPlatoonLocal();
+      const postId=delBtn.getAttribute('data-blog-delete');
+      const posts=blogPostsSorted(p);
+      const post=posts.find(x=>String(x.id)===String(postId));
+      if(!post||!canModerateBlog(p,post))return;
+      if(!confirm('Delete this locker post?'))return;
+      const next=posts.filter(x=>String(x.id)!==String(postId));
+      const map=readBlogPhotosSide(p);
+      if(post.photoId)delete map[post.photoId];
+      delete map[post.id];
+      writeBlogPhotosSide(p,map);
+      saveBlogPosts(p,next);
+      return;
+    }
+  });
+  document.addEventListener('submit',e=>{
+    if(e.target&&e.target.id==='grBlogComposer'){
+      e.preventDefault();
+      submitBlogComposer(e.target);
+      return;
+    }
+    const replyForm=e.target.closest('[data-blog-reply-form]');
+    if(!replyForm)return;
+    e.preventDefault();
+    const p=loadPlatoonLocal();
+    const me=currentBlogAuthor(p);
+    const postId=replyForm.getAttribute('data-blog-reply-form');
+    const input=replyForm.querySelector('input[name="reply"]');
+    const body=String(input?.value||'').trim();
+    if(!body)return;
+    const posts=blogPostsSorted(p);
+    const post=posts.find(x=>String(x.id)===String(postId));
+    if(!post)return;
+    post.replies=Array.isArray(post.replies)?post.replies:[];
+    post.replies.push({
+      id:'br-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      authorId:me.id,
+      authorName:me.name,
+      body:body.slice(0,400),
+      createdAt:new Date().toISOString()
+    });
+    post.updatedAt=new Date().toISOString();
+    saveBlogPosts(p,posts);
+  });
+  document.addEventListener('change',async e=>{
+    if(!e.target||e.target.id!=='grBlogPhoto')return;
+    const f=e.target.files&&e.target.files[0];
+    e.target.value='';
+    if(!f)return;
+    try{
+      blogPendingPhoto=await compressImageFile(f,{max:960,quality:.62});
+      renderGroups();
+    }catch(err){alert(err?.message||'Could not read that photo.')}
   });
 }
 

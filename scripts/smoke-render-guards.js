@@ -129,6 +129,7 @@ const platoon = {
     rosterProfiles: {},
     constitution: '',
     guestPool: [],
+    blogPosts: [],
     modes: {},
     records: [],
     eagleBalances: [],
