@@ -99,7 +99,7 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
 .gr-cal-daynum{font-weight:900;font-size:var(--fs-data);flex:0 0 auto}
 .gr-cal-mission{display:flex;align-items:flex-start;gap:3px;width:100%;min-width:0;border:0;background:transparent;color:inherit;text-align:left;padding:2px 0;font-size:var(--fs-data);font-weight:700;line-height:1.15;cursor:pointer;overflow:hidden}
 .gr-cal-mission-ico{flex:0 0 auto;line-height:1.15}
-.gr-cal-mission-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;word-break:break-word}
+.gr-cal-mission-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
 .gr-cal-more{font-size:var(--fs-data);font-weight:800;color:var(--accent,#d4af6a);opacity:.9}
 .gr-cal-add{margin-top:auto;font-size:var(--fs-data);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#d4af6a);opacity:.85;white-space:nowrap;overflow:hidden}
 .gr-cal-add-short{display:none}
@@ -111,7 +111,7 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
   .gr-cal-daynum{font-size:11px}
   .gr-cal-mission{padding:1px 0;font-size:9px;line-height:1.1;gap:2px}
   .gr-cal-mission-ico{display:none}
-  .gr-cal-mission-txt{-webkit-line-clamp:2}
+  .gr-cal-mission-txt{display:block;white-space:nowrap;text-overflow:ellipsis;-webkit-line-clamp:unset}
   .gr-cal-more{font-size:9px}
   .gr-cal-add{letter-spacing:0;font-size:14px;line-height:1;text-align:center;align-self:center}
   .gr-cal-add-full{display:none}
