@@ -469,15 +469,23 @@ window.grWireFormatSelect=wireFormatSelect;
 function slugifyCourse(s){return String(s||'course').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48)||'course'}
 function ensureCourseInDb({name,tees,holes,par,rating,slope}){
   if(typeof db==='undefined'||!Array.isArray(db.courses))return null;
+  const expanded=typeof expandTeeOnlyCourseName==='function'
+    ? expandTeeOnlyCourseName(name,tees)
+    : {course_name:name,baseName:name,tees:tees||'Unknown'};
+  const label=expanded.course_name||name;
   const holesN=Number(holes)||18;
   const segment=holesN===18?'18 holes':'9 holes';
-  let id=slugifyCourse(`${name}-${tees||'tees'}-${segment}`);
+  let id=slugifyCourse(`${label}-${expanded.tees||tees||'tees'}-${segment}`);
   let n=2,base=id;
   while(db.courses.some(c=>c.id===id))id=`${base}-${n++}`;
   const pars=Array(holesN).fill(null);
   const holeNumbers=Array.from({length:holesN},(_,i)=>i+1);
   const c={
-    id,name,baseName:name,tees:tees||'Unknown',yardage:0,
+    id,
+    name:label,
+    baseName:expanded.baseName||label,
+    tees:expanded.tees||tees||'Unknown',
+    yardage:0,
     slope:Number.isFinite(Number(slope))?Number(slope):null,
     rating:Number.isFinite(Number(rating))?Number(rating):null,
     par:Number.isFinite(Number(par))?Number(par):null,
