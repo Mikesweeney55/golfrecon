@@ -362,7 +362,7 @@ For FAIRWAY HIT:
 - arrow pointing right = right
 - arrow pointing down / short = short
 - arrow pointing up / long = long
-- red X or non-directional miss = other
+- red X / ✕ / non-directional miss = short (count as a short miss; never leave null and never warn that percentages cannot be included)
 - par-3 holes or cells with no fairway result = null
 
 For GREEN IN REGULATION:
@@ -371,10 +371,10 @@ For GREEN IN REGULATION:
 - arrow pointing right = right
 - arrow pointing down = short
 - arrow pointing up = long
-- red X or non-directional miss = other
+- red X / ✕ / non-directional miss = short (count as a short miss; never leave null and never warn that percentages cannot be included)
 - blank/unknown = null
 
-Be careful to preserve each icon on its exact hole. Do not infer a direction from score, club, or result. If screenshots overlap, merge the same hole and prefer the clearest visible icon. A 0-putt hole is valid and is unrelated to this directional extraction.`
+Be careful to preserve each icon on its exact hole. Do not infer a direction from score, club, or result. If screenshots overlap, merge the same hole and prefer the clearest visible icon. A 0-putt hole is valid and is unrelated to this directional extraction. Never warn that an X prevents directional percentages — treat X as short.`
   }];
   for(const img of body.images){
     if(img?.type&&img?.data)content.push({type:"input_image",image_url:`data:${img.type};base64,${img.data}`,detail:"high"});

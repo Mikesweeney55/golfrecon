@@ -637,12 +637,12 @@ function installStyles(){
   .gr-hsc-chips{margin-left:auto;flex:0 1 auto;justify-content:flex-end}
 }
 .gr-hsc-chip{
-  display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:2px;
+  display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:2px;
   background:rgba(0,0,0,.42);border:1px solid rgba(154,122,69,.85);color:#d4b878;
-  font-size:var(--fs-data);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;
+  font-size:calc(var(--fs-data) + 3px);font-weight:850;font-variant-numeric:tabular-nums;line-height:1.15;
   font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
 }
-.gr-hsc-chip em{font-style:normal;color:#b08a48;font-size:10px;letter-spacing:.06em;font-weight:900}
+.gr-hsc-chip em{font-style:normal;color:#b08a48;font-size:calc(var(--fs-data) + 1px);letter-spacing:.06em;font-weight:900}
 .gr-hsc-sub{
   margin:-1px 4px 6px;padding:0 2px;
   font-family:var(--hsc-serif);
@@ -762,7 +762,8 @@ function installStyles(){
   .gr-hsc-nameplate{gap:5px;margin:0 0 5px;padding:6px 7px}
   .gr-hsc-nameplate strong{flex-basis:100%;letter-spacing:.08em;font-size:calc(var(--fs-subtitle) - 1px)}
   .gr-hsc-chips{flex-basis:100%;margin-left:0}
-  .gr-hsc-chip{padding:2px 5px}
+  .gr-hsc-chip{padding:3px 7px;font-size:calc(var(--fs-data) + 2px)}
+  .gr-hsc-chip em{font-size:var(--fs-data)}
   .gr-hsc-gross{font-size:calc(var(--fs-data) + 1px);min-width:1.1em;min-height:1.1em}
   .gr-hsc-scroll{padding:3px 2px 4px}
 }
