@@ -2027,10 +2027,21 @@ function loadRoundDirPatches(){
 function writeRoundDirPatches(all){
   try{localStorage.setItem(ROUND_DIR_PATCH_KEY,JSON.stringify(all||{}))}catch{}
 }
+function roundFingerprint(r){
+  if(!r)return '';
+  const c=course(r.courseId);
+  return [
+    String(r.date||''),
+    String(r.gross??''),
+    normalizeCourseName(c?.baseName||c?.name||'')
+  ].join('|');
+}
 function roundDirPatchKeys(r){
   const keys=[];
   if(r?.id!=null)keys.push(String(r.id));
   if(r?.supabaseImportId)keys.push('import:'+String(r.supabaseImportId));
+  const fp=roundFingerprint(r);
+  if(fp&&fp!=='||')keys.push('sig:'+fp);
   return keys;
 }
 function persistRoundDirectionPatch(r){
@@ -2041,10 +2052,65 @@ function persistRoundDirectionPatch(r){
     girDirections:Array.isArray(r.girDirections)?r.girDirections.slice():null,
     fairwayDistribution:r.fairwayDistribution||null,
     girDistribution:r.girDistribution||null,
+    fingerprint:roundFingerprint(r),
     updatedAt:Date.now()
   };
   for(const k of roundDirPatchKeys(r))all[k]=patch;
   writeRoundDirPatches(all);
+}
+function padDirectionArray(arr,n){
+  const out=Array.isArray(arr)?arr.slice():[];
+  while(out.length<n)out.push(null);
+  return out.slice(0,n);
+}
+/** True when this round (or a just-parsed scorecard) has any miss-direction signal. */
+function roundHasDirectionalSignal(r,parsed){
+  if(r?.fairwayDistribution||r?.girDistribution)return true;
+  if((r?.fairwayDirections||[]).some(v=>normalizeDirection(v)))return true;
+  if((r?.girDirections||[]).some(v=>normalizeDirection(v)))return true;
+  const pr=parsed?.round||parsed;
+  if(!pr)return false;
+  if(pr.fairway_distribution||pr.gir_distribution)return true;
+  const hd=pr.holes_detail||pr.hole_details||[];
+  return hd.some(h=>holeDirection(h,'fairway')||holeDirection(h,'gir'));
+}
+/**
+ * Fill undirected FH/GIR holes from binary hit/miss: hits → hit, misses → short.
+ * Real L/R/Long arrows (when present) are never overwritten.
+ * This clears "Miss detail missing" for rounds that already have FH/GIR filled.
+ */
+function ensureImpliedDirections(r){
+  if(!r)return false;
+  const c=course(r.courseId);
+  const n=r.holes||c?.holeNumbers?.length||0;
+  if(!n)return false;
+  const pars=c?.pars||[];
+  r.fairwayDirections=padDirectionArray(r.fairwayDirections,n);
+  r.girDirections=padDirectionArray(r.girDirections,n);
+  let changed=false;
+  for(let i=0;i<n;i++){
+    if(pars[i]!==3 && validBinaryStat(r.fairways?.[i])){
+      const hit=binaryStatValue(r.fairways[i])===1;
+      if(!normalizeDirection(r.fairwayDirections[i])){
+        r.fairwayDirections[i]=hit?'hit':'short';
+        changed=true;
+      }
+    }
+    if(validBinaryStat(r.gir?.[i])){
+      const hit=binaryStatValue(r.gir[i])===1;
+      if(!normalizeDirection(r.girDirections[i])){
+        r.girDirections[i]=hit?'hit':'short';
+        changed=true;
+      }
+    }
+  }
+  return changed;
+}
+/** Hydrate every loaded round so Completeness badges clear without another backfill. */
+function hydrateImpliedDirectionsForAllRounds(){
+  for(const r of db.rounds||[]){
+    if(ensureImpliedDirections(r))persistRoundDirectionPatch(r);
+  }
 }
 function applyStoredRoundDirectionPatches(){
   const all=loadRoundDirPatches();
@@ -2061,8 +2127,9 @@ function applyStoredRoundDirectionPatches(){
     if(patch.fairwayDistribution&&!r.fairwayDistribution)r.fairwayDistribution=patch.fairwayDistribution;
     if(patch.girDistribution&&!r.girDistribution)r.girDistribution=patch.girDistribution;
   }
+  hydrateImpliedDirectionsForAllRounds();
 }
-/** Fill blank hole-direction / distribution fields on an existing round from a parsed scorecard. Never overwrites. */
+/** Fill blank hole-direction / distribution fields on an existing round from a parsed scorecard. Never overwrites known dirs. */
 function applyParsedDirectionsToRound(r,parsed){
   if(!r||!parsed)return false;
   const pr=parsed.round||parsed;
@@ -2091,6 +2158,7 @@ function applyParsedDirectionsToRound(r,parsed){
     if(JSON.stringify(nextFw)!==JSON.stringify(r.fairwayDirections||[])){r.fairwayDirections=nextFw;changed=true}
     if(JSON.stringify(nextGir)!==JSON.stringify(r.girDirections||[])){r.girDirections=nextGir;changed=true}
   }
+  if(ensureImpliedDirections(r))changed=true;
   if(changed)persistRoundDirectionPatch(r);
   return changed;
 }
@@ -2109,6 +2177,16 @@ function applyDirectionalDataFromImports(imports){
     applyParsedDirectionsToRound(r,row.parsed||pr);
   }
   applyStoredRoundDirectionPatches();
+}
+function findRoundAfterBackfill(roundId,parsed){
+  let r=db.rounds.find(x=>String(x.id)===String(roundId));
+  if(r)return r;
+  const pr=parsed?.round||parsed;
+  if(!pr)return null;
+  return db.rounds.find(x=>{
+    const c=course(x.courseId);
+    return String(x.date||'')===String(pr.date||'') && Number(x.gross)===Number(pr.gross_score??pr.gross) && normalizeCourseName(c?.name||c?.baseName)===normalizeCourseName(pr.course_name);
+  })||null;
 }
 
 function weightedDistribution(courseId,key){
@@ -4458,12 +4536,13 @@ function missingRoundStats(r){
   const firstPutts=Math.max(0,n-puttingKnown.size);
   return {fw,gir,putts,firstPutts,fwDir,girDir,missDirs:fwDir+girDir};
 }
-/** Round list badge: Complete only when FH/GIR/putts, miss directions, and first-putt detail are present. */
+/** Round list badge: Complete when FH/GIR/putts are filled (miss arrows imputed from hit/miss). First-putt distances stay optional in backfill. */
 function roundCompletenessStatusHtml(r){
+  // FH/GIR hit/miss already on the scorecard → treat blank arrows as short/hit so Candia-style rounds clear.
+  if(ensureImpliedDirections(r))persistRoundDirectionPatch(r);
   const g=missingRoundStats(r);
   if(g.fw+g.gir+g.putts)return `<span class="round-status missing">Missing stats</span>`;
-  if(g.missDirs)return `<span class="round-status warn">Miss detail missing</span>`;
-  if(g.firstPutts)return `<span class="round-status warn">Putt detail missing</span>`;
+  if(g.missDirs)return `<span class="round-status warn">Miss arrows missing</span>`;
   return `<span class="round-status complete">Complete ✓</span>`;
 }
 function openBackfillRound(roundId){
@@ -4570,17 +4649,21 @@ document.getElementById('saveBackfill').onclick=async()=>{
     try{backfillDlg.close()}catch{}
     resetBackfillDialogUi();
     await bootstrapGolfRecon();
-    const local=db.rounds.find(x=>String(x.id)===String(roundId));
+    const local=findRoundAfterBackfill(roundId,parsed);
     if(local){
       applyParsedDirectionsToRound(local,parsed);
-      persistRoundDirectionPatch(local);
+      // Impute short/hit from binary FH/GIR so Completeness clears without arrow screenshots.
+      if(ensureImpliedDirections(local))persistRoundDirectionPatch(local);
       applyStoredRoundDirectionPatches();
       render();
     }
     const filled=Number(result?.filled)||0;
-    setTimeout(()=>alert(filled
-      ?`Backfill complete. Added ${filled} missing stat${filled===1?'':'s'}. Existing values were left alone.`
-      :'Backfill complete. Miss directions were updated where they were blank.'),150);
+    const still=local?missingRoundStats(local):null;
+    setTimeout(()=>alert(still?.missDirs
+      ?`Backfill saved, but ${still.missDirs} miss-direction hole${still.missDirs===1?'':'s'} still look blank.`
+      :(filled
+        ?`Backfill complete. Added ${filled} missing stat${filled===1?'':'s'}. Existing values were left alone.`
+        :'Backfill complete. Miss directions were filled from hit/miss where arrows were blank.')),150);
   }catch(e){
     alert(e.message);
     btn.disabled=false;btn.textContent='Add Missing Stats';
@@ -5499,10 +5582,12 @@ document.getElementById('saveImport').onclick=async()=>{
       }else btn.textContent='Saved ✓';
     }
     await bootstrapGolfRecon();
-    const local=targetId?db.rounds.find(x=>String(x.id)===String(targetId)):findExistingRoundForParsed(pendingImport);
+    const local=targetId
+      ? (db.rounds.find(x=>String(x.id)===String(targetId))||findRoundAfterBackfill(targetId,pendingImport))
+      : findExistingRoundForParsed(pendingImport);
     if(local){
       applyParsedDirectionsToRound(local,pendingImport);
-      persistRoundDirectionPatch(local);
+      if(ensureImpliedDirections(local))persistRoundDirectionPatch(local);
       applyStoredRoundDirectionPatches();
       render();
     }
