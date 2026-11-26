@@ -101,6 +101,7 @@ let blogComposerTone='trash';
 let blogPendingPhoto=null;
 let blogPendingBody='';
 let blogPhotoBusy=false;
+let blogReplyOpenId=''; // only one reply box open — keeps a single clear place to compose
 function blogPhotosStorageKey(p){return BLOG_PHOTOS_KEY+':'+String(p?.id||p?.serverId||'local')}
 function readBlogPhotosSide(p){
   const merged={};
@@ -148,6 +149,72 @@ function rememberBlogPhoto(p,postId,dataUrl){
   map[postId]=dataUrl;
   writeBlogPhotosSide(p,map);
 }
+/** Re-attach locker photo bytes after sync (server hq_meta never keeps reliable data-URLs). */
+function hydrateBlogPhotos(p){
+  if(!p)return p;
+  p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+  if(!Array.isArray(p.hqMeta.blogPosts))p.hqMeta.blogPosts=[];
+  const map=readBlogPhotosSide(p);
+  let sideDirty=false;
+  for(const post of p.hqMeta.blogPosts){
+    if(!post||typeof post!=='object')continue;
+    const id=String(post.photoId||post.id||'');
+    if(post.photoData&&String(post.photoData).startsWith('data:')){
+      if(id&&map[id]!==post.photoData){map[id]=post.photoData;sideDirty=true}
+      post.hasPhoto=true;
+      if(id)post.photoId=id;
+      continue;
+    }
+    if(id&&map[id]){
+      post.photoData=map[id];
+      post.hasPhoto=true;
+      post.photoId=id;
+    }
+  }
+  if(sideDirty){
+    try{writeBlogPhotosSide(p,map)}catch(e){console.warn('Locker photo hydrate save failed',e)}
+  }
+  return p;
+}
+/** Persist photo bytes to side storage and strip them from the object we stringify into the main platoon key. */
+function preparePlatoonForLocalWrite(p){
+  if(!p)return p;
+  hydrateBlogPhotos(p);
+  let copy;
+  try{copy=JSON.parse(JSON.stringify(p))}catch{return p}
+  const posts=copy?.hqMeta?.blogPosts;
+  if(Array.isArray(posts)){
+    for(const post of posts){
+      if(!post)continue;
+      if(post.photoData&&String(post.photoData).startsWith('data:')){
+        try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(e){console.warn(e)}
+      }
+      delete post.photoData;
+    }
+  }
+  return copy;
+}
+/** Server snapshot: never ship multi-hundred-KB data URLs in hq_meta. */
+function snapshotPlatoonForServer(p){
+  hydrateBlogPhotos(p);
+  let copy;
+  try{copy=JSON.parse(JSON.stringify(p))}catch{return p}
+  const posts=copy?.hqMeta?.blogPosts;
+  if(Array.isArray(posts)){
+    for(const post of posts){
+      if(!post)continue;
+      if(post.photoData&&String(post.photoData).startsWith('data:')){
+        try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch{}
+      }
+      delete post.photoData;
+      // Keep hasPhoto + photoId so other devices know a photo exists (bytes stay local for now).
+    }
+  }
+  return copy;
+}
+window.grHydrateBlogPhotos=hydrateBlogPhotos;
+window.grPreparePlatoonForLocalWrite=preparePlatoonForLocalWrite;
+window.grSnapshotPlatoonForServer=snapshotPlatoonForServer;
 function relativeBlogTime(iso){
   const t=Date.parse(iso||'');
   if(!Number.isFinite(t))return '';
@@ -182,6 +249,7 @@ function canModerateBlog(p,post){
 }
 function blogToneLabel(tone){return (BLOG_TONES.find(t=>t.id===tone)||BLOG_TONES[4]).label}
 function blogPostsSorted(p){
+  hydrateBlogPhotos(p);
   const posts=typeof window.grBlogPostsOf==='function'?window.grBlogPostsOf(p):(p?.hqMeta?.blogPosts||[]);
   return (posts||[]).slice().sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
 }
@@ -189,6 +257,16 @@ function saveBlogPosts(p,posts,{push=true}={}){
   p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
   p.hqMeta.blogPosts=posts;
   if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
+  // Ensure side storage has every photo before sync can rewrite hqMeta without bytes.
+  for(const post of (p.hqMeta.blogPosts||[])){
+    if(post?.photoData&&String(post.photoData).startsWith('data:')){
+      try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(err){
+        alert(err?.message||'Could not save photo.');
+        return;
+      }
+    }
+  }
+  hydrateBlogPhotos(p);
   if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,push);
   else if(typeof writePlatoonLocal==='function'){writePlatoonLocal(p);renderGroups()}
   else renderGroups();
@@ -221,12 +299,13 @@ function blogPostCard(p,post,me){
     </div>
     ${post.body?`<p class="gr-blog-body">${E(post.body)}</p>`:''}
     ${photo?`<button type="button" class="gr-blog-photo" data-blog-open-photo="${E(post.id)}"><img src="${photo.replace(/"/g,'')}" alt="Locker photo from ${E(post.authorName)}"></button>`:''}
-    <div class="gr-blog-reacts">${reacts}</div>
+    <div class="gr-blog-reacts">${reacts}<button type="button" class="gr-blog-react gr-blog-reply-toggle ${blogReplyOpenId===post.id?'is-on':''}" data-blog-reply-toggle="${E(post.id)}" aria-expanded="${blogReplyOpenId===post.id?'true':'false'}">Reply${(post.replies||[]).length?`<span>${(post.replies||[]).length}</span>`:''}</button></div>
     ${replies?`<div class="gr-blog-replies">${replies}</div>`:''}
-    <form class="gr-blog-reply-form" data-blog-reply-form="${E(post.id)}">
+    ${blogReplyOpenId===post.id?`<form class="gr-blog-reply-form" data-blog-reply-form="${E(post.id)}">
       <input name="reply" maxlength="400" placeholder="Reply with heat…" autocomplete="off">
-      <button class="button secondary" type="submit">Reply</button>
-    </form>
+      <button class="button secondary" type="submit">Send</button>
+      <button class="button secondary" type="button" data-blog-reply-cancel="${E(post.id)}">Cancel</button>
+    </form>`:''}
   </article>`;
 }
 function blogView(){
@@ -982,12 +1061,21 @@ function preserveClientPlatoonFields(serverP,localP){
       ?window.grMergeBlogPosts(serverBlog,localBlog)
       :[...serverBlog,...localBlog];
   }
-  // Blog photo bytes live in side storage — keep local map across sync.
+  // Blog photo bytes live in side storage — keep local map across sync, then rehydrate posts.
   try{
     const localMap=readBlogPhotosSide(localP||serverP);
     const serverMap=readBlogPhotosSide(serverP);
     writeBlogPhotosSide(serverP,{...serverMap,...localMap});
   }catch{}
+  try{
+    // Also harvest any photoData still on the local posts before server snapshot wins.
+    for(const post of (localP?.hqMeta?.blogPosts||[])){
+      if(post?.photoData&&String(post.photoData).startsWith('data:')){
+        try{rememberBlogPhoto(serverP,post.photoId||post.id,post.photoData)}catch{}
+      }
+    }
+  }catch{}
+  hydrateBlogPhotos(serverP);
   hydrateRosterProfiles(serverP);
   preserveMissionPhotosOnSync(serverP,localP);
   if(typeof window.grPreserveMyTimeMasters2026==='function'){
@@ -1809,6 +1897,16 @@ if(!document.body.dataset.grPlatoonShellBound){
       return;
     }
     if(e.target.closest('[data-blog-clear-photo]')){blogPendingPhoto=null;blogPhotoBusy=false;renderGroups();return}
+    const replyToggle=e.target.closest('[data-blog-reply-toggle]');
+    if(replyToggle){
+      const id=replyToggle.getAttribute('data-blog-reply-toggle')||'';
+      blogReplyOpenId=blogReplyOpenId===id?'':id;
+      renderGroups();
+      if(blogReplyOpenId)queueMicrotask(()=>document.querySelector(`[data-blog-reply-form="${blogReplyOpenId}"] input`)?.focus());
+      return;
+    }
+    const replyCancel=e.target.closest('[data-blog-reply-cancel]');
+    if(replyCancel){blogReplyOpenId='';renderGroups();return}
     const openPhoto=e.target.closest('[data-blog-open-photo]');
     if(openPhoto){
       const p=loadPlatoonLocal();
@@ -1895,6 +1993,7 @@ if(!document.body.dataset.grPlatoonShellBound){
       createdAt:new Date().toISOString()
     });
     post.updatedAt=new Date().toISOString();
+    blogReplyOpenId='';
     saveBlogPosts(p,posts);
   });
   document.addEventListener('input',e=>{

@@ -313,11 +313,12 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
 .gr-blog-reply-meta{display:flex;gap:8px;align-items:baseline;font-size:var(--fs-data)}
 .gr-blog-reply-meta span{color:var(--muted)}
 .gr-blog-reply p{margin:3px 0 0;font-size:var(--fs-data);line-height:1.4;color:#e8dfd2}
-.gr-blog-reply-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:12px}
+.gr-blog-reply-form{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;margin-top:12px;align-items:center}
 .gr-blog-reply-form input{
   width:100%;box-sizing:border-box;border-radius:12px;border:1px solid rgba(255,255,255,.1);
   background:rgba(14,12,10,.45);color:var(--text);padding:10px 12px;font:inherit;font-size:var(--fs-data);
 }
+.gr-blog-reply-toggle{margin-left:auto}
 .gr-blog-lightbox{
   border:0;padding:0;background:rgba(8,6,4,.92);width:min(920px,calc(100vw - 24px));
   max-height:min(90dvh,calc(100dvh - 24px));margin:auto;
