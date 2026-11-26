@@ -99,13 +99,26 @@ const BLOG_REACTS=[
 const BLOG_PHOTOS_KEY='golfreconPlatoonBlogPhotosV1';
 let blogComposerTone='trash';
 let blogPendingPhoto=null;
+let blogPendingBody='';
+let blogPhotoBusy=false;
 function blogPhotosStorageKey(p){return BLOG_PHOTOS_KEY+':'+String(p?.id||p?.serverId||'local')}
 function readBlogPhotosSide(p){
+  const merged={};
+  const keys=new Set([blogPhotosStorageKey(p),BLOG_PHOTOS_KEY+':local']);
   try{
-    const raw=localStorage.getItem(blogPhotosStorageKey(p));
-    const obj=raw?JSON.parse(raw):{};
-    return obj&&typeof obj==='object'?obj:{};
-  }catch{return {}}
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith(BLOG_PHOTOS_KEY+':'))keys.add(k);
+    }
+  }catch{}
+  for(const key of keys){
+    try{
+      const raw=localStorage.getItem(key);
+      const obj=raw?JSON.parse(raw):{};
+      if(obj&&typeof obj==='object')Object.assign(merged,obj);
+    }catch{}
+  }
+  return merged;
 }
 function writeBlogPhotosSide(p,map){
   try{
@@ -113,13 +126,27 @@ function writeBlogPhotosSide(p,map){
     for(const [id,dataUrl] of Object.entries(map||{})){
       if(id&&typeof dataUrl==='string'&&dataUrl.startsWith('data:'))clean[id]=dataUrl;
     }
-    localStorage.setItem(blogPhotosStorageKey(p),JSON.stringify(clean));
-  }catch{}
+    const payload=JSON.stringify(clean);
+    localStorage.setItem(blogPhotosStorageKey(p),payload);
+    // Mirror under :local so id/serverId flips after sync cannot orphan photos.
+    localStorage.setItem(BLOG_PHOTOS_KEY+':local',payload);
+  }catch(err){
+    console.warn('Locker photo storage failed',err);
+    throw new Error('Could not save that photo on this device (storage full?). Try a smaller image.');
+  }
 }
 function blogPhotoOf(p,post){
-  if(!post?.hasPhoto)return '';
+  if(!post)return '';
+  if(post.photoData&&String(post.photoData).startsWith('data:'))return post.photoData;
+  if(!post.hasPhoto)return '';
   const map=readBlogPhotosSide(p);
   return map[post.photoId||post.id]||'';
+}
+function rememberBlogPhoto(p,postId,dataUrl){
+  if(!postId||!dataUrl)return;
+  const map=readBlogPhotosSide(p);
+  map[postId]=dataUrl;
+  writeBlogPhotosSide(p,map);
 }
 function relativeBlogTime(iso){
   const t=Date.parse(iso||'');
@@ -211,7 +238,10 @@ function blogView(){
   const feed=posts.length
     ? posts.map(post=>blogPostCard(p,post,me)).join('')
     : `<div class="gr-blog-empty card"><strong>Locker’s quiet.</strong><span class="muted">Drop the first take — trash talk, a flex photo, or a prop bet. The platoon will answer.</span></div>`;
-  const preview=blogPendingPhoto?`<div class="gr-blog-pending"><img src="${String(blogPendingPhoto).replace(/"/g,'')}" alt="Pending upload"><button type="button" class="gr-blog-tool danger" data-blog-clear-photo>Remove photo</button></div>`:'';
+  const preview=blogPendingPhoto
+    ?`<div class="gr-blog-pending"><img src="${String(blogPendingPhoto).replace(/"/g,'')}" alt="Pending upload"><button type="button" class="gr-blog-tool danger" data-blog-clear-photo>Remove photo</button></div>`
+    :(blogPhotoBusy?`<div class="gr-blog-pending is-busy"><span class="muted">Attaching photo…</span></div>`:'');
+  const draft=blogPendingBody||'';
   return `${subHead('Locker Room',(p.name||'My Time')+' · trash talk · photos · props')}
   <div class="gr-blog">
     <section class="card gr-blog-composer">
@@ -224,11 +254,11 @@ function blogView(){
       </div>
       <div class="gr-blog-tones" role="group" aria-label="Post tone">${tones}</div>
       <form id="grBlogComposer">
-        <textarea id="grBlogBody" name="body" rows="3" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…"></textarea>
+        <textarea id="grBlogBody" name="body" rows="3" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…">${E(draft)}</textarea>
         ${preview}
         <div class="gr-blog-composer-actions">
-          <label class="button secondary gr-blog-photo-btn">📷 Photo<input id="grBlogPhoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" hidden></label>
-          <button class="button primary" type="submit">Post</button>
+          <label class="button secondary gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}">📷 ${blogPhotoBusy?'Working…':'Photo'}<input id="grBlogPhoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}></label>
+          <button class="button primary" type="submit" ${blogPhotoBusy?'disabled':''}>${blogPhotoBusy?'Wait…':'Post'}</button>
         </div>
       </form>
       <div class="gr-blog-prompts-wrap">
@@ -1722,33 +1752,37 @@ window.grDeleteMission=async(id,btn)=>{
 window.grRemoveMission=(id)=>window.grDeleteMission(id);
 
 async function submitBlogComposer(form){
+  if(blogPhotoBusy){alert('Photo is still attaching — wait a second.');return}
   const p=loadPlatoonLocal();
   const me=currentBlogAuthor(p);
-  const body=String(form.querySelector('#grBlogBody')?.value||document.getElementById('grBlogBody')?.value||'').trim();
+  const body=String(form.querySelector('#grBlogBody')?.value||document.getElementById('grBlogBody')?.value||blogPendingBody||'').trim();
+  blogPendingBody=body;
   if(!body&&!blogPendingPhoto){alert('Write something or attach a photo.');return}
+  const photo=blogPendingPhoto;
   const id='bp-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  if(photo){
+    try{rememberBlogPhoto(p,id,photo)}
+    catch(err){alert(err?.message||'Could not save photo.');return}
+  }
   const post={
     id,
     authorId:me.id,
     authorName:me.name,
     body,
     tone:blogComposerTone||'trash',
-    hasPhoto:!!blogPendingPhoto,
-    photoId:blogPendingPhoto?id:'',
+    hasPhoto:!!photo,
+    photoId:photo?id:'',
+    photoData:photo||'',
     createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString(),
     pinned:false,
     reactions:{fire:[],dead:[],salute:[],cap:[]},
     replies:[]
   };
-  if(blogPendingPhoto){
-    const map=readBlogPhotosSide(p);
-    map[id]=blogPendingPhoto;
-    writeBlogPhotosSide(p,map);
-  }
   const posts=blogPostsSorted(p);
   posts.unshift(post);
   blogPendingPhoto=null;
+  blogPendingBody='';
   saveBlogPosts(p,posts);
 }
 if(!document.body.dataset.grPlatoonShellBound){
@@ -1769,10 +1803,12 @@ if(!document.body.dataset.grPlatoonShellBound){
     const promptBtn=e.target.closest('[data-blog-prompt]');
     if(promptBtn){
       const ta=document.getElementById('grBlogBody');
-      if(ta){ta.value=promptBtn.getAttribute('data-blog-prompt')||'';ta.focus()}
+      const text=promptBtn.getAttribute('data-blog-prompt')||'';
+      blogPendingBody=text;
+      if(ta){ta.value=text;ta.focus()}
       return;
     }
-    if(e.target.closest('[data-blog-clear-photo]')){blogPendingPhoto=null;renderGroups();return}
+    if(e.target.closest('[data-blog-clear-photo]')){blogPendingPhoto=null;blogPhotoBusy=false;renderGroups();return}
     const openPhoto=e.target.closest('[data-blog-open-photo]');
     if(openPhoto){
       const p=loadPlatoonLocal();
@@ -1861,15 +1897,30 @@ if(!document.body.dataset.grPlatoonShellBound){
     post.updatedAt=new Date().toISOString();
     saveBlogPosts(p,posts);
   });
+  document.addEventListener('input',e=>{
+    if(e.target&&e.target.id==='grBlogBody')blogPendingBody=String(e.target.value||'');
+  });
   document.addEventListener('change',async e=>{
     if(!e.target||e.target.id!=='grBlogPhoto')return;
     const f=e.target.files&&e.target.files[0];
     e.target.value='';
     if(!f)return;
+    const ta=document.getElementById('grBlogBody');
+    if(ta)blogPendingBody=String(ta.value||'');
+    blogPhotoBusy=true;
+    blogPendingPhoto=null;
+    renderGroups();
     try{
-      blogPendingPhoto=await compressImageFile(f,{max:960,quality:.62});
+      const dataUrl=await compressImageFile(f,{max:960,quality:.62});
+      if(!dataUrl||!String(dataUrl).startsWith('data:'))throw new Error('Photo decode failed.');
+      blogPendingPhoto=dataUrl;
+    }catch(err){
+      blogPendingPhoto=null;
+      alert(err?.message||'Could not read that photo.');
+    }finally{
+      blogPhotoBusy=false;
       renderGroups();
-    }catch(err){alert(err?.message||'Could not read that photo.')}
+    }
   });
 }
 

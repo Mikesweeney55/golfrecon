@@ -75,14 +75,18 @@ function normalizeBlogPost(post){
   const body=String(post.body||'').trim().slice(0,800);
   const tone=BLOG_TONES.has(post.tone)?post.tone:'chatter';
   const replies=Array.isArray(post.replies)?post.replies.map(normalizeBlogReply).filter(Boolean).slice(0,40):[];
+  const photoData=(typeof post.photoData==='string'&&post.photoData.startsWith('data:'))?post.photoData:'';
+  const hasPhoto=!!post.hasPhoto||!!photoData;
   return {
     id:String(post.id||uid('bp')),
     authorId:String(post.authorId||'').trim(),
     authorName:String(post.authorName||'').trim()||'Cadet',
     body,
     tone,
-    hasPhoto:!!post.hasPhoto,
-    photoId:post.hasPhoto?String(post.photoId||post.id||''):'',
+    hasPhoto,
+    photoId:hasPhoto?String(post.photoId||post.id||''):'',
+    // Keep bytes on the post so Locker photos survive sync/key flips; side storage is a backup.
+    photoData,
     createdAt:post.createdAt||new Date().toISOString(),
     updatedAt:post.updatedAt||post.createdAt||new Date().toISOString(),
     pinned:!!post.pinned,
@@ -134,7 +138,18 @@ function mergeBlogPosts(serverPosts,localPosts){
   for(const post of [...(serverPosts||[]),...(localPosts||[])]){
     if(!post?.id)continue;
     const prev=byId.get(post.id);
-    if(!prev||String(post.updatedAt||'')>=String(prev.updatedAt||''))byId.set(post.id,post);
+    if(!prev){byId.set(post.id,post);continue}
+    const newer=String(post.updatedAt||'')>=String(prev.updatedAt||'')?post:prev;
+    const older=newer===post?prev:post;
+    const photoData=newer.photoData||older.photoData||'';
+    byId.set(post.id,{
+      ...newer,
+      photoData,
+      hasPhoto:!!(newer.hasPhoto||older.hasPhoto||photoData),
+      photoId:newer.photoId||older.photoId||(photoData?newer.id:''),
+      reactions:newer.reactions||older.reactions,
+      replies:(Array.isArray(newer.replies)&&newer.replies.length>=(older.replies||[]).length)?newer.replies:older.replies
+    });
   }
   return [...byId.values()]
     .sort((a,b)=>Number(b.pinned)-Number(a.pinned)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')))
