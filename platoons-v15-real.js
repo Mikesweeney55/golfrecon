@@ -101,6 +101,7 @@ let blogComposerTone='trash';
 let blogPendingPhoto=null;
 let blogPendingBody='';
 let blogPhotoBusy=false;
+let blogReplyOpenId=''; // only one reply box open — keeps a single clear place to compose
 function blogPhotosStorageKey(p){return BLOG_PHOTOS_KEY+':'+String(p?.id||p?.serverId||'local')}
 function readBlogPhotosSide(p){
   const merged={};
@@ -298,12 +299,13 @@ function blogPostCard(p,post,me){
     </div>
     ${post.body?`<p class="gr-blog-body">${E(post.body)}</p>`:''}
     ${photo?`<button type="button" class="gr-blog-photo" data-blog-open-photo="${E(post.id)}"><img src="${photo.replace(/"/g,'')}" alt="Locker photo from ${E(post.authorName)}"></button>`:''}
-    <div class="gr-blog-reacts">${reacts}</div>
+    <div class="gr-blog-reacts">${reacts}<button type="button" class="gr-blog-react gr-blog-reply-toggle ${blogReplyOpenId===post.id?'is-on':''}" data-blog-reply-toggle="${E(post.id)}" aria-expanded="${blogReplyOpenId===post.id?'true':'false'}">Reply${(post.replies||[]).length?`<span>${(post.replies||[]).length}</span>`:''}</button></div>
     ${replies?`<div class="gr-blog-replies">${replies}</div>`:''}
-    <form class="gr-blog-reply-form" data-blog-reply-form="${E(post.id)}">
+    ${blogReplyOpenId===post.id?`<form class="gr-blog-reply-form" data-blog-reply-form="${E(post.id)}">
       <input name="reply" maxlength="400" placeholder="Reply with heat…" autocomplete="off">
-      <button class="button secondary" type="submit">Reply</button>
-    </form>
+      <button class="button secondary" type="submit">Send</button>
+      <button class="button secondary" type="button" data-blog-reply-cancel="${E(post.id)}">Cancel</button>
+    </form>`:''}
   </article>`;
 }
 function blogView(){
@@ -1895,6 +1897,16 @@ if(!document.body.dataset.grPlatoonShellBound){
       return;
     }
     if(e.target.closest('[data-blog-clear-photo]')){blogPendingPhoto=null;blogPhotoBusy=false;renderGroups();return}
+    const replyToggle=e.target.closest('[data-blog-reply-toggle]');
+    if(replyToggle){
+      const id=replyToggle.getAttribute('data-blog-reply-toggle')||'';
+      blogReplyOpenId=blogReplyOpenId===id?'':id;
+      renderGroups();
+      if(blogReplyOpenId)queueMicrotask(()=>document.querySelector(`[data-blog-reply-form="${blogReplyOpenId}"] input`)?.focus());
+      return;
+    }
+    const replyCancel=e.target.closest('[data-blog-reply-cancel]');
+    if(replyCancel){blogReplyOpenId='';renderGroups();return}
     const openPhoto=e.target.closest('[data-blog-open-photo]');
     if(openPhoto){
       const p=loadPlatoonLocal();
@@ -1981,6 +1993,7 @@ if(!document.body.dataset.grPlatoonShellBound){
       createdAt:new Date().toISOString()
     });
     post.updatedAt=new Date().toISOString();
+    blogReplyOpenId='';
     saveBlogPosts(p,posts);
   });
   document.addEventListener('input',e=>{
