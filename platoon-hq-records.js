@@ -19,7 +19,8 @@ const MODES=['combined','automatic','manual'];
 function getP(){try{return loadPlatoonLocal()}catch{return null}}
 function canon(p,raw){return typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,raw):null}
 function memberById(p,id){return (p?.members||[]).find(m=>String(m.id)===String(id))||null}
-function displayName(p,raw){return typeof window.grDisplayName==='function'?window.grDisplayName(p,raw):(canon(p,raw)?.name||raw||'Player')}
+function memberLabel(m){return typeof window.grMemberLabel==='function'?window.grMemberLabel(m):(String(m?.displayName||'').trim()||String(m?.name||'').trim()||'Player')}
+function displayName(p,raw){return typeof window.grDisplayName==='function'?window.grDisplayName(p,raw):(canon(p,raw)?memberLabel(canon(p,raw)):(raw||'Player'))}
 function aliasesOf(m){return typeof window.grAliasesOf==='function'?window.grAliasesOf(m):[]}
 function cleanHoles(holes){
   if(typeof window.grCleanHoles==='function')return window.grCleanHoles(holes);
@@ -42,7 +43,8 @@ function defaultHqMeta(){
     suppressedAuto:[],
     constitution:'',
     guestPool:[],
-    rosterEmails:{}
+    rosterEmails:{},
+    rosterProfiles:{}
   };
 }
 function normalizeRosterEmails(raw){
@@ -52,6 +54,19 @@ function normalizeRosterEmails(raw){
     const key=String(id||'').trim();
     const em=String(email||'').trim().toLowerCase();
     if(key&&em.includes('@'))out[key]=em;
+  }
+  return out;
+}
+function normalizeRosterProfiles(raw){
+  const out={};
+  if(!raw||typeof raw!=='object')return out;
+  for(const [id,prof] of Object.entries(raw)){
+    const key=String(id||'').trim();
+    if(!key||!prof||typeof prof!=='object')continue;
+    const fullName=String(prof.fullName||prof.name||'').trim();
+    const displayName=String(prof.displayName||'').trim();
+    if(!fullName&&!displayName)continue;
+    out[key]={fullName,displayName};
   }
   return out;
 }
@@ -66,6 +81,7 @@ function normalizeHqMeta(raw){
   d.constitution=String(x.constitution||'').trim();
   d.guestPool=Array.isArray(x.guestPool)?x.guestPool.map(normalizeGuestPoolEntry).filter(Boolean):[];
   d.rosterEmails=normalizeRosterEmails(x.rosterEmails);
+  d.rosterProfiles=normalizeRosterProfiles(x.rosterProfiles);
   return d;
 }
 function normalizeGuestPoolEntry(g){
@@ -220,6 +236,7 @@ function mergeHqMetaPreserve(serverP,localP){
     }
     out.guestPool=[...byId.values()];
     out.rosterEmails={...(localMeta.rosterEmails||{}),...(out.rosterEmails||{})};
+    out.rosterProfiles={...(localMeta.rosterProfiles||{}),...(out.rosterProfiles||{})};
   }
   serverP.hqMeta=out;
   return serverP;
@@ -462,7 +479,7 @@ function renderStandingsBubble(p,standingRows){
   const lead=active[0];
   const hero=lead?`<div class="gr-eagle-spotlight gr-standings-spotlight"><div class="gr-eagle-spotlight-label">Cup lead</div><div class="gr-eagle-spotlight-name">${esc(lead.member?.name||lead.name)}</div><div class="gr-eagle-spotlight-count">${lead.points}<span> /rnd</span></div><div class="gr-standings-hero-meta">${Number(lead.totalPoints||0)} 18Birdies · ${Number(lead.played||0)} round${Number(lead.played)===1?'':'s'}</div></div>`:'';
   const rows=active.length
-    ? active.map((x,i)=>`<div class="gr155-recap-row gr-standings-row ${i===0?'is-lead':''}"><span><b>${i+1}</b> ${esc(x.member?.name||x.name)}<small class="gr-standings-meta">${Number(x.totalPoints||0)} pts · ${Number(x.played||0)} rnd</small></span><span class="gr-standings-pts">${x.points}</span></div>`).join('')
+    ? active.map((x,i)=>`<div class="gr155-recap-row gr-standings-row ${i===0?'is-lead':''}"><span><b>${i+1}</b> ${esc(x.member?memberLabel(x.member):(x.name||'Player'))}<small class="gr-standings-meta">${Number(x.totalPoints||0)} pts · ${Number(x.played||0)} rnd</small></span><span class="gr-standings-pts">${x.points}</span></div>`).join('')
     : '<div class="gr155-empty">No My Time ⛳ Points yet — finish a Mission to open the cup.</div>';
   return `<section class="gr155-recap-block gr-honor-card gr-honor-standings-card" data-gr-hq="standings">${lockup}${hero}${rows}</section>`;
 }

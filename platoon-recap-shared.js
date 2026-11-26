@@ -27,21 +27,32 @@ function aliasesOf(m){
   return [...new Set(a)];
 }
 
+/** Public board name: Display Name when set, otherwise Full name. */
+function memberLabel(m){
+  const show=String(m?.displayName||'').trim();
+  if(show)return show;
+  return String(m?.name||'').trim()||'Player';
+}
+
 function canonicalMember(p,raw){
   const n=norm(raw);if(!n)return null;
   const exact=[];
   for(const m of (p?.members||[])){
-    const vals=[m.name,...aliasesOf(m)].map(norm).filter(Boolean);
+    const vals=[m.name,m.displayName,...aliasesOf(m)].map(norm).filter(Boolean);
     if(vals.includes(n))exact.push(m);
   }
   if(exact.length===1)return exact[0];
   const first=n.split(' ')[0];
-  const firstMatches=(p?.members||[]).filter(m=>norm(m.name).split(' ')[0]===first);
+  const firstMatches=(p?.members||[]).filter(m=>{
+    const keys=[m.name,m.displayName].map(norm).filter(Boolean);
+    return keys.some(k=>k.split(' ')[0]===first);
+  });
   return firstMatches.length===1?firstMatches[0]:null;
 }
 
 function displayName(p,raw){
-  return canonicalMember(p,raw)?.name||raw||'Player';
+  const hit=canonicalMember(p,raw);
+  return hit?memberLabel(hit):(raw||'Player');
 }
 
 function memberById(p,id){
@@ -816,6 +827,7 @@ window.grFinite=finite;
 window.grAliasesOf=aliasesOf;
 window.grCanonicalMember=canonicalMember;
 window.grDisplayName=displayName;
+window.grMemberLabel=memberLabel;
 window.grCleanCourseName=cleanCourseName;
 window.grMissionStandingsRows=missionStandingsRows;
 window.grMissionStandingsMarkup=(m,p)=>standingsTableMarkup(p,m);

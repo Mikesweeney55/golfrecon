@@ -1688,7 +1688,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=196">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=197">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1730,7 +1730,7 @@ body::before,body::after{opacity:0!important}
 
       <button id="forgotPasswordBtn" class="auth-link auth-link-secondary" type="button">Forgot password?</button>
       <button id="authModeToggle" class="auth-link" type="button">New to Golf Recon? Create account</button>
-      <div class="auth-foot">Each Golf Recon account has its own private rounds, stats and game keys.</div>
+      <div class="auth-foot">My Time players: sign up with the roster email your Chief saved — that claims your seat. Each account keeps its own rounds and game keys.</div>
     </div>
   </div>
 
@@ -1748,6 +1748,7 @@ body::before,body::after{opacity:0!important}
       <div class="topbar-right">
         <div class="user-tools">
           <span id="userChip" class="user-chip"></span>
+          <button id="accountSettingsBtn" class="mini-link" type="button">Account</button>
           <button id="logoutBtn" class="mini-link" type="button">Sign out</button>
         </div>
         <button id="importBtn" class="button secondary">Import Round</button>
@@ -3771,8 +3772,11 @@ async function syncPlatoonFromServer(){
     if(out?.platoon){
       let merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,localBefore):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore.hqMeta});
       if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,localBefore);
+      if(typeof window.grHydrateAllScorecardSeeds==='function')window.grHydrateAllScorecardSeeds(merged);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
+      // Cadet just claimed (or already linked): pull their mission scorecards into THEIR personal rounds.
+      try{await persistClaimedPersonalRoundsFromPlatoon(merged)}catch(e){console.warn('Personal mission claim failed',e)}
     }
     platoonSyncError='';
     if(state.view==='groups')render();
@@ -4034,7 +4038,10 @@ function groupsView(){
   }
   let n=1;while(cells.length%7)cells.push(`<div class="calendar-day muted-day">${n++}</div>`);
   const chief=(p.members||[]).find(m=>m.role==='chief'),co=(p.members||[]).find(m=>m.role==='co_chief');
-  const roster=(p.members||[]).map(m=>`<div class="roster-row"><div><div class="roster-name">${safeText(m.name)}</div><div class="roster-role">${m.linked?'Golf Recon linked':'Cadet profile'}</div></div><span class="platoon-role ${m.role}">${safeText(platoonRoleLabel(m.role))}</span></div>`).join('');
+  const roster=(p.members||[]).map(m=>{
+    const label=(typeof window.grMemberLabel==='function'?window.grMemberLabel(m):null)||m.displayName||m.name;
+    return `<div class="roster-row"><div><div class="roster-name">${safeText(label)}</div><div class="roster-role">${m.linked?'Golf Recon linked':'Cadet profile'}${m.name&&m.displayName&&m.name!==m.displayName?` · ${safeText(m.name)}`:''}</div></div><span class="platoon-role ${m.role}">${safeText(platoonRoleLabel(m.role))}</span></div>`;
+  }).join('');
   const missionCard=nextMission?`<section class="card mission-card"><div class="mission-banner"><span class="mission-tag ${nextMission.type}">${platoonMissionTypeLabel(nextMission.type)}</span></div><div class="mission-empty"><div class="mission-hero-line"><div><div class="mission-hero-title">${safeText(nextMission.title||nextMission.locationName)}</div><div class="mission-meta">${safeText(platoonMissionDate(nextMission.date))}${nextMission.teeTime?` · ${safeText(nextMission.teeTime)}`:''} · ${safeText(nextMission.locationName)}</div></div></div><div class="mission-actions"><button class="button primary" type="button" onclick="openMissionDetail('${safeText(nextMission.id)}')">Open Mission</button><button class="button secondary" type="button" onclick="openMissionEditor()">Create Mission</button></div></div></section>`:`<section class="card mission-card"><div class="mission-banner"><span class="mission-tag battle">MISSION CONTROL</span></div><div class="mission-empty"><strong>No upcoming mission scheduled.</strong><div class="mission-actions"><button class="button primary" type="button" onclick="openMissionEditor()">Create Mission</button></div></div></section>`;
   const resultCount=missions.filter(m=>Array.isArray(m.results)&&m.results.length).length;
   const syncMsg=platoonSyncError?`<div class="platoon-sync-error">${safeText(platoonSyncError)}</div>`:'';
@@ -4738,6 +4745,10 @@ document.getElementById('logoutBtn').onclick=async()=>{
   saveAuthSession(null);
   showAuth('signin','Signed out.','ok');
 };
+document.getElementById('accountSettingsBtn').onclick=()=>{
+  if(typeof window.grOpenAccountSettings==='function')window.grOpenAccountSettings();
+  else alert('Account settings load with Platoons. Open the Platoons tab once, then try again.');
+};
 
 const editDlg=document.getElementById('editRoundDialog');
 
@@ -5075,7 +5086,7 @@ function showAuth(mode='signin',message='',kind=''){
   document.getElementById('confirmPasswordWrap').style.display=(signup||recovery)?'grid':'none';
   document.getElementById('forgotPasswordBtn').style.display=mode==='signin'?'block':'none';
   document.getElementById('authTitle').textContent=recovery?'Choose a new password':signup?'Create your Golf Recon account':'Sign in';
-  document.getElementById('authSubtitle').textContent=recovery?'Set a new password for your account.':signup?'Pick a username for Platoons, events and leaderboards.':'Your golf memory, game plan and round history.';
+  document.getElementById('authSubtitle').textContent=recovery?'Set a new password for your account.':signup?'Use the email your Chief put on the My Time roster, then pick a username.':'Your golf memory, game plan and round history.';
   document.getElementById('authSubmit').textContent=recovery?'Update password':signup?'Create account':'Sign in';
   document.getElementById('authModeToggle').textContent=recovery?'Back to sign in':signup?'Already have an account? Sign in':'New to Golf Recon? Create account';
   document.getElementById('authPassword').setAttribute('autocomplete',(signup||recovery)?'new-password':'current-password');
@@ -5144,6 +5155,17 @@ async function bootstrapGolfRecon(){
     if(pill)pill.classList.add('ok');
     if(txt)txt.textContent='Synced';
     render();
+    // Claim My Time seat on login — don't wait until the player opens Platoons.
+    try{syncPlatoonFromServer().then(()=>{
+      try{
+        const p=loadPlatoonLocal();
+        const meId=typeof resolveCurrentPlatoonMemberId==='function'?resolveCurrentPlatoonMemberId(p):null;
+        const me=(p?.members||[]).find(m=>String(m.id)===String(meId));
+        const label=(typeof window.grMemberLabel==='function'&&me)?window.grMemberLabel(me):'';
+        const chip=document.getElementById('userChip');
+        if(chip&&label&&label!=='Player')chip.textContent=label.startsWith('@')?label:('@'+label.replace(/^@/,''));
+      }catch{}
+    }).catch(e=>console.warn('Platoon seat claim deferred',e))}catch(e){console.warn('Platoon seat claim deferred',e)}
     return data;
   }catch(e){
     if(pill)pill.classList.add('err');
@@ -5306,29 +5328,36 @@ function fillBlankArray(dst,src){
   src.forEach((v,i)=>{if((out[i]==null||out[i]==='')&&v!=null&&v!=='')out[i]=v});
   return out;
 }
+/** Build a golfiq-import-compatible parsed payload from a mission scorecard seed. */
+function parsedFromMissionSeed(seed){
+  const holeRows=Array.isArray(seed?.holes)?seed.holes:[];
+  return {
+    confidence:1,
+    round:{
+      date:seed.date,
+      course_name:seed.course_name,
+      course_id:seed.course_id,
+      gross_score:seed.gross,
+      net_score:seed.net,
+      holes:holeRows.length||18,
+      holes_detail:holeRows.map(h=>({
+        hole:h.hole,par:h.par,score:h.score,
+        putts:h.putts,fairway_hit:h.fairway_hit,gir:h.gir,
+        chips:h.chips,sand:h.sand,penalties:h.penalties,
+        fairway_direction:h.fairway_direction,gir_direction:h.gir_direction,
+        first_putt_distance_ft:h.first_putt_distance_ft
+      })),
+      source_app:'Mission Import',
+      missionFingerprint:seed.fingerprint||null,
+      mission_id:seed.mission_id||null
+    }
+  };
+}
 /** Merge a mission scorecard seed into this device's personal rounds (blanks-only). */
 function mergeMissionSeedIntoPersonal(seed,resultRow){
   if(!seed||typeof db==='undefined'||!Array.isArray(db.rounds))return {claimed:false};
   try{
-    const fakeParsed={
-      confidence:1,
-      round:{
-        date:seed.date,
-        course_name:seed.course_name,
-        course_id:seed.course_id,
-        gross_score:seed.gross,
-        net_score:seed.net,
-        holes:Array.isArray(seed.holes)?seed.holes.length:18,
-        holes_detail:(seed.holes||[]).map(h=>({
-          hole:h.hole,par:h.par,score:h.score,
-          putts:h.putts,fairway_hit:h.fairway_hit,gir:h.gir,
-          chips:h.chips,sand:h.sand,penalties:h.penalties,
-          fairway_direction:h.fairway_direction,gir_direction:h.gir_direction,
-          first_putt_distance_ft:h.first_putt_distance_ft
-        })),
-        source_app:'Mission Import'
-      }
-    };
+    const fakeParsed=parsedFromMissionSeed(seed);
     let existing=findPersonalRoundForMissionSeed(seed);
     if(!existing){
       const created=mergeImportedRound(fakeParsed,null);
@@ -5337,13 +5366,13 @@ function mergeMissionSeedIntoPersonal(seed,resultRow){
         existing.missionFingerprint=seed.fingerprint;
         existing.missionId=seed.mission_id;
         existing.source=existing.source||'Mission Import';
-        if(typeof save==='function')save();
-        return {claimed:true,merged:true,roundId:existing.id};
+        if(resultRow)resultRow.personal_round_id=String(existing.id);
+        return {claimed:true,merged:true,roundId:existing.id,parsed:fakeParsed,created:true};
       }
       // duplicate path — locate again
       existing=findExistingRoundForParsed(fakeParsed)||findPersonalRoundForMissionSeed(seed);
     }
-    if(!existing)return {claimed:false};
+    if(!existing)return {claimed:false,parsed:fakeParsed};
     // Fill blanks only onto the existing personal round.
     const hd=fakeParsed.round.holes_detail||[];
     const holes=existing.holes||hd.length||18;
@@ -5360,26 +5389,92 @@ function mergeMissionSeedIntoPersonal(seed,resultRow){
     existing.missionFingerprint=seed.fingerprint||existing.missionFingerprint;
     existing.missionId=seed.mission_id||existing.missionId;
     if(resultRow)resultRow.personal_round_id=String(existing.id);
-    if(typeof save==='function')save();
-    return {claimed:true,merged:true,roundId:existing.id};
+    return {claimed:true,merged:true,roundId:existing.id,parsed:fakeParsed,created:false};
   }catch(e){
     console.warn('Mission scorecard claim failed',e);
     return {claimed:false,error:String(e?.message||e)};
   }
 }
+/**
+ * After a cadet claims their My Time seat, push their mission scorecard seeds into
+ * their own golfiq-import account so Rounds survive refresh/bootstrap.
+ */
+async function persistClaimedPersonalRoundsFromPlatoon(p){
+  if(!p||typeof window.grClaimMissionScorecardsIntoPersonalDb!=='function')return {claimed:0,saved:0};
+  const claim=window.grClaimMissionScorecardsIntoPersonalDb(p);
+  let saved=0;
+  for(const item of (claim.seeds||[])){
+    const parsed=item.parsed||parsedFromMissionSeed(item.seed);
+    if(!parsed?.round?.date)continue;
+    try{
+      const existing=(item.roundId&&db.rounds.find(r=>String(r.id)===String(item.roundId)))
+        ||findPersonalRoundForMissionSeed(item.seed)
+        ||findExistingRoundForParsed(parsed);
+      // Already owned by this account on the server — leave alone after first claim.
+      if(existing?.supabaseImportId)continue;
+      const result=await callImportFunction({action:'save',parsed});
+      if(result?.duplicate){
+        const hit=findExistingRoundForParsed(parsed)||existing;
+        if(hit){
+          if(item.seed){
+            hit.missionFingerprint=item.seed.fingerprint||hit.missionFingerprint;
+            hit.missionId=item.seed.mission_id||hit.missionId;
+          }
+          if(Array.isArray(item.seed?.holes)&&item.seed.holes.length){
+            try{await callImportFunction({action:'backfill',round_id:hit.id,parsed})}catch{}
+          }
+          saved++;
+        }
+      }else{
+        const id=result?.id||result?.import_id||result?.round_id||null;
+        if(id)mergeImportedRound(parsed,id);
+        const local=findExistingRoundForParsed(parsed)||(item.roundId&&db.rounds.find(r=>String(r.id)===String(item.roundId)))||db.rounds[db.rounds.length-1];
+        if(local&&item.seed){
+          local.missionFingerprint=item.seed.fingerprint||local.missionFingerprint;
+          local.missionId=item.seed.mission_id||local.missionId;
+          if(id)local.supabaseImportId=local.supabaseImportId||id;
+        }
+        saved++;
+      }
+    }catch(e){
+      console.warn('Could not persist claimed mission round',item?.seed?.fingerprint,e);
+    }
+  }
+  if(saved){
+    try{await syncSupabaseRounds()}catch(e){console.warn('Claimed rounds re-sync failed',e)}
+    try{if(typeof render==='function')render()}catch{}
+  }
+  return {claimed:claim.claimed||0,saved,memberId:claim.memberId||null};
+}
+window.grPersistClaimedPersonalRoundsFromPlatoon=persistClaimedPersonalRoundsFromPlatoon;
+function sessionEmailFromAuth(){
+  try{
+    const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const direct=String(session?.user?.email||'').trim().toLowerCase();
+    if(direct.includes('@'))return direct;
+    const token=session?.access_token||'';
+    if(!token)return '';
+    const payload=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return String(payload.email||'').trim().toLowerCase();
+  }catch{return ''}
+}
 function resolveCurrentPlatoonMemberId(p){
   try{
     const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const members=p?.members||[];
+    const email=sessionEmailFromAuth();
+    if(email){
+      const byEmail=members.find(m=>String(m.email||'').trim().toLowerCase()===email);
+      if(byEmail)return byEmail.id;
+    }
     const meta=session?.user?.user_metadata||{};
     const names=[meta.username,meta.display_name,meta.full_name,p?.chief]
       .map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
-    const members=p?.members||[];
     for(const m of members){
-      const n=String(m.name||'').trim().toLowerCase();
-      if(!n)continue;
-      if(names.some(x=>x===n||n.includes(x)||x.includes(n)))return m.id;
+      const keys=[m.name,m.displayName].map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+      if(keys.some(n=>names.some(x=>x===n||n.includes(x)||x.includes(n))))return m.id;
     }
-    return members.find(m=>m.role==='chief')?.id||null;
+    return members.find(m=>m.linked)?.id||members.find(m=>m.role==='chief')?.id||null;
   }catch{return (p?.members||[]).find(m=>m.role==='chief')?.id||null}
 }
 window.grResolveCurrentPlatoonMemberId=resolveCurrentPlatoonMemberId;
@@ -5674,10 +5769,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=205"></script>
-  <script src="platoon-mission-core.js?v=196"></script>
-  <script src="platoon-hq-records.js?v=198"></script>
-  <script src="platoons-v15-real.js?v=202"></script>
+  <script src="platoon-recap-shared.js?v=206"></script>
+  <script src="platoon-mission-core.js?v=197"></script>
+  <script src="platoon-hq-records.js?v=199"></script>
+  <script src="platoons-v15-real.js?v=204"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
