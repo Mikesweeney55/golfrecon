@@ -1059,9 +1059,9 @@ function detailStatsLocal(r){
   return {holes,birds,eagles};
 }
 function platoonRecapMarkup(p){
-  const complete=(p.missions||[]).filter(m=>m.type!=='war'&&m.status==='completed');
+  const complete=(p.missions||[]).filter(m=>m&&m.type!=='war'&&m.status==='completed');
   const cup=typeof window.grMyTimePointsStandings==='function'?window.grMyTimePointsStandings(p):{rows:[]};
-  const map=new Map((p.members||[]).map(m=>[m.id,{member:m,points:0,played:0,totalPoints:0,birds:0,eagles:0,wins:0}]));
+  const map=new Map((p.members||[]).filter(m=>m&&m.id!=null).map(m=>[m.id,{member:m,points:0,played:0,totalPoints:0,birds:0,eagles:0,wins:0}]));
   for(const c of (cup.rows||[])){
     if(!map.has(c.id))continue;
     const x=map.get(c.id);

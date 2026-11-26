@@ -2439,10 +2439,24 @@ function courseDropdownOptions(selectedId,includeAll=false,allLabel='All courses
   const list=sortedCourses();
   return `${includeAll?`<option value="all" ${selectedId==='all'?'selected':''}>${allLabel}</option>`:''}${list.map(c=>`<option value="${c.id}" ${selectedId===c.id?'selected':''}>${safeText(courseMenuLabel(c))}</option>`).join('')}`;
 }
+/** Keep selected/game/round course ids pointing at a real course (default Four Oaks id may not exist for every account). */
+function ensureSelectedCourse(){
+  const list=(db.courses||[]).filter(c=>c&&c.id!=null&&c.id!=='');
+  if(!list.length){
+    state.selectedCourseId=null;
+    return null;
+  }
+  const has=id=>list.some(c=>String(c.id)===String(id));
+  if(!has(state.selectedCourseId))state.selectedCourseId=list[0].id;
+  if(state.gameCourseId!=='all'&&!has(state.gameCourseId))state.gameCourseId=state.selectedCourseId;
+  if(state.roundCourseId!=='all'&&!has(state.roundCourseId))state.roundCourseId=state.selectedCourseId;
+  return course(state.selectedCourseId);
+}
 function refreshGlobalCourseSelector(){
   const sel=document.getElementById('globalCourseSelect');
   const label=document.getElementById('globalCourseName');
   if(!sel)return;
+  ensureSelectedCourse();
   const list=sortedCourses();
   sel.innerHTML=list.map(c=>`<option value="${c.id}" ${c.id===state.selectedCourseId?'selected':''}>${safeText(courseMenuLabel(c))}</option>`).join('');
   sel.disabled=!list.length;
@@ -3552,7 +3566,11 @@ window.toggleCoursePreviewHoles=()=>{
 };
 
 function pregame(){
-  const c=course(state.selectedCourseId), rounds=roundsFor(c.id), priority=priorityHoles(c.id);
+  const c=ensureSelectedCourse();
+  if(!c){
+    return `<div class="card bootstrap-card"><div class="eyebrow">PREGAME</div><h2 style="margin:8px 0 6px">No course in memory yet</h2><div class="muted">Import a round so Pregame has a course to plan against.</div><button class="button primary" style="margin-top:16px" type="button" onclick="document.getElementById('importBtn').click()">Import Round</button></div>`;
+  }
+  const rounds=roundsFor(c.id), priority=priorityHoles(c.id);
   const latest=rounds[0], keys=deepPregameInsights(c.id);
   const lastStats=courseRoundStats(c.id,'last'), allStats=courseRoundStats(c.id,'all');
   const pctVal=v=>v==null?'—':`${v}%`, numVal=v=>v==null?'—':v.toFixed(1);
@@ -3756,8 +3774,8 @@ function loadPlatoonLocal(){
     if(!x)p=d;
     else{
       p={...d,...x};
-      p.members=Array.isArray(x.members)&&x.members.length?x.members:d.members;
-      p.missions=Array.isArray(x.missions)?x.missions:[];
+      p.members=Array.isArray(x.members)&&x.members.length?x.members.filter(m=>m&&typeof m==='object'):d.members;
+      p.missions=Array.isArray(x.missions)?x.missions.filter(m=>m&&typeof m==='object'):[];
       if(x.hqMeta&&typeof x.hqMeta==='object')p.hqMeta=x.hqMeta;
       else if(!p.hqMeta)p.hqMeta=(typeof window.grHqMetaDefault==='function'?window.grHqMetaDefault():{version:1,modes:{},records:[],eagleBalances:[],eagleDetails:[],suppressedAuto:[]});
     }
@@ -4444,6 +4462,7 @@ function render(){
    app.innerHTML=`<div class="card bootstrap-card"><div class="eyebrow">WELCOME TO GOLF RECON</div><h2 style="margin:8px 0 6px">Your account is ready.</h2><div class="muted">Import your first round to start building your golf memory.</div><button class="button primary" style="margin-top:16px" type="button" onclick="document.getElementById('importBtn').click()">Import First Round</button></div>`;
    return;
  }
+ ensureSelectedCourse();
  const globalCourseBar=document.querySelector('.global-course-bar');
  if(globalCourseBar)globalCourseBar.style.display=['pregame','groups'].includes(state.view)?'none':'grid';
  let viewHtml='';
@@ -5220,14 +5239,10 @@ async function bootstrapGolfRecon(){
 
     let savedCourse=null;
     try{savedCourse=localStorage.getItem('golfreconSelectedCourseId')}catch{}
-    if(savedCourse && db.courses.some(c=>c.id===savedCourse)){
+    if(savedCourse && db.courses.some(c=>c&&String(c.id)===String(savedCourse))){
       state.selectedCourseId=savedCourse;
-    }else if(!db.courses.some(c=>c.id===state.selectedCourseId)){
-      state.selectedCourseId=db.courses[0]?.id||null;
     }
-
-    if(state.gameCourseId!=='all')state.gameCourseId=state.selectedCourseId;
-    if(state.roundCourseId!=='all')state.roundCourseId=state.selectedCourseId;
+    ensureSelectedCourse();
 
     refreshGlobalCourseSelector();
     if(pill)pill.classList.add('ok');
@@ -5848,8 +5863,8 @@ initializeAuth();
 </script>
   <script src="platoon-recap-shared.js?v=206"></script>
   <script src="platoon-mission-core.js?v=197"></script>
-  <script src="platoon-hq-records.js?v=199"></script>
-  <script src="platoons-v15-real.js?v=207"></script>
+  <script src="platoon-hq-records.js?v=208"></script>
+  <script src="platoons-v15-real.js?v=208"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>

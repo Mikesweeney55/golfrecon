@@ -215,7 +215,7 @@ function guestsOf(m){
 function warIdOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR:([^\]]+)\]\]/);return x?x[1]:''}
 function warEndOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR_END:([^\]]*)\]\]/);return x?x[1]:''}
 function composeNotes(base,guests=[],warId='',warEnd=''){let s=cleanNotes(base);if(guests.length)s+=`${s?'\n':''}[[GR_GUESTS:${JSON.stringify(guests)}]]`;if(warId)s+=`${s?'\n':''}[[GR_WAR:${warId}]]`;if(warEnd)s+=`${s?'\n':''}[[GR_WAR_END:${warEnd}]]`;return s}
-function membersOf(p){return (p.members||[]).filter(m=>m.status!=='inactive')}
+function membersOf(p){return (p.members||[]).filter(m=>m&&typeof m==='object'&&m.status!=='inactive')}
 function memberLabel(m){
   // Do NOT call window.grMemberLabel here — this function is assigned to it below.
   // Delegating caused infinite recursion and broke every nav click after display-name work shipped.
@@ -425,7 +425,11 @@ function warCard(p,w){
 function groupsV15(){
   if(platoonSubpage==='calendar')return withSubNav(calendarView());
   if(platoonSubpage==='blog')return withSubNav(blogView());
-  const p=loadPlatoonLocal(),missions=(p.missions||[]).filter(m=>m.type!=='war'),wars=(p.missions||[]).filter(m=>m.type==='war'),standalone=missions.filter(m=>!warIdOf(m));
+  const p=loadPlatoonLocal();
+  // Drop sparse/null slots — server or local merges can leave holes that crash standings on .id
+  if(Array.isArray(p.members))p.members=p.members.filter(m=>m&&typeof m==='object');
+  if(Array.isArray(p.missions))p.missions=p.missions.filter(m=>m&&typeof m==='object');
+  const missions=(p.missions||[]).filter(m=>m.type!=='war'),wars=(p.missions||[]).filter(m=>m.type==='war'),standalone=missions.filter(m=>!warIdOf(m));
   const upcoming=standalone.filter(m=>m.status!=='completed').sort((a,b)=>{
     const ad=String(a.date||'9999'),bd=String(b.date||'9999');
     if(ad!==bd)return ad.localeCompare(bd);
