@@ -2020,6 +2020,48 @@ function puttingForCourse(c){
 function puttingCourseOptions(){
   return [...new Set(db.puttingDetails.map(p=>p.course))].sort((a,b)=>a.localeCompare(b));
 }
+const ROUND_DIR_PATCH_KEY='golfreconRoundDirPatchesV1';
+function loadRoundDirPatches(){
+  try{return JSON.parse(localStorage.getItem(ROUND_DIR_PATCH_KEY)||'{}')||{}}catch{return{}}
+}
+function writeRoundDirPatches(all){
+  try{localStorage.setItem(ROUND_DIR_PATCH_KEY,JSON.stringify(all||{}))}catch{}
+}
+function roundDirPatchKeys(r){
+  const keys=[];
+  if(r?.id!=null)keys.push(String(r.id));
+  if(r?.supabaseImportId)keys.push('import:'+String(r.supabaseImportId));
+  return keys;
+}
+function persistRoundDirectionPatch(r){
+  if(!r)return;
+  const all=loadRoundDirPatches();
+  const patch={
+    fairwayDirections:Array.isArray(r.fairwayDirections)?r.fairwayDirections.slice():null,
+    girDirections:Array.isArray(r.girDirections)?r.girDirections.slice():null,
+    fairwayDistribution:r.fairwayDistribution||null,
+    girDistribution:r.girDistribution||null,
+    updatedAt:Date.now()
+  };
+  for(const k of roundDirPatchKeys(r))all[k]=patch;
+  writeRoundDirPatches(all);
+}
+function applyStoredRoundDirectionPatches(){
+  const all=loadRoundDirPatches();
+  for(const r of db.rounds||[]){
+    let patch=null;
+    for(const k of roundDirPatchKeys(r)){if(all[k]){patch=all[k];break}}
+    if(!patch)continue;
+    if(Array.isArray(patch.fairwayDirections)){
+      r.fairwayDirections=fillBlankArray(r.fairwayDirections,patch.fairwayDirections).map(v=>normalizeDirection(v)||v);
+    }
+    if(Array.isArray(patch.girDirections)){
+      r.girDirections=fillBlankArray(r.girDirections,patch.girDirections).map(v=>normalizeDirection(v)||v);
+    }
+    if(patch.fairwayDistribution&&!r.fairwayDistribution)r.fairwayDistribution=patch.fairwayDistribution;
+    if(patch.girDistribution&&!r.girDistribution)r.girDistribution=patch.girDistribution;
+  }
+}
 /** Fill blank hole-direction / distribution fields on an existing round from a parsed scorecard. Never overwrites. */
 function applyParsedDirectionsToRound(r,parsed){
   if(!r||!parsed)return false;
@@ -2028,12 +2070,15 @@ function applyParsedDirectionsToRound(r,parsed){
   let changed=false;
   const fd=pr.fairway_distribution;
   if(fd&&!r.fairwayDistribution){
-    r.fairwayDistribution={hitPct:Number(fd.hit_pct)||0,missLeftPct:Number(fd.left_pct)||0,missRightPct:Number(fd.right_pct)||0,missShortPct:Number(fd.short_pct)||0,missLongPct:Number(fd.long_pct)||0,missFairwaysHitPct:Number(fd.other_pct)||0};
+    // Fold "other" into short — X misses are treated as short.
+    const other=Number(fd.other_pct)||0;
+    r.fairwayDistribution={hitPct:Number(fd.hit_pct)||0,missLeftPct:Number(fd.left_pct)||0,missRightPct:Number(fd.right_pct)||0,missShortPct:(Number(fd.short_pct)||0)+other,missLongPct:Number(fd.long_pct)||0,missFairwaysHitPct:0};
     changed=true;
   }
   const gd=pr.gir_distribution;
   if(gd&&!r.girDistribution){
-    r.girDistribution={hitPct:Number(gd.hit_pct)||0,missShortPct:Number(gd.short_pct)||0,missLeftPct:Number(gd.left_pct)||0,missRightPct:Number(gd.right_pct)||0,missLongPct:Number(gd.long_pct)||0,missGirPct:Number(gd.other_pct)||0,noChancePct:Number(gd.no_chance_pct)||0};
+    const other=Number(gd.other_pct)||0;
+    r.girDistribution={hitPct:Number(gd.hit_pct)||0,missShortPct:(Number(gd.short_pct)||0)+other,missLeftPct:Number(gd.left_pct)||0,missRightPct:Number(gd.right_pct)||0,missLongPct:Number(gd.long_pct)||0,missGirPct:0,noChancePct:Number(gd.no_chance_pct)||0};
     changed=true;
   }
   if(hd.length){
@@ -2046,6 +2091,7 @@ function applyParsedDirectionsToRound(r,parsed){
     if(JSON.stringify(nextFw)!==JSON.stringify(r.fairwayDirections||[])){r.fairwayDirections=nextFw;changed=true}
     if(JSON.stringify(nextGir)!==JSON.stringify(r.girDirections||[])){r.girDirections=nextGir;changed=true}
   }
+  if(changed)persistRoundDirectionPatch(r);
   return changed;
 }
 function applyDirectionalDataFromImports(imports){
@@ -2062,6 +2108,7 @@ function applyDirectionalDataFromImports(imports){
     if(!r)continue;
     applyParsedDirectionsToRound(r,row.parsed||pr);
   }
+  applyStoredRoundDirectionPatches();
 }
 
 function weightedDistribution(courseId,key){
@@ -2158,6 +2205,7 @@ function holeDirectionBreakdown(rounds,index,{directionsKey,hitKey}={}){
       if(hitFlag===1||hitFlag===true)d='hit';
       else continue;
     }
+    if(d==='other')d='short'; // legacy X / non-directional → short
     if(d==='hit')counts.hit++;
     else if(d==='left')counts.left++;
     else if(d==='right')counts.right++;
@@ -4439,7 +4487,6 @@ function openBackfillRound(roundId){
   if(editDlg?.open)editDlg.close();
   backfillDlg.showModal();
 }
-document.getElementById('closeBackfill').onclick=()=>backfillDlg.close();
 document.getElementById('backBackfill').onclick=()=>{
   backfillReviewStep.style.display='none';
   backfillUploadStep.style.display='';
@@ -4492,27 +4539,51 @@ document.getElementById('analyzeBackfill').onclick=async()=>{
   }
 };
 
+function resetBackfillDialogUi(){
+  pendingBackfill=null;
+  try{
+    backfillReviewStep.style.display='none';
+    backfillUploadStep.style.display='';
+    backfillFiles.value='';
+    backfillFileList.innerHTML='';
+    backfillStatus.textContent='';
+    backfillStatus.className='import-status';
+    const btn=document.getElementById('saveBackfill');
+    if(btn){btn.disabled=false;btn.textContent='Add Missing Stats'}
+  }catch{}
+}
 document.getElementById('saveBackfill').onclick=async()=>{
   const roundId=document.getElementById('backfillRoundId').value;
   if(!roundId||!pendingBackfill)return;
   const btn=document.getElementById('saveBackfill');
+  const parsed=pendingBackfill;
   try{
     btn.disabled=true;btn.textContent='Adding…';
-    const result=await callImportFunction({action:'backfill',round_id:roundId,parsed:pendingBackfill});
+    const result=await callImportFunction({action:'backfill',round_id:roundId,parsed});
     btn.textContent='Added ✓';
+    // Close immediately so the modal never hangs on "Added ✓".
+    try{backfillDlg.close()}catch{}
+    resetBackfillDialogUi();
     await bootstrapGolfRecon();
     const local=db.rounds.find(x=>String(x.id)===String(roundId));
-    if(local&&applyParsedDirectionsToRound(local,pendingBackfill)){
-      try{if(typeof save==='function')save()}catch{}
+    if(local){
+      applyParsedDirectionsToRound(local,parsed);
+      persistRoundDirectionPatch(local);
+      applyStoredRoundDirectionPatches();
+      render();
     }
-    backfillDlg.close();
-    if(result?.filled){
-      setTimeout(()=>alert(`Backfill complete. Added ${result.filled} missing stat${result.filled===1?'':'s'}. Existing values were left alone.`),150);
-    }
+    const filled=Number(result?.filled)||0;
+    setTimeout(()=>alert(filled
+      ?`Backfill complete. Added ${filled} missing stat${filled===1?'':'s'}. Existing values were left alone.`
+      :'Backfill complete. Miss directions were updated where they were blank.'),150);
   }catch(e){
     alert(e.message);
     btn.disabled=false;btn.textContent='Add Missing Stats';
   }
+};
+document.getElementById('closeBackfill').onclick=()=>{
+  resetBackfillDialogUi();
+  try{backfillDlg.close()}catch{}
 };
 
 
@@ -4707,8 +4778,13 @@ function normalizeDirection(v){
   if(s.includes('left')||s==='l'||s==='←')return 'left';
   if(s.includes('right')||s==='r'||s==='→')return 'right';
   if(s.includes('short')||s==='s'||s==='↓')return 'short';
-  if(s.includes('long')||s==='long'||s==='↑')return 'long';
-  if(s.includes('other')||s.includes('x')||s==='miss')return 'other';
+  if(s.includes('long')||s==='↑')return 'long';
+  // 18Birdies red X / non-directional miss → count as short (not a separate "other" bucket).
+  if(
+    s==='other'||s==='miss'||s==='x'||s==='✕'||s==='×'||s==='❌'||
+    s.includes('✕')||s.includes('❌')||s.includes('non-directional')||
+    (s.includes('x')&&!s.includes('ex'))
+  )return 'short';
   return null;
 }
 function holeDirection(h,type){
@@ -4733,13 +4809,29 @@ function normalizeParsedRound(x){
       h.putting_sg=null;
       h.zero_putt_chip_in=true;
     }
+    for(const k of ['fairway_direction','fairway_miss_direction','fh_direction','fairway_result_direction','gir_direction','gir_miss_direction','green_direction','gir_result_direction']){
+      const d=normalizeDirection(h?.[k]);
+      if(d)h[k]=d;
+    }
   });
-  if(!r.fairway_distribution){const d=distributionFromHoles(holes,'fairway');if(d)r.fairway_distribution=d}
-  if(!r.gir_distribution){const d=distributionFromHoles(holes,'gir');if(d)r.gir_distribution=d}
+  // Rebuild from coerced hole dirs so X/other land in short.
+  const fd=distributionFromHoles(holes,'fairway');if(fd)r.fairway_distribution=fd;
+  const gd=distributionFromHoles(holes,'gir');if(gd)r.gir_distribution=gd;
+  if(r.fairway_distribution&&r.fairway_distribution.other_pct){
+    r.fairway_distribution.short_pct=(Number(r.fairway_distribution.short_pct)||0)+(Number(r.fairway_distribution.other_pct)||0);
+    r.fairway_distribution.other_pct=0;
+  }
+  if(r.gir_distribution&&r.gir_distribution.other_pct){
+    r.gir_distribution.short_pct=(Number(r.gir_distribution.short_pct)||0)+(Number(r.gir_distribution.other_pct)||0);
+    r.gir_distribution.other_pct=0;
+  }
   const cleanWarnings=a=>(Array.isArray(a)?a:[]).filter(w=>{
     const s=String(w||'').toLowerCase();
     if(s.includes('zero putt')||s.includes('zero putts')||s.includes('0 putt')||s.includes('first-putt distance')&&s.includes('null'))return false;
-    if((s.includes('red x')||s.includes('red ×'))&&s.includes('gir'))return false;
+    if((s.includes('red x')||s.includes('red ×')||s.includes('✕'))&&(s.includes('gir')||s.includes('fairway')||s.includes('direction')||s.includes('percent')))return false;
+    if(s.includes('cannot')&&s.includes('direction'))return false;
+    if(s.includes('x')&&s.includes('percent'))return false;
+    if(s.includes('other')&&s.includes('direction'))return false;
     return true;
   });
   if(x?.round){x.warnings=cleanWarnings(x.warnings);r.warnings=cleanWarnings(r.warnings)}
@@ -4762,7 +4854,7 @@ function mergeHoleDirectionsIntoParsed(parsed,directional){
 }
 function directionMark(v){
   const d=normalizeDirection(v);
-  return d==='left'?'←':d==='right'?'→':d==='short'?'↓':d==='long'?'↑':d==='hit'?'✓':d==='other'?'✕':'—';
+  return d==='left'?'←':d==='right'?'→':d==='short'?'↓':d==='long'?'↑':d==='hit'?'✓':'—';
 }
 function reviewHtml(x){
   x=normalizeParsedRound(x);
@@ -4941,7 +5033,11 @@ async function bootstrapGolfRecon(){
     db.rounds=data.rounds||[];
     db.puttingDetails=data.puttingDetails||[];
     db.clubStats=data.clubStats||[];
-    try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){console.warn('Directional import hydration failed',e)}
+    try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){
+      console.warn('Directional import hydration failed',e);
+      applyStoredRoundDirectionPatches();
+    }
+    applyStoredRoundDirectionPatches();
     const userChip=document.getElementById('userChip');
     if(userChip)userChip.textContent='@'+(db.player.username||db.player.name||'golfer');
 
@@ -5345,7 +5441,7 @@ document.getElementById('analyzeImport').onclick=async()=>{
     }
     importStatus.textContent='Reading round data…';
     const userNote=document.getElementById('importNote').value;
-    const parserHint='18Birdies scorecard summary now shows per-hole directional misses in the Fairway Hit and Green in Regulation rows. Read those arrows hole-by-hole when visible: left, right, short, long, hit, or other/X. Preserve them on each hole as fairway_direction and gir_direction and use them to build directional distributions. A hole with 0 putts is valid and means a chip-in/holed shot from off the green; do not warn, do not invent a first-putt distance, and keep putts=0.';
+    const parserHint='18Birdies scorecard summary now shows per-hole directional misses in the Fairway Hit and Green in Regulation rows. Read those arrows hole-by-hole when visible: left, right, short, long, hit. A red X / ✕ / non-directional miss MUST be stored as short (not other, not null). Preserve fairway_direction and gir_direction and use them to build directional distributions. Never warn that an X prevents directional percentages. A hole with 0 putts is valid and means a chip-in/holed shot from off the green; do not warn, do not invent a first-putt distance, and keep putts=0.';
     const result=await callImportFunction({
       action:'parse',
       source:document.getElementById('sourceSelect').value,
@@ -5399,10 +5495,13 @@ document.getElementById('saveImport').onclick=async()=>{
     }
     await bootstrapGolfRecon();
     const local=targetId?db.rounds.find(x=>String(x.id)===String(targetId)):findExistingRoundForParsed(pendingImport);
-    if(local&&applyParsedDirectionsToRound(local,pendingImport)){
-      try{if(typeof save==='function')save()}catch{}
+    if(local){
+      applyParsedDirectionsToRound(local,pendingImport);
+      persistRoundDirectionPatch(local);
+      applyStoredRoundDirectionPatches();
+      render();
     }
-    setTimeout(()=>{dlg.close()},400);
+    setTimeout(()=>{try{dlg.close()}catch{}},200);
   }catch(e){
     alert(e.message);
     btn.disabled=false;btn.textContent='Save Round';
