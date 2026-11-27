@@ -4,7 +4,7 @@ const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt
 let platoonSubpage='home',calendarCursor=null;
 function renderGroups(){try{if(typeof render==='function')render()}catch{}}
 function goSubpage(name){platoonSubpage=name||'home';renderGroups()}
-function subNav(){const tabs=[{id:'home',label:'Missions'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Locker'}];return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${E(t.label)}</button>`).join('')}</nav>`}
+function subNav(){const tabs=[{id:'home',label:'Home'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Locker'}];return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${E(t.label)}</button>`).join('')}</nav>`}
 function withSubNav(html){return `<div class="gr-platoons-shell">${html||''}${subNav()}</div>`}
 function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${E(title)}</h2>${sub?`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">${E(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
 function monthStart(){if(calendarCursor)return new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);const now=new Date(),rows=(loadPlatoonLocal().missions||[]).filter(m=>m.date&&m.type!=='war').map(m=>new Date(m.date+'T12:00:00')).filter(d=>!isNaN(d));const next=rows.filter(d=>d>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a,b)=>a-b)[0];calendarCursor=new Date((next||now).getFullYear(),(next||now).getMonth(),1);return calendarCursor}
@@ -70,7 +70,13 @@ function calendarView(){
   for(let i=0;i<first;i++)cells+='<div class="gr-cal-pad" aria-hidden="true"></div>';
   for(let d=1;d<=days;d++){
     const items=map[d]||[],iso=isoDate(y,m,d),busy=items.length>0;
-    cells+=`<button type="button" class="gr-cal-day ${busy?'has-missions':''}" data-cal-iso="${E(iso)}" aria-label="Schedule mission on ${E(iso)}"><div class="gr-cal-daynum">${d}</div>${items.map(x=>`<span class="gr-cal-mission" data-mission="${E(x.id)}">⛳ ${E(x.title||x.locationName||'Mission')}</span>`).join('')}${busy?'':`<span class="gr-cal-add">+ Mission</span>`}</button>`;
+    const shown=items.slice(0,2);
+    const extra=items.length-shown.length;
+    const missionBits=shown.map(x=>{
+      const label=String(x.title||x.locationName||'Mission').trim()||'Mission';
+      return `<span class="gr-cal-mission" data-mission="${E(x.id)}" title="${E(label)}"><span class="gr-cal-mission-ico" aria-hidden="true">⛳</span><span class="gr-cal-mission-txt">${E(label)}</span></span>`;
+    }).join('')+(extra>0?`<span class="gr-cal-more">+${extra}</span>`:'');
+    cells+=`<button type="button" class="gr-cal-day ${busy?'has-missions':''}" data-cal-iso="${E(iso)}" aria-label="${busy?`${items.length} mission${items.length===1?'':'s'} on ${E(iso)}`:`Schedule mission on ${E(iso)}`}"><div class="gr-cal-daynum">${d}</div>${missionBits}${busy?'':`<span class="gr-cal-add" aria-hidden="true"><span class="gr-cal-add-full">+ Mission</span><span class="gr-cal-add-short">+</span></span>`}</button>`;
   }
   const label=cur.toLocaleString(undefined,{month:'long',year:'numeric'});
   return `${subHead('Calendar',p.name||'My Time')}<div class="card gr-cal-card"><div class="gr-cal-nav"><button class="icon-button" type="button" data-cal-prev aria-label="Previous month">‹</button><strong>${E(label)}</strong><button class="icon-button" type="button" data-cal-next aria-label="Next month">›</button></div><p class="muted gr-cal-hint">Tap a day to schedule a Mission. Tap an existing Mission to open it.</p><div class="gr-cal-dows">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div>${x}</div>`).join('')}</div><div class="gr-cal-grid">${cells}</div></div>`;
@@ -464,15 +470,23 @@ window.grWireFormatSelect=wireFormatSelect;
 function slugifyCourse(s){return String(s||'course').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48)||'course'}
 function ensureCourseInDb({name,tees,holes,par,rating,slope}){
   if(typeof db==='undefined'||!Array.isArray(db.courses))return null;
+  const expanded=typeof expandTeeOnlyCourseName==='function'
+    ? expandTeeOnlyCourseName(name,tees)
+    : {course_name:name,baseName:name,tees:tees||'Unknown'};
+  const label=expanded.course_name||name;
   const holesN=Number(holes)||18;
   const segment=holesN===18?'18 holes':'9 holes';
-  let id=slugifyCourse(`${name}-${tees||'tees'}-${segment}`);
+  let id=slugifyCourse(`${label}-${expanded.tees||tees||'tees'}-${segment}`);
   let n=2,base=id;
   while(db.courses.some(c=>c.id===id))id=`${base}-${n++}`;
   const pars=Array(holesN).fill(null);
   const holeNumbers=Array.from({length:holesN},(_,i)=>i+1);
   const c={
-    id,name,baseName:name,tees:tees||'Unknown',yardage:0,
+    id,
+    name:label,
+    baseName:expanded.baseName||label,
+    tees:expanded.tees||tees||'Unknown',
+    yardage:0,
     slope:Number.isFinite(Number(slope))?Number(slope):null,
     rating:Number.isFinite(Number(rating))?Number(rating):null,
     par:Number.isFinite(Number(par))?Number(par):null,
