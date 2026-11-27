@@ -1723,7 +1723,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=223">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=224">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -2526,6 +2526,7 @@ async function setGlobalCourse(id){
     repairKnownCourseLabels();
     ensureCoursesForOrphanRounds();
     consolidateDuplicateCourses();
+    try{await scrubCorruptRoundTotals()}catch(e){console.warn('Corrupt round scrub failed',e)}
     if(!db.courses.some(c=>c.id===id)) state.selectedCourseId=db.courses[0]?.id||null;
     if(state.gameCourseId!=='all') state.gameCourseId=state.selectedCourseId;
     if(state.roundCourseId!=='all') state.roundCourseId=state.selectedCourseId;
@@ -4169,13 +4170,50 @@ function roundIsTotalsOnly(r){
   return !!(r&&!roundHasHoleScores(r)&&Number.isFinite(Number(r.gross)));
 }
 function roundLooksCorrupt(r){
-  if(!r||!Number.isFinite(Number(r.gross)))return false;
+  if(!r)return false;
+  if(r.corruptTotalCleared)return true;
+  if(!Number.isFinite(Number(r.gross)))return false;
   const holes=Number(r.holes)||18;
   const gross=Number(r.gross);
   // 18-hole gross past ~120 with no holes is almost always a bad import / double-counted nines.
   if(holes>=18&&gross>=120&&!roundHasHoleScores(r))return true;
   if(holes===9&&gross>=70&&!roundHasHoleScores(r))return true;
   return false;
+}
+/** Gross shown in the round list — never flash a corrupt 160 as a real score. */
+function roundDisplayGross(r){
+  if(!r||roundLooksCorrupt(r))return null;
+  return Number.isFinite(Number(r.gross))?Number(r.gross):null;
+}
+/**
+ * Clear absurd totals-only gross locally (and in cloud when linked) so the
+ * summary stops showing 160 after sync.
+ */
+async function scrubCorruptRoundTotals(){
+  let cleared=0;
+  for(const r of (db.rounds||[])){
+    if(!r||r.corruptTotalCleared)continue;
+    if(!roundLooksCorrupt(r))continue;
+    const was=Number(r.gross);
+    r.corruptTotalWas=was;
+    r.corruptTotalCleared=true;
+    r.gross=null;
+    r.net=null;
+    r.scoreToPar=null;
+    cleared++;
+    if(r.supabaseImportId&&typeof callImportFunction==='function'&&!window.grTestEnvActive){
+      try{
+        await callImportFunction({
+          action:'update',
+          id:r.supabaseImportId,
+          changes:{gross_score:null,net_score:null}
+        });
+      }catch(e){
+        console.warn('Could not clear corrupt gross in cloud',r.id,e);
+      }
+    }
+  }
+  return cleared;
 }
 function scoreDifferential(r){
  const c=course(r.courseId);
@@ -4231,7 +4269,7 @@ function currentHandicapIndex(){
 }
 
 const roundStatDefs={
- score:{label:'Score',short:'Score',domain:[70,100],value:r=>r.holes===18?r.gross:null,better:'low',fmt:v=>Math.round(v)},
+ score:{label:'Score',short:'Score',domain:[70,100],value:r=>r.holes===18&&!roundLooksCorrupt(r)?roundDisplayGross(r):null,better:'low',fmt:v=>Math.round(v)},
  scoreToPar:{label:'Score vs par',short:'Vs Par',domain:[0,25],value:r=>r.scoreToPar,better:'low',fmt:v=>(v>=0?'+':'')+Math.round(v)},
  differential:{label:'Score differential',short:'Score Differential',domain:[0,25],value:r=>scoreDifferential(r),better:'low',fmt:v=>v.toFixed(1)},
  handicap:{label:'Handicap Index',short:'Handicap',domain:[0,30],value:r=>handicapIndexAtRound(r),better:'low',fmt:v=>v.toFixed(1)},
@@ -4295,16 +4333,17 @@ function roundsChart(rounds,key){
 }
 function personalRoundScorecardHtml(r){
   const c=course(r.courseId);
-  if(roundIsTotalsOnly(r)){
+  if(roundIsTotalsOnly(r)||roundLooksCorrupt(r)){
     const mission=!!(r.limitedFromMission||/mission/i.test(String(r.source||'')));
     const corrupt=roundLooksCorrupt(r);
+    const was=Number.isFinite(Number(r.corruptTotalWas))?Number(r.corruptTotalWas):(corrupt&&Number.isFinite(Number(r.gross))?Number(r.gross):null);
     return `<div class="card" style="margin:8px 10px 12px;padding:12px 14px">
-      <strong>${corrupt?'Broken total — no hole scores':'Totals only — no hole scores'}</strong>
+      <strong>${corrupt?'Broken total — cleared from summary':'Totals only — no hole scores'}</strong>
       <div class="muted" style="margin-top:6px;line-height:1.45">
-        Stored gross is <strong>${safeText(r.gross)}</strong>${Number.isFinite(Number(r.net))?` · net <strong>${safeText(r.net)}</strong>`:''},
-        but every hole on the card is blank.${corrupt?' That total is not a believable 18-hole score (often a bad import that double-counted nines).':''}
+        ${was!=null?`Bad stored gross was <strong>${safeText(was)}</strong> with every hole blank.`:'Every hole on the card is blank.'}
+        ${corrupt?' That total is not a believable 18-hole score (often a bad import that double-counted nines), so it is hidden from the round summary and handicap.':''}
         ${mission?' This row was seeded from Mission results without a hole-by-hole card.':''}
-        Use <strong>Edit</strong> to fix the gross, or backfill from a scorecard screenshot.
+        Use <strong>Edit</strong> to enter the real gross, backfill a scorecard screenshot, or <strong>Delete</strong> the round.
       </div>
     </div>`;
   }
@@ -4338,11 +4377,12 @@ function roundsView(){
  const list=sorted.map(r=>{
    const c=course(r.courseId),diff=scoreDifferential(r),sel=String(state.selectedRoundId)===String(r.id);
    const status=roundCompletenessStatusHtml(r);
+   const shownGross=roundDisplayGross(r);
    const expand=sel?`<div class="round-scorecard-expand" data-round-expand="${r.id}">${personalRoundScorecardHtml(r)}</div>`:'';
    return `<div class="round-block ${sel?'is-open':''}">
-     <div class="round-row round-summary has-edit ${sel?'selected':''}" data-round-row="${r.id}" role="button" tabindex="0" aria-expanded="${sel?'true':'false'}" aria-label="${safeText(c?.name||'Round')} ${fmtDate(r.date)}, score ${r.gross}">
+     <div class="round-row round-summary has-edit ${sel?'selected':''}" data-round-row="${r.id}" role="button" tabindex="0" aria-expanded="${sel?'true':'false'}" aria-label="${safeText(c?.name||'Round')} ${fmtDate(r.date)}, score ${shownGross??'unavailable'}">
        <div><strong>${safeText(c?.name||'Round')}</strong><div class="muted">${fmtDate(r.date)} · ${safeText(c?.tees||'')} tees · Par ${c?.par??'—'} · ${r.holes} holes</div><div class="round-status-row">${status}</div></div>
-       <div class="score-big">${r.gross}${sel&&Number.isFinite(c?.par)?`<span class="score-over">${r.gross-c.par>=0?'+':''}${r.gross-c.par}</span>`:''}</div>
+       <div class="score-big">${shownGross??'—'}${sel&&shownGross!=null&&Number.isFinite(c?.par)?`<span class="score-over">${shownGross-c.par>=0?'+':''}${shownGross-c.par}</span>`:''}</div>
        <div><span class="badge">Diff ${diff==null?'—':diff.toFixed(1)}</span></div>
        <button class="edit-round-btn" data-round-action="${r.id}" type="button">Edit</button>
      </div>
@@ -5327,6 +5367,7 @@ async function bootstrapGolfRecon(){
     repairKnownCourseLabels();
     ensureCoursesForOrphanRounds();
     consolidateDuplicateCourses();
+    try{await scrubCorruptRoundTotals()}catch(e){console.warn('Corrupt round scrub failed',e)}
     setTopbarDisplayName(db.player.username||db.player.name||'golfer');
 
     let savedCourse=null;
@@ -6168,10 +6209,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=223"></script>
-  <script src="platoon-mission-core.js?v=223"></script>
-  <script src="platoon-hq-records.js?v=223"></script>
-  <script src="platoons-v15-real.js?v=223"></script>
+  <script src="platoon-recap-shared.js?v=224"></script>
+  <script src="platoon-mission-core.js?v=224"></script>
+  <script src="platoon-hq-records.js?v=224"></script>
+  <script src="platoons-v15-real.js?v=224"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
