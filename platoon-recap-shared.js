@@ -435,19 +435,25 @@ function namesOf(p,rows,useDetail=false,m=null){
 }
 
 function missionHighlights(p,m,rows,detail){
-  const net=lowLeaders(rows,'net');
-  const gross=lowLeaders(rows,'gross');
+  const doubled=typeof window.grMissionResultsLookDoubled==='function'&&window.grMissionResultsLookDoubled(m);
+  const usable=doubled?rows.filter(r=>!(typeof window.grMissionResultLooksAbsurd==='function'&&window.grMissionResultLooksAbsurd(r))):rows;
+  const net=lowLeaders(usable,'net');
+  const gross=lowLeaders(usable,'gross');
   const birds=detailHigh(detail,x=>x.s.birds.length);
   const back=detailLow(detail.filter(x=>x.s.back!==null),x=>x.s.back);
   const clean=detailLow(detail.filter(x=>x.s.holes.length),x=>x.s.doubles.length);
   const points=rows.filter(r=>finite(r.raw_points)).sort((a,b)=>Number(b.raw_points)-Number(a.raw_points));
   const topPoints=points.length&&Number(points[0].raw_points)>0?[points[0]]:[];
   const eagles=rows.filter(r=>Number(r.eagle_count)>0).sort((a,b)=>Number(b.eagle_count)-Number(a.eagle_count));
-  return {net,gross,birds,back,clean,topPoints,eagles};
+  return {net,gross,birds,back,clean,topPoints,eagles,doubled};
 }
 
 function afterActionLines(p,m,rows,detail,hi){
   const lines=[];
+  if(hi.doubled){
+    lines.push('These gross/net totals look doubled (classic bad import). Changing the format label does not fix them — use Fix doubled totals, then re-check Standings.');
+    return lines;
+  }
   const note=String(m?.recap_note||'').trim();
   if(note)lines.push(`From the field: ${note}`);
   if(hi.net.length){
@@ -484,9 +490,19 @@ function standingsTableMarkup(p,m){
     const net=finite(r.net)?Number(r.net):(finite(resolved)?Number(resolved):'—');
     const gross=finite(r.gross)?Number(r.gross):'—';
     const pts=finite(r.raw_points)?Number(r.raw_points):0;
-    return `<div class="grstd-row"><div class="grstd-name"><b>${pos}</b><span>${esc(labeledName(p,m,r.player_name))}</span></div><div>${net}</div><div>${gross}</div><div>${pts}</div></div>`;
+    const bad=typeof window.grMissionResultLooksAbsurd==='function'&&window.grMissionResultLooksAbsurd(r);
+    return `<div class="grstd-row${bad?' grstd-row-bad':''}"><div class="grstd-name"><b>${pos}</b><span>${esc(labeledName(p,m,r.player_name))}</span></div><div>${net}</div><div>${gross}${bad?'*':''}</div><div>${pts}</div></div>`;
   }).join('')||'<div class="grstd-empty">No results yet.</div>';
   return `<div class="grstd-table"><div class="grstd-head"><div>NAME</div><div>NET</div><div>GROSS</div><div>POINTS</div></div>${body}</div>`;
+}
+function doubledTotalsBanner(m){
+  if(!(typeof window.grMissionResultsLookDoubled==='function'&&window.grMissionResultsLookDoubled(m)))return '';
+  const id=esc(String(m?.id||''));
+  return `<div class="gr155-doubled-banner" data-gr-doubled-banner="1">
+    <strong>Broken totals</strong>
+    <p>Gross numbers like 160 look like a doubled import — not a real 18-hole card. Editing Format alone does not fix this.</p>
+    <button type="button" class="button primary" data-gr-repair-doubled="${id}">Fix doubled totals</button>
+  </div>`;
 }
 
 function highlightsMarkup(p,hi,m=null){
@@ -524,7 +540,7 @@ function missionRecapMarkup(p,m){
   const detail=rows.map(r=>({r,s:detailStats(r)}));
   const hi=missionHighlights(p,source,rows,detail);
   const intel=afterActionLines(p,source,rows,detail,hi);
-  return `${missionPhotosMarkup(p,source)}<div class="gr155-recap-grid" data-gr-shared-recap="1"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsTableMarkup(p,source)}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${highlightsMarkup(p,hi,source)}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${afterActionMarkup(intel)}</section></div>${holeScoreboardMarkup(p,source,detail)}`;
+  return `${doubledTotalsBanner(source)}${missionPhotosMarkup(p,source)}<div class="gr155-recap-grid" data-gr-shared-recap="1"><section class="gr155-recap-block"><div class="gr155-recap-title">RESULT STANDINGS</div>${standingsTableMarkup(p,source)}</section><section class="gr155-recap-block"><div class="gr155-recap-title">HIGHLIGHTED SCORES</div>${highlightsMarkup(p,hi,source)}</section><section class="gr155-recap-block gr155-recap-copy"><div class="gr155-recap-title">AFTER ACTION REPORT</div>${afterActionMarkup(intel)}</section></div>${holeScoreboardMarkup(p,source,detail)}`;
 }
 
 function installStyles(){
@@ -537,6 +553,11 @@ function installStyles(){
 .grstd-head>div:not(:first-child),.grstd-row>div:not(:first-child){text-align:right}
 .grstd-row{min-height:44px;border-bottom:1px solid rgba(255,255,255,.08);font-size:var(--fs-data)}
 .grstd-row:last-child{border-bottom:0}
+.grstd-row-bad{color:#ffc9a8}
+.gr155-doubled-banner{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(255,160,100,.45);border-radius:12px;background:rgba(80,30,10,.35)}
+.gr155-doubled-banner strong{display:block;margin:0 0 6px;color:#ffd2b0}
+.gr155-doubled-banner p{margin:0 0 10px;font-size:var(--fs-data);line-height:1.45;color:rgba(255,235,210,.88)}
+.gr155-doubled-banner .button{width:auto}
 .grstd-name{display:flex;align-items:center;gap:8px;min-width:0}
 .grstd-name b{width:16px;flex:0 0 16px}
 .grstd-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
