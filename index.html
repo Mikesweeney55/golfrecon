@@ -3862,8 +3862,11 @@ async function syncPlatoonFromServer(){
       if(typeof window.grHydrateAllScorecardSeeds==='function')window.grHydrateAllScorecardSeeds(merged);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
-      // Cadet just claimed (or already linked): pull their mission scorecards into THEIR personal rounds.
-      try{await persistClaimedPersonalRoundsFromPlatoon(merged)}catch(e){console.warn('Personal mission claim failed',e)}
+      // Cadet claimed/linked: pull their mission scorecards into THEIR personal rounds.
+      try{
+        if(typeof claimAndPersistMissionRounds==='function')await claimAndPersistMissionRounds(merged);
+        else if(typeof persistClaimedPersonalRoundsFromPlatoon==='function')await persistClaimedPersonalRoundsFromPlatoon(merged);
+      }catch(e){console.warn('Mission → Rounds claim after platoon sync failed',e)}
     }
     platoonSyncError='';
     if(state.view==='groups')render();
@@ -5276,6 +5279,13 @@ async function bootstrapGolfRecon(){
     ensureSelectedCourse();
 
     refreshGlobalCourseSelector();
+    try{
+      const p=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
+      if(p&&typeof claimAndPersistMissionRounds==='function'){
+        const claim=await claimAndPersistMissionRounds(p);
+        if(claim?.claimed)render();
+      }
+    }catch(e){console.warn('Mission → Rounds claim skipped',e)}
     if(pill)pill.classList.add('ok');
     if(txt)txt.textContent='Synced';
     render();
@@ -5516,19 +5526,31 @@ function missionSeedSignature(seed){
 }
 function findPersonalRoundForMissionSeed(seed){
   if(!seed||typeof db==='undefined'||!Array.isArray(db?.rounds))return null;
+  if(seed.fingerprint){
+    const byFp=db.rounds.find(x=>x.missionFingerprint&&String(x.missionFingerprint)===String(seed.fingerprint));
+    if(byFp)return byFp;
+  }
   if(seed.personal_round_id){
     const byId=db.rounds.find(r=>String(r.id)===String(seed.personal_round_id));
     if(byId)return byId;
   }
   const wantedDate=String(seed.date||'');
   const wantedGross=Number(seed.gross);
+  const wantedNet=Number(seed.net);
+  const hasGross=Number.isFinite(wantedGross);
+  const hasNet=Number.isFinite(wantedNet);
   return db.rounds.find(x=>{
-    if(x.missionFingerprint&&seed.fingerprint&&String(x.missionFingerprint)===String(seed.fingerprint))return true;
+    if(x.missionId&&seed.mission_id&&String(x.missionId)===String(seed.mission_id)){
+      const cc=db.courses.find(c=>c.id===x.courseId);
+      const courseOk=courseNameScore(seed.course_name,cc?.baseName||cc?.name)>=58;
+      if(courseOk&&String(x.date||'')===wantedDate)return true;
+    }
     const cc=db.courses.find(c=>c.id===x.courseId);
     const dateOk=String(x.date||'')===wantedDate;
-    const grossOk=!Number.isFinite(wantedGross)||Number(x.gross)===wantedGross;
+    const grossOk=!hasGross||Number(x.gross)===wantedGross;
+    const netOk=!hasNet||Number(x.net)===wantedNet;
     const courseOk=courseNameScore(seed.course_name,cc?.baseName||cc?.name)>=58;
-    return dateOk&&grossOk&&courseOk;
+    return dateOk&&courseOk&&grossOk&&(hasGross||netOk);
   })||null;
 }
 function fillBlankArray(dst,src){
@@ -5537,18 +5559,19 @@ function fillBlankArray(dst,src){
   src.forEach((v,i)=>{if((out[i]==null||out[i]==='')&&v!=null&&v!=='')out[i]=v});
   return out;
 }
-/** Build a golfiq-import-compatible parsed payload from a mission scorecard seed. */
-function parsedFromMissionSeed(seed){
+/** Build the import payload used for Mission → Rounds claims (limited totals OK). */
+function missionSeedToParsed(seed){
   const holeRows=Array.isArray(seed?.holes)?seed.holes:[];
+  const holes=holeRows.length||18;
   return {
-    confidence:1,
+    confidence:seed?.limited?0.55:1,
     round:{
       date:seed.date,
       course_name:seed.course_name,
       course_id:seed.course_id,
       gross_score:seed.gross,
       net_score:seed.net,
-      holes:holeRows.length||18,
+      holes,
       holes_detail:holeRows.map(h=>({
         hole:h.hole,par:h.par,score:h.score,
         putts:h.putts,fairway_hit:h.fairway_hit,gir:h.gir,
@@ -5557,26 +5580,46 @@ function parsedFromMissionSeed(seed){
         first_putt_distance_ft:h.first_putt_distance_ft
       })),
       source_app:'Mission Import',
+      mission_id:seed.mission_id||null,
+      mission_title:seed.mission_title||null,
+      mission_fingerprint:seed.fingerprint||null,
       missionFingerprint:seed.fingerprint||null,
-      mission_id:seed.mission_id||null
+      raw_points:seed.raw_points??null,
+      finish_position:seed.finish_position??null,
+      limited_from_mission:!!seed.limited
     }
   };
 }
+/** Alias for callers that still use the older name. */
+function parsedFromMissionSeed(seed){return missionSeedToParsed(seed)}
+
+function tagRoundFromMissionSeed(round,seed){
+  if(!round||!seed)return round;
+  round.missionFingerprint=seed.fingerprint||round.missionFingerprint;
+  round.missionId=seed.mission_id||round.missionId;
+  round.missionTitle=seed.mission_title||round.missionTitle||null;
+  round.source=round.source||'Mission Import';
+  if(seed.limited)round.limitedFromMission=true;
+  if(seed.raw_points!=null&&round.rawPoints==null)round.rawPoints=seed.raw_points;
+  if(seed.finish_position!=null&&round.finishPosition==null)round.finishPosition=seed.finish_position;
+  return round;
+}
+
 /** Merge a mission scorecard seed into this device's personal rounds (blanks-only). */
 function mergeMissionSeedIntoPersonal(seed,resultRow){
   if(!seed||typeof db==='undefined'||!Array.isArray(db.rounds))return {claimed:false};
   try{
-    const fakeParsed=parsedFromMissionSeed(seed);
+    const fakeParsed=missionSeedToParsed(seed);
     let existing=findPersonalRoundForMissionSeed(seed);
+    let created=false;
     if(!existing){
-      const created=mergeImportedRound(fakeParsed,null);
-      if(created?.added){
+      const createdOut=mergeImportedRound(fakeParsed,null);
+      if(createdOut?.added){
         existing=db.rounds[db.rounds.length-1];
-        existing.missionFingerprint=seed.fingerprint;
-        existing.missionId=seed.mission_id;
-        existing.source=existing.source||'Mission Import';
+        tagRoundFromMissionSeed(existing,seed);
+        created=true;
         if(resultRow)resultRow.personal_round_id=String(existing.id);
-        return {claimed:true,merged:true,roundId:existing.id,parsed:fakeParsed,created:true};
+        return {claimed:true,merged:true,created:true,roundId:existing.id,parsed:fakeParsed};
       }
       // duplicate path — locate again
       existing=findExistingRoundForParsed(fakeParsed)||findPersonalRoundForMissionSeed(seed);
@@ -5589,71 +5632,89 @@ function mergeMissionSeedIntoPersonal(seed,resultRow){
       const h=hd.find(x=>Number(x.hole)===i+1)||hd[i];
       return h?.[key]??null;
     });
-    existing.scores=fillBlankArray(existing.scores,arr('score'));
-    existing.putts=fillBlankArray(existing.putts,arr('putts'));
-    existing.fairways=fillBlankArray(existing.fairways,arr('fairway_hit').map(v=>v===true?1:v===false?0:v));
-    existing.gir=fillBlankArray(existing.gir,arr('gir').map(v=>v===true?1:v===false?0:v));
+    if(hd.length){
+      existing.scores=fillBlankArray(existing.scores,arr('score'));
+      existing.putts=fillBlankArray(existing.putts,arr('putts'));
+      existing.fairways=fillBlankArray(existing.fairways,arr('fairway_hit').map(v=>v===true?1:v===false?0:v));
+      existing.gir=fillBlankArray(existing.gir,arr('gir').map(v=>v===true?1:v===false?0:v));
+    }
     if(existing.net==null&&seed.net!=null)existing.net=seed.net;
     if(existing.gross==null&&seed.gross!=null)existing.gross=seed.gross;
-    existing.missionFingerprint=seed.fingerprint||existing.missionFingerprint;
-    existing.missionId=seed.mission_id||existing.missionId;
+    tagRoundFromMissionSeed(existing,seed);
     if(resultRow)resultRow.personal_round_id=String(existing.id);
-    return {claimed:true,merged:true,roundId:existing.id,parsed:fakeParsed,created:false};
+    return {claimed:true,merged:true,created,roundId:existing.id,parsed:fakeParsed};
   }catch(e){
     console.warn('Mission scorecard claim failed',e);
     return {claimed:false,error:String(e?.message||e)};
   }
 }
-/**
- * After a cadet claims their My Time seat, push their mission scorecard seeds into
- * their own golfiq-import account so Rounds survive refresh/bootstrap.
- */
-async function persistClaimedPersonalRoundsFromPlatoon(p){
-  if(!p||typeof window.grClaimMissionScorecardsIntoPersonalDb!=='function')return {claimed:0,saved:0};
-  const claim=window.grClaimMissionScorecardsIntoPersonalDb(p);
+
+let missionClaimBusy=false;
+
+/** Persist newly claimed Mission rounds into the signed-in user's personal cloud Rounds. */
+async function persistClaimedMissionRounds(created){
+  if(!Array.isArray(created)||!created.length)return {saved:0};
+  if(typeof callImportFunction!=='function')return {saved:0,skipped:'no-import'};
+  if(window.grTestEnvActive)return {saved:0,skipped:'test-env'};
   let saved=0;
-  for(const item of (claim.seeds||[])){
-    const parsed=item.parsed||parsedFromMissionSeed(item.seed);
-    if(!parsed?.round?.date)continue;
+  for(const row of created){
+    const parsed=row?.parsed;if(!parsed?.round)continue;
+    const fp=row.seed?.fingerprint||parsed.round.mission_fingerprint||parsed.round.missionFingerprint;
+    if(fp&&db.rounds.some(r=>r.missionFingerprint&&String(r.missionFingerprint)===String(fp)&&r.supabaseImportId)){
+      continue;
+    }
     try{
-      const existing=(item.roundId&&db.rounds.find(r=>String(r.id)===String(item.roundId)))
-        ||findPersonalRoundForMissionSeed(item.seed)
-        ||findExistingRoundForParsed(parsed);
-      // Already owned by this account on the server — leave alone after first claim.
-      if(existing?.supabaseImportId)continue;
+      const existing=findPersonalRoundForMissionSeed(row.seed)||findExistingRoundForParsed(parsed);
+      if(existing?.supabaseImportId){
+        await callImportFunction({action:'backfill',round_id:existing.id,parsed});
+        saved++;
+        continue;
+      }
       const result=await callImportFunction({action:'save',parsed});
       if(result?.duplicate){
-        const hit=findExistingRoundForParsed(parsed)||existing;
-        if(hit){
-          if(item.seed){
-            hit.missionFingerprint=item.seed.fingerprint||hit.missionFingerprint;
-            hit.missionId=item.seed.mission_id||hit.missionId;
-          }
-          if(Array.isArray(item.seed?.holes)&&item.seed.holes.length){
-            try{await callImportFunction({action:'backfill',round_id:hit.id,parsed})}catch{}
-          }
-          saved++;
-        }
-      }else{
-        const id=result?.id||result?.import_id||result?.round_id||null;
-        if(id)mergeImportedRound(parsed,id);
-        const local=findExistingRoundForParsed(parsed)||(item.roundId&&db.rounds.find(r=>String(r.id)===String(item.roundId)))||db.rounds[db.rounds.length-1];
-        if(local&&item.seed){
-          local.missionFingerprint=item.seed.fingerprint||local.missionFingerprint;
-          local.missionId=item.seed.mission_id||local.missionId;
-          if(id)local.supabaseImportId=local.supabaseImportId||id;
-        }
-        saved++;
+        const nowExisting=findExistingRoundForParsed(parsed)||findPersonalRoundForMissionSeed(row.seed);
+        if(nowExisting)await callImportFunction({action:'backfill',round_id:nowExisting.id,parsed});
       }
+      saved++;
     }catch(e){
-      console.warn('Could not persist claimed mission round',item?.seed?.fingerprint,e);
+      console.warn('Mission round persist failed',row?.seed?.fingerprint,e);
     }
   }
-  if(saved){
-    try{await syncSupabaseRounds()}catch(e){console.warn('Claimed rounds re-sync failed',e)}
-    try{if(typeof render==='function')render()}catch{}
+  return {saved};
+}
+
+/** Claim this member's Mission results into personal Rounds (limited totals OK) and persist. */
+async function claimAndPersistMissionRounds(p,{currentMemberId=null}={}){
+  if(!p||typeof window.grClaimMissionScorecardsIntoPersonalDb!=='function')return {claimed:0};
+  if(missionClaimBusy)return {claimed:0,skipped:'busy'};
+  missionClaimBusy=true;
+  try{
+    const claim=window.grClaimMissionScorecardsIntoPersonalDb(p,{currentMemberId});
+    if(claim?.claimed&&typeof writePlatoonLocal==='function'){
+      try{writePlatoonLocal(p)}catch{}
+    }
+    let persist={saved:0};
+    const toPersist=(claim?.created?.length?claim.created:null)||(claim?.seeds||[]).filter(x=>x?.parsed);
+    if(toPersist.length){
+      persist=await persistClaimedMissionRounds(toPersist);
+      if(persist.saved){
+        try{
+          // Refresh personal rounds from cloud so Mission-tagged rows stick with import ids.
+          // Do not re-enter claimAndPersistMissionRounds (guarded by missionClaimBusy).
+          const data=await callImportFunction({action:'bootstrap'});
+          if(data?.rounds)db.rounds=data.rounds;
+          if(data?.courses)db.courses=data.courses;
+        }catch(e){console.warn('Post-claim bootstrap refresh failed',e)}
+      }
+    }
+    return {...claim,persist,saved:persist.saved||0};
+  }finally{
+    missionClaimBusy=false;
   }
-  return {claimed:claim.claimed||0,saved,memberId:claim.memberId||null};
+}
+/** Alias used by older sync callers. */
+async function persistClaimedPersonalRoundsFromPlatoon(p){
+  return claimAndPersistMissionRounds(p);
 }
 window.grPersistClaimedPersonalRoundsFromPlatoon=persistClaimedPersonalRoundsFromPlatoon;
 function sessionEmailFromAuth(){
@@ -5677,18 +5738,27 @@ function resolveCurrentPlatoonMemberId(p){
       if(byEmail)return byEmail.id;
     }
     const meta=session?.user?.user_metadata||{};
-    const names=[meta.username,meta.display_name,meta.full_name,p?.chief]
+    const names=[meta.username,meta.display_name,meta.full_name,db?.player?.username,db?.player?.name,p?.chief]
       .map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+    // Prefer an explicit name match (aliases + displayName).
     for(const m of members){
-      const keys=[m.name,m.displayName].map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
-      if(keys.some(n=>names.some(x=>x===n||n.includes(x)||x.includes(n))))return m.id;
+      const vals=[m.name,m.displayName,...(Array.isArray(m.aliases)?m.aliases:[])]
+        .map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+      if(!vals.length)continue;
+      if(names.some(n=>vals.some(v=>v===n||v.includes(n)||n.includes(v))))return m.id;
     }
+    // Single linked Golf Recon account on this roster → that seat is "me".
+    const linked=members.filter(m=>m.linked);
+    if(linked.length===1)return linked[0].id;
     return members.find(m=>m.linked)?.id||members.find(m=>m.role==='chief')?.id||null;
   }catch{return (p?.members||[]).find(m=>m.role==='chief')?.id||null}
 }
 window.grResolveCurrentPlatoonMemberId=resolveCurrentPlatoonMemberId;
 window.grMergeMissionSeedIntoPersonal=mergeMissionSeedIntoPersonal;
 window.grFindPersonalRoundForMissionSeed=findPersonalRoundForMissionSeed;
+window.grMissionSeedToParsed=missionSeedToParsed;
+window.grPersistClaimedMissionRounds=persistClaimedMissionRounds;
+window.grClaimAndPersistMissionRounds=claimAndPersistMissionRounds;
 
 function mergeImportedRound(parsed, importId){
   const r=parsed?.round;
@@ -5978,14 +6048,14 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=210"></script>
-  <script src="platoon-mission-core.js?v=201"></script>
-  <script src="platoon-hq-records.js?v=220"></script>
-  <script src="platoons-v15-real.js?v=220"></script>
+  <script src="platoon-recap-shared.js?v=221"></script>
+  <script src="platoon-mission-core.js?v=221"></script>
+  <script src="platoon-hq-records.js?v=221"></script>
+  <script src="platoons-v15-real.js?v=221"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
-<script src="past-mission-import.js?v=203"></script>
+<script src="past-mission-import.js?v=204"></script>
 <script src="mission-delete.js?v=4"></script>
 </body>
 </html>

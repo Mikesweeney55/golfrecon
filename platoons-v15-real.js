@@ -2113,7 +2113,11 @@ try{groupsView=groupsV15}catch{window.groupsView=groupsV15}
 window.grGroupsView=groupsV15;
 try{
   const p=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
-  if(p&&typeof window.grClaimMissionScorecardsIntoPersonalDb==='function'){
+  if(p&&typeof window.grClaimAndPersistMissionRounds==='function'){
+    Promise.resolve(window.grClaimAndPersistMissionRounds(p)).then(claim=>{
+      if(claim?.claimed&&typeof state!=='undefined'&&state.view==='rounds'&&typeof render==='function')render();
+    }).catch(e=>console.warn('Mission → Rounds claim failed',e));
+  }else if(p&&typeof window.grClaimMissionScorecardsIntoPersonalDb==='function'){
     const claim=window.grClaimMissionScorecardsIntoPersonalDb(p);
     if(claim?.claimed&&typeof savePlatoonLocal==='function')savePlatoonLocal(p,false);
   }
