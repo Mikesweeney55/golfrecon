@@ -7,8 +7,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="favicon.svg" />
   <script src="gr-test-env.js?v=1"></script>
-  <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
+  <!-- Mapbox CSS/JS load on demand — a blocking head script freezes phones when the CDN is slow. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Oswald:wght@500;600;700&family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -1548,8 +1547,14 @@ dialog .dialog-head{
 }
 body{background:#070806!important}
 body::before,body::after{opacity:0!important}
-.auth-gate,.app-shell{position:relative;z-index:1}
+.app-shell{position:relative;z-index:1}
+/* Keep sign-in fixed over atmosphere — relative z-index:1 made phones look blank. */
 .auth-gate{
+  position:fixed!important;
+  inset:0!important;
+  z-index:200!important;
+  display:grid!important;
+  place-items:center;
   background:transparent!important;
   animation:grRiseIn .7s ease both;
 }
@@ -1723,7 +1728,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=228">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=229">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -3157,8 +3162,32 @@ function osmHoleSvg(geom){
 
 
 const MAPBOX_TOKEN_KEY='golfreconMapboxPublicTokenV1';
+const MAPBOX_GL_CSS='https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css';
+const MAPBOX_GL_JS='https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js';
+let mapboxLoadPromise=null;
 function mapboxToken(){
   try{return String(localStorage.getItem(MAPBOX_TOKEN_KEY)||'').trim()}catch{return ''}
+}
+/** Load Mapbox only when Hole Preview needs it — never block first paint. */
+function ensureMapboxLoaded(){
+  if(window.mapboxgl)return Promise.resolve(true);
+  if(mapboxLoadPromise)return mapboxLoadPromise;
+  mapboxLoadPromise=new Promise(resolve=>{
+    try{
+      if(!document.querySelector(`link[href="${MAPBOX_GL_CSS}"]`)){
+        const link=document.createElement('link');
+        link.rel='stylesheet';link.href=MAPBOX_GL_CSS;
+        document.head.appendChild(link);
+      }
+      const s=document.createElement('script');
+      s.src=MAPBOX_GL_JS;
+      s.async=true;
+      s.onload=()=>resolve(!!window.mapboxgl);
+      s.onerror=()=>{mapboxLoadPromise=null;resolve(false)};
+      document.head.appendChild(s);
+    }catch{mapboxLoadPromise=null;resolve(false)}
+  });
+  return mapboxLoadPromise;
 }
 window.configureMapboxToken=()=>{
   const existing=mapboxToken();
@@ -3169,7 +3198,8 @@ window.configureMapboxToken=()=>{
     if(clean)localStorage.setItem(MAPBOX_TOKEN_KEY,clean);
     else localStorage.removeItem(MAPBOX_TOKEN_KEY);
   }catch{}
-  render();
+  if(clean)ensureMapboxLoaded().finally(()=>render());
+  else render();
 };
 function mercatorWorldPixel(pt,z){
   const lon=Number(pt?.[0]),lat0=Number(pt?.[1]);
@@ -3406,9 +3436,14 @@ function fitCoursePreviewMap(extraZoom=true){
   }catch{}
 }
 window.resetCoursePreviewMap=()=>fitCoursePreviewMap(false);
-function initInteractiveCourseMap(){
+async function initInteractiveCourseMap(){
   if(!['pregame','coursePreview'].includes(state.view))return;
-  const container=document.getElementById('coursePreviewMap'),token=mapboxToken();if(!container||!token||!window.mapboxgl)return;
+  const container=document.getElementById('coursePreviewMap'),token=mapboxToken();if(!container||!token)return;
+  if(!window.mapboxgl){
+    const ok=await ensureMapboxLoaded();
+    if(!ok||!['pregame','coursePreview'].includes(state.view))return;
+  }
+  if(!window.mapboxgl)return;
   const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);
   if(!cached?.geom)return;
   if(cached.courseId&&String(cached.courseId)!==String(state.selectedCourseId))return;
@@ -5425,20 +5460,25 @@ async function initializeAuth(){
   await bootstrapGolfRecon();
 }
 
+function withTimeout(promise,ms,label='Request'){
+  let t=null;
+  const timeout=new Promise((_,rej)=>{t=setTimeout(()=>rej(new Error(`${label} timed out`)),ms)});
+  return Promise.race([promise,timeout]).finally(()=>{if(t)clearTimeout(t)});
+}
 async function bootstrapGolfRecon(){
   const pill=document.getElementById('syncPill'),txt=document.getElementById('syncText');
   app.innerHTML=`<div class="card bootstrap-card"><div class="bootstrap-spinner"></div><strong>Loading GolfRecon</strong><div class="muted">Syncing your golf database…</div></div>`;
   try{
     if(txt)txt.textContent='Syncing';
     if(pill)pill.classList.remove('ok','err');
-    const data=await callImportFunction({action:'bootstrap'});
+    const data=await withTimeout(callImportFunction({action:'bootstrap'}),25000,'Sync');
     db.player=data.player||db.player;
     db.swingThoughts=data.swingThoughts||db.swingThoughts;
     db.courses=data.courses||[];
     db.rounds=data.rounds||[];
     db.puttingDetails=data.puttingDetails||[];
     db.clubStats=data.clubStats||[];
-    try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){
+    try{const rawImports=await withTimeout(callImportFunction({action:'list'}),12000,'Import list');applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){
       console.warn('Directional import hydration failed',e);
       applyStoredRoundDirectionPatches();
     }
@@ -5457,16 +5497,18 @@ async function bootstrapGolfRecon(){
     ensureSelectedCourse();
 
     refreshGlobalCourseSelector();
+    if(pill)pill.classList.add('ok');
+    if(txt)txt.textContent='Synced';
+    // Paint the app first — Mission claim must not block first paint.
+    render();
     try{
       const p=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
       if(p&&typeof claimAndPersistMissionRounds==='function'){
-        const claim=await claimAndPersistMissionRounds(p);
-        if(claim?.claimed)render();
+        claimAndPersistMissionRounds(p).then(claim=>{
+          if(claim?.claimed||claim?.saved)try{render()}catch{}
+        }).catch(e=>console.warn('Mission → Rounds claim skipped',e));
       }
     }catch(e){console.warn('Mission → Rounds claim skipped',e)}
-    if(pill)pill.classList.add('ok');
-    if(txt)txt.textContent='Synced';
-    render();
     // Claim My Time seat on login — don't wait until the player opens Platoons.
     try{syncPlatoonFromServer().then(()=>{
       try{
@@ -5481,7 +5523,18 @@ async function bootstrapGolfRecon(){
   }catch(e){
     if(pill)pill.classList.add('err');
     if(txt)txt.textContent='Database error';
-    app.innerHTML=`<div class="card bootstrap-card"><strong>Could not load GolfRecon</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:10px">Check the Supabase migration and Edge Function deployment.</div></div>`;
+    // Prefer a usable shell over a dead end when sync fails (stale token / slow phone).
+    try{
+      if((db.courses||[]).length){
+        ensureSelectedCourse();
+        refreshGlobalCourseSelector();
+        render();
+        app.insertAdjacentHTML('afterbegin',`<div class="card bootstrap-card" style="margin-bottom:12px"><strong>Sync paused</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:8px">Showing last data on this device. Pull to refresh or sign in again.</div></div>`);
+        return null;
+      }
+    }catch{}
+    app.innerHTML=`<div class="card bootstrap-card"><strong>Could not load GolfRecon</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:10px">Hard-refresh, or sign out and back in. If it keeps failing, tell Chief.</div><button class="button primary" style="margin-top:14px" type="button" onclick="location.reload()">Retry</button> <button class="button secondary" style="margin-top:14px" type="button" id="bootSignOut">Sign out</button></div>`;
+    try{document.getElementById('bootSignOut')?.addEventListener('click',()=>{try{saveAuthSession(null)}catch{};location.reload()})}catch{}
     console.error(e);
     return null;
   }
@@ -6359,10 +6412,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=228"></script>
-  <script src="platoon-mission-core.js?v=228"></script>
-  <script src="platoon-hq-records.js?v=228"></script>
-  <script src="platoons-v15-real.js?v=228"></script>
+  <script src="platoon-recap-shared.js?v=229"></script>
+  <script src="platoon-mission-core.js?v=229"></script>
+  <script src="platoon-hq-records.js?v=229"></script>
+  <script src="platoons-v15-real.js?v=229"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
