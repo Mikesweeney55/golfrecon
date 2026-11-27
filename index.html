@@ -1723,7 +1723,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=220">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=222">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1968,6 +1968,14 @@ const courseShort = n => ({"Campbell's Scot. Highlands":"Campbell’s","Bill Fly
 const TEE_ONLY_COURSE_FIX={
   gold:{club:'Kingswood',tees:'Gold',label:'Kingswood - Gold'}
 };
+const COLOR_TEE_RE=/^(blue|white|red|gold|black|green|championship|forward|member)$/i;
+/** Peel trailing " - White" / " · Gold" off a course title into a club name. */
+function stripTrailingTeeLabel(name){
+  const raw=String(name||'').trim();
+  const m=raw.match(/^(.*?)(?:\s*[-–—·]\s*)(blue|white|red|gold|black|green|championship|forward|member)\s*$/i);
+  if(!m)return {club:raw,tee:null};
+  return {club:m[1].trim()||raw,tee:m[2]};
+}
 
 const CALUSA_BLUE_TEE_RATINGS={
   'I':{rating:75.3,slope:143},
@@ -2443,12 +2451,21 @@ function courseMenuLabel(c){
   const base=String(c.baseName||'').trim();
   const tees=String(c.tees||'').trim();
   const teeOk=tees&&!/^unknown$/i.test(tees);
-  const teeOnly=/^(blue|white|red|gold|black|green|championship|forward|member)$/i.test(name);
+  const teeOnly=COLOR_TEE_RE.test(name);
+  // Tee-only shells (Gold) and explicit Kingswood - Gold keep the Club - Tee label.
   if(teeOnly&&base)return `${base} - ${teeOk?tees:name}`;
-  if(base&&teeOk&&(name===base||name===tees))return `${base} - ${tees}`;
-  if(base&&teeOk&&base!==name&&!name.toLowerCase().includes(tees.toLowerCase()))return `${name} - ${tees}`;
-  const dupes=(db.courses||[]).filter(x=>x&&x.name===c.name);
-  return dupes.length>1&&teeOk?`${name} · ${tees}`:name;
+  if(TEE_ONLY_COURSE_FIX[normalizeCourseName(name)]||TEE_ONLY_COURSE_FIX[normalizeCourseName(base)]){
+    return teeOk?`${base||name} - ${tees}`:(base||name);
+  }
+  // Same club title, different tee boxes → disambiguate with · Tees (not a second course name).
+  const clubKey=normalizeCourseName(stripTrailingTeeLabel(base||name).club);
+  const sameClub=(db.courses||[]).filter(x=>{
+    if(!x)return false;
+    return normalizeCourseName(stripTrailingTeeLabel(x.baseName||x.name||'').club)===clubKey;
+  });
+  const label=stripTrailingTeeLabel(name).club||name;
+  if(sameClub.length>1&&teeOk)return `${label} · ${tees}`;
+  return label;
 }
 function courseDropdownOptions(selectedId,includeAll=false,allLabel='All courses'){
   const list=sortedCourses();
@@ -2508,6 +2525,7 @@ async function setGlobalCourse(id){
     try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){console.warn('Directional import hydration failed',e)}
     repairKnownCourseLabels();
     ensureCoursesForOrphanRounds();
+    consolidateDuplicateCourses();
     if(!db.courses.some(c=>c.id===id)) state.selectedCourseId=db.courses[0]?.id||null;
     if(state.gameCourseId!=='all') state.gameCourseId=state.selectedCourseId;
     if(state.roundCourseId!=='all') state.roundCourseId=state.selectedCourseId;
@@ -5269,6 +5287,7 @@ async function bootstrapGolfRecon(){
     applyStoredRoundDirectionPatches();
     repairKnownCourseLabels();
     ensureCoursesForOrphanRounds();
+    consolidateDuplicateCourses();
     setTopbarDisplayName(db.player.username||db.player.name||'golfer');
 
     let savedCourse=null;
@@ -5327,7 +5346,7 @@ function normalizeCourseName(s){
     .trim()
     .replace(/\s+/g,' ');
 }
-/** Expand tee-only import names (e.g. "Gold") into club + tee. */
+/** Expand tee-only import names (e.g. "Gold") into club + tee — without forking Club - Tee duplicates. */
 function expandTeeOnlyCourseName(courseName,tees){
   const raw=String(courseName||'').trim();
   const teeRaw=String(tees||'').trim();
@@ -5340,16 +5359,20 @@ function expandTeeOnlyCourseName(courseName,tees){
       tees:teeRaw&&!/^unknown$/i.test(teeRaw)?teeRaw:hit.tees
     };
   }
-  // "Kingswood Golf Club" + Gold tees → keep club, label with tee
-  if(raw&&teeRaw&&!/^unknown$/i.test(teeRaw)&&!raw.toLowerCase().includes(teeRaw.toLowerCase())){
-    const club=raw.replace(/\s+Golf(?:\s+Club|\s+Course|\s+Links)?\s*$/i,'').trim()||raw;
-    if(/^(blue|white|red|gold|black|green)$/i.test(teeRaw)){
-      return {course_name:`${club} - ${teeRaw}`,baseName:club,tees:teeRaw};
-    }
+  // "Atkinson Country Club - White" already embeds the tee → peel it so we don't keep two rows.
+  const peeled=stripTrailingTeeLabel(raw);
+  if(peeled.tee){
+    const club=peeled.club.replace(/\s+Golf(?:\s+Club|\s+Course|\s+Links)?\s*$/i,'').trim()||peeled.club;
+    const teesOut=teeRaw&&!/^unknown$/i.test(teeRaw)?teeRaw:peeled.tee;
+    return {course_name:club,baseName:club,tees:teesOut||'Unknown'};
   }
-  return {course_name:raw,baseName:raw,tees:teeRaw||'Unknown'};
+  const club=raw.replace(/\s+Golf(?:\s+Club|\s+Course|\s+Links)?\s*$/i,'').trim()||raw;
+  // Keep the imported club title as the course name. Tee stays in `tees` so White/Blue
+  // variants of the same club can still differ — but we never rename to "Club - Tee"
+  // (that forked Atkinson Country Club into a second identical course).
+  return {course_name:raw,baseName:club||raw,tees:teeRaw||'Unknown'};
 }
-/** Fix already-saved tee-only courses (Gold → Kingswood - Gold) after bootstrap. */
+/** Fix tee-only + peeled Club-Tee labels after bootstrap. */
 function repairKnownCourseLabels(){
   let changed=false;
   for(const c of (db.courses||[])){
@@ -5357,7 +5380,8 @@ function repairKnownCourseLabels(){
     const expanded=expandTeeOnlyCourseName(c.name||c.baseName,c.tees);
     const key=normalizeCourseName(c.name||'');
     const baseKey=normalizeCourseName(c.baseName||'');
-    if(TEE_ONLY_COURSE_FIX[key]||TEE_ONLY_COURSE_FIX[baseKey]){
+    const peeled=!!stripTrailingTeeLabel(c.name||'').tee;
+    if(TEE_ONLY_COURSE_FIX[key]||TEE_ONLY_COURSE_FIX[baseKey]||peeled){
       if(c.name!==expanded.course_name||c.baseName!==expanded.baseName||c.tees!==expanded.tees){
         c.name=expanded.course_name;
         c.baseName=expanded.baseName;
@@ -5367,6 +5391,52 @@ function repairKnownCourseLabels(){
     }
   }
   return changed;
+}
+/** Same club + same tee + same hole count → one course row (remap rounds). */
+function courseDedupeKey(c){
+  const club=normalizeCourseName(stripTrailingTeeLabel(c?.baseName||c?.name||'').club);
+  const tee=normalizeTee(c?.tees)||'unknown';
+  const holes=Number((String(c?.segment||'').match(/\d+/)||[])[0])||(Array.isArray(c?.holeNumbers)?c.holeNumbers.length:0)||(Array.isArray(c?.pars)?c.pars.length:0)||18;
+  return `${club}|${tee}|${holes}`;
+}
+function courseRichness(c){
+  const pars=(c?.pars||[]).filter(x=>x!=null&&x!=='').length;
+  const rounds=(db.rounds||[]).filter(r=>String(r?.courseId)===String(c?.id)).length;
+  return pars*10+rounds*5+(c?.recovered?0:3)+(c?.slope?1:0)+(c?.rating?1:0)+(c?.imported?1:0);
+}
+function consolidateDuplicateCourses(){
+  const groups=new Map();
+  for(const c of (db.courses||[])){
+    if(!c?.id)continue;
+    const k=courseDedupeKey(c);
+    if(!k.startsWith('|')){
+      if(!groups.has(k))groups.set(k,[]);
+      groups.get(k).push(c);
+    }
+  }
+  let removed=0;
+  for(const list of groups.values()){
+    if(list.length<2)continue;
+    list.sort((a,b)=>courseRichness(b)-courseRichness(a)||String(a.id).localeCompare(String(b.id)));
+    const keep=list[0];
+    for(const drop of list.slice(1)){
+      for(const r of (db.rounds||[])){
+        if(r&&String(r.courseId)===String(drop.id))r.courseId=keep.id;
+      }
+      try{
+        if(String(state.selectedCourseId)===String(drop.id))state.selectedCourseId=keep.id;
+        if(String(state.gameCourseId)===String(drop.id))state.gameCourseId=keep.id;
+        if(String(state.roundCourseId)===String(drop.id))state.roundCourseId=keep.id;
+      }catch{}
+      db.courses=(db.courses||[]).filter(c=>c&&String(c.id)!==String(drop.id));
+      removed++;
+    }
+    const expanded=expandTeeOnlyCourseName(keep.name||keep.baseName,keep.tees);
+    keep.name=expanded.course_name;
+    keep.baseName=expanded.baseName||keep.baseName;
+    keep.tees=expanded.tees||keep.tees;
+  }
+  return removed;
 }
 /** Rebuild stub courses for rounds whose courseId vanished from the course list. */
 function ensureCoursesForOrphanRounds(){
@@ -6048,10 +6118,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=221"></script>
-  <script src="platoon-mission-core.js?v=221"></script>
-  <script src="platoon-hq-records.js?v=221"></script>
-  <script src="platoons-v15-real.js?v=221"></script>
+  <script src="platoon-recap-shared.js?v=222"></script>
+  <script src="platoon-mission-core.js?v=222"></script>
+  <script src="platoon-hq-records.js?v=222"></script>
+  <script src="platoons-v15-real.js?v=222"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
