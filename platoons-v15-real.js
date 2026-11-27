@@ -476,6 +476,21 @@ function ensureCourseInDb({name,tees,holes,par,rating,slope}){
   const label=expanded.course_name||name;
   const holesN=Number(holes)||18;
   const segment=holesN===18?'18 holes':'9 holes';
+  // Reuse an existing Atkinson/etc. row instead of forking Club - Tee duplicates.
+  if(typeof findCourseForImport==='function'){
+    const hit=findCourseForImport({course_name:label,tees:expanded.tees||tees,holes:holesN});
+    if(hit)return hit;
+  }
+  const wantTee=String(expanded.tees||tees||'').trim().toLowerCase();
+  const wantClub=(typeof normalizeCourseName==='function'?normalizeCourseName:s=>String(s||'').toLowerCase())(expanded.baseName||label);
+  const existing=db.courses.find(c=>{
+    if(!c)return false;
+    const club=(typeof normalizeCourseName==='function'?normalizeCourseName:s=>String(s||'').toLowerCase())(c.baseName||c.name||'');
+    const tee=String(c.tees||'').trim().toLowerCase();
+    const cHoles=Number((String(c.segment||'').match(/\d+/)||[])[0])||(c.holeNumbers||c.pars||[]).length||18;
+    return club===wantClub&&(!wantTee||wantTee==='unknown'||tee===wantTee)&&cHoles===holesN;
+  });
+  if(existing)return existing;
   let id=slugifyCourse(`${label}-${expanded.tees||tees||'tees'}-${segment}`);
   let n=2,base=id;
   while(db.courses.some(c=>c.id===id))id=`${base}-${n++}`;
