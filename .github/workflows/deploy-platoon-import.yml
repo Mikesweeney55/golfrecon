@@ -82,3 +82,31 @@ jobs:
       - name: Deploy platoon-import from main
         run: |
           supabase functions deploy platoon-import --remote="$SUPABASE_PROJECT_ID" --use-api --yes
+      - name: Snapshot golfiq-import source
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/golfiq-import-src
+          # Management API function body (TypeScript entry)
+          HTTP=$(curl -sS -o /tmp/golfiq-import-src/body.bin -w '%{http_code}' \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/functions/golfiq-import/body" || true)
+          echo "body HTTP $HTTP"
+          file /tmp/golfiq-import-src/body.bin || true
+          # Also list function metadata
+          curl -sS -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/functions/golfiq-import" \
+            -o /tmp/golfiq-import-src/meta.json || true
+          # Try CLI download into workspace
+          supabase functions download golfiq-import --project-ref "$SUPABASE_PROJECT_ID" \
+            || supabase functions download golfiq-import --remote "$SUPABASE_PROJECT_ID" \
+            || true
+          find . -iname '*golfiq*' -type f 2>/dev/null | head -50 >> /tmp/golfiq-import-src/find.txt || true
+          if [ -d supabase/functions/golfiq-import ]; then
+            cp -a supabase/functions/golfiq-import /tmp/golfiq-import-src/cli-download
+          fi
+          ls -laR /tmp/golfiq-import-src
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: golfiq-import-source
+          path: /tmp/golfiq-import-src
