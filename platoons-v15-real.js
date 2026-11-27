@@ -4,7 +4,7 @@ const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt
 let platoonSubpage='home',calendarCursor=null;
 function renderGroups(){try{if(typeof render==='function')render()}catch{}}
 function goSubpage(name){platoonSubpage=name||'home';renderGroups()}
-function subNav(){const tabs=[{id:'home',label:'Missions'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Blog'}];return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${E(t.label)}</button>`).join('')}</nav>`}
+function subNav(){const tabs=[{id:'home',label:'Home'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Locker'}];return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${E(t.label)}</button>`).join('')}</nav>`}
 function withSubNav(html){return `<div class="gr-platoons-shell">${html||''}${subNav()}</div>`}
 function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${E(title)}</h2>${sub?`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">${E(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
 function monthStart(){if(calendarCursor)return new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);const now=new Date(),rows=(loadPlatoonLocal().missions||[]).filter(m=>m.date&&m.type!=='war').map(m=>new Date(m.date+'T12:00:00')).filter(d=>!isNaN(d));const next=rows.filter(d=>d>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a,b)=>a-b)[0];calendarCursor=new Date((next||now).getFullYear(),(next||now).getMonth(),1);return calendarCursor}
@@ -70,12 +70,308 @@ function calendarView(){
   for(let i=0;i<first;i++)cells+='<div class="gr-cal-pad" aria-hidden="true"></div>';
   for(let d=1;d<=days;d++){
     const items=map[d]||[],iso=isoDate(y,m,d),busy=items.length>0;
-    cells+=`<button type="button" class="gr-cal-day ${busy?'has-missions':''}" data-cal-iso="${E(iso)}" aria-label="Schedule mission on ${E(iso)}"><div class="gr-cal-daynum">${d}</div>${items.map(x=>`<span class="gr-cal-mission" data-mission="${E(x.id)}">⛳ ${E(x.title||x.locationName||'Mission')}</span>`).join('')}${busy?'':`<span class="gr-cal-add">+ Mission</span>`}</button>`;
+    const shown=items.slice(0,2);
+    const extra=items.length-shown.length;
+    const missionBits=shown.map(x=>{
+      const label=String(x.title||x.locationName||'Mission').trim()||'Mission';
+      return `<span class="gr-cal-mission" data-mission="${E(x.id)}" title="${E(label)}"><span class="gr-cal-mission-ico" aria-hidden="true">⛳</span><span class="gr-cal-mission-txt">${E(label)}</span></span>`;
+    }).join('')+(extra>0?`<span class="gr-cal-more">+${extra}</span>`:'');
+    cells+=`<button type="button" class="gr-cal-day ${busy?'has-missions':''}" data-cal-iso="${E(iso)}" aria-label="${busy?`${items.length} mission${items.length===1?'':'s'} on ${E(iso)}`:`Schedule mission on ${E(iso)}`}"><div class="gr-cal-daynum">${d}</div>${missionBits}${busy?'':`<span class="gr-cal-add" aria-hidden="true"><span class="gr-cal-add-full">+ Mission</span><span class="gr-cal-add-short">+</span></span>`}</button>`;
   }
   const label=cur.toLocaleString(undefined,{month:'long',year:'numeric'});
   return `${subHead('Calendar',p.name||'My Time')}<div class="card gr-cal-card"><div class="gr-cal-nav"><button class="icon-button" type="button" data-cal-prev aria-label="Previous month">‹</button><strong>${E(label)}</strong><button class="icon-button" type="button" data-cal-next aria-label="Next month">›</button></div><p class="muted gr-cal-hint">Tap a day to schedule a Mission. Tap an existing Mission to open it.</p><div class="gr-cal-dows">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div>${x}</div>`).join('')}</div><div class="gr-cal-grid">${cells}</div></div>`;
 }
-function blogView(){const p=loadPlatoonLocal();return `${subHead('Blog',(p.name||'My Time')+' Clubhouse')}<div class="card"><div class="empty" style="padding:34px 12px">No posts yet.</div></div>`}
+const BLOG_PROMPTS=[
+  'That chip was 90% luck and 10% denial.',
+  'Buying drinks for the first birdie of the day.',
+  'Prop: someone three-putts 14 before noon.',
+  'Post your "this is fine" face after the last tee shot.',
+  'Who owed who a beer after last Mission?',
+  'Hottest take in the platoon — go.'
+];
+const BLOG_TONES=[
+  {id:'trash',label:'Trash'},
+  {id:'flex',label:'Flex'},
+  {id:'prop',label:'Prop'},
+  {id:'recap',label:'Recap'},
+  {id:'chatter',label:'Chatter'}
+];
+const BLOG_REACTS=[
+  {id:'fire',label:'🔥'},
+  {id:'dead',label:'💀'},
+  {id:'salute',label:'🫡'},
+  {id:'cap',label:'🧢'}
+];
+const BLOG_PHOTOS_KEY='golfreconPlatoonBlogPhotosV1';
+let blogComposerTone='trash';
+let blogPendingPhoto=null;
+let blogPendingBody='';
+let blogPhotoBusy=false;
+let blogReplyOpenId=''; // only one reply box open — keeps a single clear place to compose
+function blogPhotosStorageKey(p){return BLOG_PHOTOS_KEY+':'+String(p?.id||p?.serverId||'local')}
+function readBlogPhotosSide(p){
+  const merged={};
+  const keys=new Set([blogPhotosStorageKey(p),BLOG_PHOTOS_KEY+':local']);
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith(BLOG_PHOTOS_KEY+':'))keys.add(k);
+    }
+  }catch{}
+  for(const key of keys){
+    try{
+      const raw=localStorage.getItem(key);
+      const obj=raw?JSON.parse(raw):{};
+      if(obj&&typeof obj==='object')Object.assign(merged,obj);
+    }catch{}
+  }
+  return merged;
+}
+function writeBlogPhotosSide(p,map){
+  try{
+    const clean={};
+    for(const [id,dataUrl] of Object.entries(map||{})){
+      if(id&&typeof dataUrl==='string'&&dataUrl.startsWith('data:'))clean[id]=dataUrl;
+    }
+    const payload=JSON.stringify(clean);
+    localStorage.setItem(blogPhotosStorageKey(p),payload);
+    // Mirror under :local so id/serverId flips after sync cannot orphan photos.
+    localStorage.setItem(BLOG_PHOTOS_KEY+':local',payload);
+  }catch(err){
+    console.warn('Locker photo storage failed',err);
+    throw new Error('Could not save that photo on this device (storage full?). Try a smaller image.');
+  }
+}
+function blogPhotoOf(p,post){
+  if(!post)return '';
+  if(post.photoData&&String(post.photoData).startsWith('data:'))return post.photoData;
+  if(!post.hasPhoto)return '';
+  const map=readBlogPhotosSide(p);
+  return map[post.photoId||post.id]||'';
+}
+function rememberBlogPhoto(p,postId,dataUrl){
+  if(!postId||!dataUrl)return;
+  const map=readBlogPhotosSide(p);
+  map[postId]=dataUrl;
+  writeBlogPhotosSide(p,map);
+}
+/** Re-attach locker photo bytes after sync (server hq_meta never keeps reliable data-URLs). */
+function hydrateBlogPhotos(p){
+  if(!p)return p;
+  p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+  if(!Array.isArray(p.hqMeta.blogPosts))p.hqMeta.blogPosts=[];
+  const map=readBlogPhotosSide(p);
+  let sideDirty=false;
+  for(const post of p.hqMeta.blogPosts){
+    if(!post||typeof post!=='object')continue;
+    const id=String(post.photoId||post.id||'');
+    if(post.photoData&&String(post.photoData).startsWith('data:')){
+      if(id&&map[id]!==post.photoData){map[id]=post.photoData;sideDirty=true}
+      post.hasPhoto=true;
+      if(id)post.photoId=id;
+      continue;
+    }
+    if(id&&map[id]){
+      post.photoData=map[id];
+      post.hasPhoto=true;
+      post.photoId=id;
+    }
+  }
+  if(sideDirty){
+    try{writeBlogPhotosSide(p,map)}catch(e){console.warn('Locker photo hydrate save failed',e)}
+  }
+  return p;
+}
+function blogPostsWithoutPhotoBytes(posts){
+  return (Array.isArray(posts)?posts:[]).map(post=>{
+    if(!post||typeof post!=='object')return post;
+    const photoData=post.photoData;
+    const rest={...post};
+    delete rest.photoData;
+    if(photoData&&String(photoData).startsWith('data:')){
+      rest.hasPhoto=true;
+      if(!rest.photoId)rest.photoId=rest.id;
+    }
+    return rest;
+  });
+}
+/** Persist photo bytes to side storage and strip them from the object we stringify into the main platoon key. */
+function preparePlatoonForLocalWrite(p){
+  if(!p)return p;
+  // Move any in-memory bytes to side storage first — do NOT JSON.stringify posts while they still hold data-URLs.
+  const livePosts=p.hqMeta?.blogPosts;
+  if(Array.isArray(livePosts)){
+    for(const post of livePosts){
+      if(post?.photoData&&String(post.photoData).startsWith('data:')){
+        try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(e){console.warn(e)}
+      }
+    }
+  }
+  const slim={
+    ...p,
+    hqMeta:{
+      ...(p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{}),
+      blogPosts:blogPostsWithoutPhotoBytes(p.hqMeta?.blogPosts)
+    }
+  };
+  try{return JSON.parse(JSON.stringify(slim))}
+  catch(e){
+    console.warn('preparePlatoonForLocalWrite clone failed',e);
+    return slim;
+  }
+}
+/** Server snapshot: never ship multi-hundred-KB data URLs in hq_meta. */
+function snapshotPlatoonForServer(p){
+  return preparePlatoonForLocalWrite(p);
+}
+window.grHydrateBlogPhotos=hydrateBlogPhotos;
+window.grPreparePlatoonForLocalWrite=preparePlatoonForLocalWrite;
+window.grSnapshotPlatoonForServer=snapshotPlatoonForServer;
+function relativeBlogTime(iso){
+  const t=Date.parse(iso||'');
+  if(!Number.isFinite(t))return '';
+  const mins=Math.round((Date.now()-t)/60000);
+  if(mins<1)return 'just now';
+  if(mins<60)return `${mins}m ago`;
+  const hrs=Math.round(mins/60);
+  if(hrs<24)return `${hrs}h ago`;
+  const days=Math.round(hrs/24);
+  if(days<14)return `${days}d ago`;
+  try{return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'})}catch{return ''}
+}
+function blogAuthorInitials(name){
+  const parts=String(name||'C').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length)return 'C';
+  if(parts.length===1)return parts[0].slice(0,2).toUpperCase();
+  return (parts[0][0]+parts[parts.length-1][0]).toUpperCase();
+}
+function currentBlogAuthor(p){
+  const meId=typeof window.grResolveCurrentPlatoonMemberId==='function'
+    ?window.grResolveCurrentPlatoonMemberId(p)
+    :(typeof resolveCurrentPlatoonMemberId==='function'?resolveCurrentPlatoonMemberId(p):null);
+  const me=(p.members||[]).find(m=>m&&String(m.id)===String(meId))||(p.members||[]).find(m=>m&&m.role==='chief')||null;
+  const name=me?memberLabel(me):(typeof db!=='undefined'?(db.player?.username||db.player?.name||'Cadet'):'Cadet');
+  return {id:me?.id||'local',name};
+}
+function canModerateBlog(p,post){
+  const me=currentBlogAuthor(p);
+  if(post&&String(post.authorId)===String(me.id))return true;
+  const member=(p.members||[]).find(m=>m&&String(m.id)===String(me.id));
+  return member&&(member.role==='chief'||member.role==='co_chief');
+}
+function blogToneLabel(tone){return (BLOG_TONES.find(t=>t.id===tone)||BLOG_TONES[4]).label}
+function blogPostsSorted(p){
+  hydrateBlogPhotos(p);
+  const posts=typeof window.grBlogPostsOf==='function'?window.grBlogPostsOf(p):(p?.hqMeta?.blogPosts||[]);
+  return (posts||[]).slice().sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+}
+function saveBlogPosts(p,posts,{push=true}={}){
+  p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+  // Persist any new bytes, but never abort the whole post if an old photo rewrite fails.
+  for(const post of (posts||[])){
+    if(post?.photoData&&String(post.photoData).startsWith('data:')){
+      try{rememberBlogPhoto(p,post.photoId||post.id,post.photoData)}catch(e){console.warn('Locker photo side-save',e)}
+    }
+  }
+  // Keep flags in hqMeta; bytes stay in side storage so localStorage / sync stay small.
+  p.hqMeta.blogPosts=blogPostsWithoutPhotoBytes(posts);
+  if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
+  if(typeof savePlatoonLocal==='function')savePlatoonLocal(p,push);
+  else if(typeof writePlatoonLocal==='function'){writePlatoonLocal(p);renderGroups()}
+  else renderGroups();
+}
+function blogReactionCount(post,key){return (post?.reactions?.[key]||[]).length}
+function blogReactedByMe(post,key,meId){return (post?.reactions?.[key]||[]).some(id=>String(id)===String(meId))}
+function blogPostCard(p,post,me){
+  const photo=blogPhotoOf(p,post);
+  const tone=blogToneLabel(post.tone);
+  const reacts=BLOG_REACTS.map(r=>{
+    const n=blogReactionCount(post,r.id);
+    const on=blogReactedByMe(post,r.id,me.id);
+    return `<button type="button" class="gr-blog-react ${on?'is-on':''}" data-blog-react="${E(r.id)}" data-blog-post="${E(post.id)}" aria-pressed="${on?'true':'false'}" title="${E(r.id)}">${r.label}${n?`<span>${n}</span>`:''}</button>`;
+  }).join('');
+  const replies=(post.replies||[]).map(r=>`<div class="gr-blog-reply"><div class="gr-blog-reply-meta"><strong>${E(r.authorName)}</strong><span>${E(relativeBlogTime(r.createdAt))}</span></div><p>${E(r.body)}</p></div>`).join('');
+  const canDelete=canModerateBlog(p,post);
+  const canPin=canModerateBlog(p); // chief / co-chief only
+  const tools=(canPin||canDelete)?`<div class="gr-blog-post-tools">
+      ${canPin?`<button type="button" class="gr-blog-tool" data-blog-pin="${E(post.id)}" title="${post.pinned?'Unpin':'Pin'}">${post.pinned?'Unpin':'Pin'}</button>`:''}
+      ${canDelete?`<button type="button" class="gr-blog-tool danger" data-blog-delete="${E(post.id)}" title="Delete">Delete</button>`:''}
+    </div>`:'';
+  return `<article class="gr-blog-post ${post.pinned?'is-pinned':''} gr-blog-tone-${E(post.tone||'chatter')}" data-blog-post-id="${E(post.id)}">
+    <div class="gr-blog-post-head">
+      <div class="gr-blog-avatar" aria-hidden="true">${E(blogAuthorInitials(post.authorName))}</div>
+      <div class="gr-blog-post-meta">
+        <div class="gr-blog-post-by"><strong>${E(post.authorName)}</strong>${post.pinned?'<span class="gr-blog-pin-badge">Pinned</span>':''}<span class="gr-blog-tone-badge">${E(tone)}</span></div>
+        <div class="gr-blog-post-time">${E(relativeBlogTime(post.createdAt))}</div>
+      </div>
+      ${tools}
+    </div>
+    ${post.body?`<p class="gr-blog-body">${E(post.body)}</p>`:''}
+    ${photo?`<button type="button" class="gr-blog-photo" data-blog-open-photo="${E(post.id)}"><img src="${photo.replace(/"/g,'')}" alt="Locker photo from ${E(post.authorName)}"></button>`:''}
+    <div class="gr-blog-reacts">${reacts}<button type="button" class="gr-blog-react gr-blog-reply-toggle ${blogReplyOpenId===post.id?'is-on':''}" data-blog-reply-toggle="${E(post.id)}" aria-expanded="${blogReplyOpenId===post.id?'true':'false'}">Reply${(post.replies||[]).length?`<span>${(post.replies||[]).length}</span>`:''}</button></div>
+    ${replies?`<div class="gr-blog-replies">${replies}</div>`:''}
+    ${blogReplyOpenId===post.id?`<form class="gr-blog-reply-form" data-blog-reply-form="${E(post.id)}">
+      <input name="reply" maxlength="400" placeholder="Reply with heat…" autocomplete="off">
+      <button class="button secondary" type="submit">Send</button>
+      <button class="button secondary" type="button" data-blog-reply-cancel="${E(post.id)}">Cancel</button>
+    </form>`:''}
+  </article>`;
+}
+function blogView(){
+  const p=loadPlatoonLocal();
+  const me=currentBlogAuthor(p);
+  const posts=blogPostsSorted(p);
+  const prompts=BLOG_PROMPTS.map(t=>`<button type="button" class="gr-blog-prompt" data-blog-prompt="${E(t)}">${E(t)}</button>`).join('');
+  const tones=BLOG_TONES.map(t=>`<button type="button" class="gr-blog-tone ${blogComposerTone===t.id?'active':''}" data-blog-tone="${E(t.id)}">${E(t.label)}</button>`).join('');
+  const feed=posts.length
+    ? posts.map(post=>blogPostCard(p,post,me)).join('')
+    : `<div class="gr-blog-empty card"><strong>Locker’s quiet.</strong><span class="muted">Drop the first take — trash talk, a flex photo, or a prop bet. The platoon will answer.</span></div>`;
+  const preview=blogPendingPhoto
+    ?`<div class="gr-blog-pending"><img src="${String(blogPendingPhoto).replace(/"/g,'')}" alt="Pending upload"><button type="button" class="gr-blog-tool danger" data-blog-clear-photo>Remove photo</button></div>`
+    :(blogPhotoBusy?`<div class="gr-blog-pending is-busy"><span class="muted">Attaching photo…</span></div>`:'');
+  const draft=blogPendingBody||'';
+  return `${subHead('Locker Room',(p.name||'My Time')+' · trash talk · photos · props')}
+  <div class="gr-blog">
+    <section class="card gr-blog-composer">
+      <div class="gr-blog-composer-top">
+        <div class="gr-blog-avatar is-me" aria-hidden="true">${E(blogAuthorInitials(me.name))}</div>
+        <div>
+          <div class="eyebrow">POST TO THE LOCKER</div>
+          <div class="gr-blog-composer-as">as <strong>${E(me.name)}</strong></div>
+        </div>
+      </div>
+      <div class="gr-blog-tones" role="group" aria-label="Post tone">${tones}</div>
+      <form id="grBlogComposer">
+        <textarea id="grBlogBody" name="body" rows="3" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…">${E(draft)}</textarea>
+        ${preview}
+        <div class="gr-blog-composer-actions">
+          <label for="grBlogPhoto" class="button secondary gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}">📷 ${blogPhotoBusy?'Working…':'Photo'}</label>
+          <input id="grBlogPhoto" class="gr-blog-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}>
+          <button class="button primary" type="submit" ${blogPhotoBusy?'disabled':''}>${blogPhotoBusy?'Wait…':'Post'}</button>
+        </div>
+      </form>
+      <div class="gr-blog-prompts-wrap">
+        <div class="gr-blog-prompts-label">Spark it</div>
+        <div class="gr-blog-prompts">${prompts}</div>
+      </div>
+    </section>
+    <section class="gr-blog-feed" aria-live="polite">
+      <div class="gr-section-head"><div><div class="eyebrow">THE BOARD</div><h2>${posts.length?`${posts.length} post${posts.length===1?'':'s'}`:'Waiting on a take'}</h2></div></div>
+      <div class="gr-blog-feed-list">${feed}</div>
+    </section>
+  </div>`;
+}
+function ensureBlogLightbox(){
+  let box=document.getElementById('grBlogLightbox');
+  if(box)return box;
+  box=document.createElement('dialog');
+  box.id='grBlogLightbox';
+  box.className='gr-blog-lightbox';
+  box.innerHTML=`<form method="dialog"><button class="gr-blog-lightbox-close" value="close" aria-label="Close">✕</button></form><img alt="Locker photo">`;
+  document.body.appendChild(box);
+  box.addEventListener('click',e=>{if(e.target===box)box.close()});
+  return box;
+}
 function courseMenuName(c){
   if(typeof courseMenuLabel==='function')return courseMenuLabel(c);
   const n=c?.baseName||c?.name||'Course';
@@ -174,15 +470,23 @@ window.grWireFormatSelect=wireFormatSelect;
 function slugifyCourse(s){return String(s||'course').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48)||'course'}
 function ensureCourseInDb({name,tees,holes,par,rating,slope}){
   if(typeof db==='undefined'||!Array.isArray(db.courses))return null;
+  const expanded=typeof expandTeeOnlyCourseName==='function'
+    ? expandTeeOnlyCourseName(name,tees)
+    : {course_name:name,baseName:name,tees:tees||'Unknown'};
+  const label=expanded.course_name||name;
   const holesN=Number(holes)||18;
   const segment=holesN===18?'18 holes':'9 holes';
-  let id=slugifyCourse(`${name}-${tees||'tees'}-${segment}`);
+  let id=slugifyCourse(`${label}-${expanded.tees||tees||'tees'}-${segment}`);
   let n=2,base=id;
   while(db.courses.some(c=>c.id===id))id=`${base}-${n++}`;
   const pars=Array(holesN).fill(null);
   const holeNumbers=Array.from({length:holesN},(_,i)=>i+1);
   const c={
-    id,name,baseName:name,tees:tees||'Unknown',yardage:0,
+    id,
+    name:label,
+    baseName:expanded.baseName||label,
+    tees:expanded.tees||tees||'Unknown',
+    yardage:0,
     slope:Number.isFinite(Number(slope))?Number(slope):null,
     rating:Number.isFinite(Number(rating))?Number(rating):null,
     par:Number.isFinite(Number(par))?Number(par):null,
@@ -215,8 +519,35 @@ function guestsOf(m){
 function warIdOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR:([^\]]+)\]\]/);return x?x[1]:''}
 function warEndOf(m){const x=String(m.notes||'').match(/\[\[GR_WAR_END:([^\]]*)\]\]/);return x?x[1]:''}
 function composeNotes(base,guests=[],warId='',warEnd=''){let s=cleanNotes(base);if(guests.length)s+=`${s?'\n':''}[[GR_GUESTS:${JSON.stringify(guests)}]]`;if(warId)s+=`${s?'\n':''}[[GR_WAR:${warId}]]`;if(warEnd)s+=`${s?'\n':''}[[GR_WAR_END:${warEnd}]]`;return s}
-function membersOf(p){return (p.members||[]).filter(m=>m.status!=='inactive')}
-function playersOf(p,m){const map=new Map(membersOf(p).map(x=>[x.id,x.name]));return (m.participants||[]).map(id=>map.get(id)).filter(Boolean)}
+function membersOf(p){return (p.members||[]).filter(m=>m&&typeof m==='object'&&m.status!=='inactive')}
+function memberLabel(m){
+  // Do NOT call window.grMemberLabel here — this function is assigned to it below.
+  // Delegating caused infinite recursion and broke every nav click after display-name work shipped.
+  const show=String(m?.displayName||'').trim();
+  return show||String(m?.name||'').trim()||'Player';
+}
+function playersOf(p,m){const map=new Map(membersOf(p).map(x=>[x.id,memberLabel(x)]));return (m.participants||[]).map(id=>map.get(id)).filter(Boolean)}
+function hydrateRosterProfiles(p){
+  const profiles=(p?.hqMeta&&typeof p.hqMeta==='object'&&p.hqMeta.rosterProfiles&&typeof p.hqMeta.rosterProfiles==='object')
+    ?p.hqMeta.rosterProfiles:{};
+  for(const m of (p?.members||[])){
+    const prof=profiles[m.id];
+    if(!prof)continue;
+    if(prof.fullName)m.name=prof.fullName;
+    if(prof.displayName)m.displayName=prof.displayName;
+  }
+  return p;
+}
+function rosterProfilesFromMembers(members){
+  const out={};
+  for(const m of (members||[])){
+    if(!m?.id)continue;
+    const fullName=String(m.name||'').trim();
+    const displayName=String(m.displayName||'').trim();
+    if(fullName||displayName)out[m.id]={fullName,displayName};
+  }
+  return out;
+}
 function peopleOf(p,m){return [...playersOf(p,m).map(name=>({name,guest:false})),...guestsOf(m).map(name=>({name,guest:true}))]}
 function isGuestPlayer(p,m,raw){
   const rawName=String(raw||'').trim();
@@ -285,7 +616,12 @@ function platoonStandings(p){
       .filter(r=>Number(r.played||0)>0)
       .map(r=>({name:r.name,points:r.points,played:r.played,totalPoints:r.totalPoints}));
   }
-  const members=membersOf(p),score=new Map(members.map(m=>[String(m.name||'').trim().toLowerCase(),{name:m.name,points:0,played:0,totalPoints:0}]));
+  const members=membersOf(p),score=new Map();
+  for(const m of members){
+    const entry={name:memberLabel(m),points:0,played:0,totalPoints:0};
+    const keys=[memberLabel(m),m.name,m.displayName,...setupAliasesOf(m)].map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+    for(const k of keys)if(!score.has(k))score.set(k,entry);
+  }
   for(const m of (p.missions||[])){
     if(m.type==='war'||m.status!=='completed')continue;
     if(m.league_points===false)continue;
@@ -393,7 +729,23 @@ function warCard(p,w){
 function groupsV15(){
   if(platoonSubpage==='calendar')return withSubNav(calendarView());
   if(platoonSubpage==='blog')return withSubNav(blogView());
-  const p=loadPlatoonLocal(),missions=(p.missions||[]).filter(m=>m.type!=='war'),wars=(p.missions||[]).filter(m=>m.type==='war'),standalone=missions.filter(m=>!warIdOf(m));
+  const p=loadPlatoonLocal();
+  // Drop sparse/null slots — server or local merges can leave holes that crash standings on .id
+  if(Array.isArray(p.members))p.members=p.members.filter(m=>m&&typeof m==='object');
+  if(Array.isArray(p.missions))p.missions=p.missions.filter(m=>m&&typeof m==='object');
+  // Recover blank NET cells from handicap / hole nets / net_score already on the row.
+  if(typeof window.grHydrateMissingOfficialNets==='function'){
+    let netsFixed=false;
+    for(const m of (p.missions||[])){
+      if(m&&m.type!=='war'&&Array.isArray(m.results)&&m.results.length){
+        if(window.grHydrateMissingOfficialNets(m))netsFixed=true;
+      }
+    }
+    if(netsFixed&&typeof savePlatoonLocal==='function'){
+      try{savePlatoonLocal(p,true)}catch(e){console.warn('net hydrate save',e)}
+    }
+  }
+  const missions=(p.missions||[]).filter(m=>m.type!=='war'),wars=(p.missions||[]).filter(m=>m.type==='war'),standalone=missions.filter(m=>!warIdOf(m));
   const upcoming=standalone.filter(m=>m.status!=='completed').sort((a,b)=>{
     const ad=String(a.date||'9999'),bd=String(b.date||'9999');
     if(ad!==bd)return ad.localeCompare(bd);
@@ -440,7 +792,7 @@ function groupsV15(){
   return withSubNav(home);
 }
 
-function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=document.createElement('dialog');d.id='grPlatoonDialog';document.body.appendChild(d)}d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
+function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=document.createElement('dialog');d.id='grPlatoonDialog';document.body.appendChild(d)}d.className='';d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
 function closeModal(){document.getElementById('grPlatoonDialog')?.close()}
 window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW MISSION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-choice-grid"><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenMissionEditor()"><strong>Single Mission</strong><span class="muted">One competitive round — league night, Saturday game, outing</span></button><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenWarEditor()"><strong>War</strong><span class="muted">Multiple Missions under one season / league series</span></button></div>`)};
 window.grCloseModal=closeModal;
@@ -718,6 +1070,43 @@ function preserveClientPlatoonFields(serverP,localP){
     if(side.length)serverP.clubhousePhotos=side;
   }
   if(!serverP.logoData&&localP?.logoData)serverP.logoData=localP.logoData;
+  // Keep locally entered roster emails / display names when the server row has none yet.
+  const localMembers=Array.isArray(localP?.members)?localP.members:[];
+  for(const sm of (serverP.members||[])){
+    if(!sm)continue;
+    const lm=localMembers.find(x=>String(x.id)===String(sm.id));
+    if(!lm)continue;
+    if(!sm.email&&lm.email)sm.email=String(lm.email).trim().toLowerCase();
+    if(!sm.displayName&&lm.displayName)sm.displayName=lm.displayName;
+    if(lm.name&&(!sm.name||sm.name===sm.displayName))sm.name=lm.name;
+  }
+  if(serverP.hqMeta&&typeof serverP.hqMeta==='object'){
+    const localEmails=(localP?.hqMeta&&typeof localP.hqMeta==='object'&&localP.hqMeta.rosterEmails)||{};
+    serverP.hqMeta.rosterEmails={...(localEmails||{}),...(serverP.hqMeta.rosterEmails||{})};
+    const localProfiles=(localP?.hqMeta&&typeof localP.hqMeta==='object'&&localP.hqMeta.rosterProfiles)||{};
+    serverP.hqMeta.rosterProfiles={...(localProfiles||{}),...(serverP.hqMeta.rosterProfiles||{})};
+    const localBlog=(localP?.hqMeta&&typeof localP.hqMeta==='object'&&localP.hqMeta.blogPosts)||[];
+    const serverBlog=Array.isArray(serverP.hqMeta.blogPosts)?serverP.hqMeta.blogPosts:[];
+    serverP.hqMeta.blogPosts=typeof window.grMergeBlogPosts==='function'
+      ?window.grMergeBlogPosts(serverBlog,localBlog)
+      :[...serverBlog,...localBlog];
+  }
+  // Blog photo bytes live in side storage — keep local map across sync, then rehydrate posts.
+  try{
+    const localMap=readBlogPhotosSide(localP||serverP);
+    const serverMap=readBlogPhotosSide(serverP);
+    writeBlogPhotosSide(serverP,{...serverMap,...localMap});
+  }catch{}
+  try{
+    // Also harvest any photoData still on the local posts before server snapshot wins.
+    for(const post of (localP?.hqMeta?.blogPosts||[])){
+      if(post?.photoData&&String(post.photoData).startsWith('data:')){
+        try{rememberBlogPhoto(serverP,post.photoId||post.id,post.photoData)}catch{}
+      }
+    }
+  }catch{}
+  hydrateBlogPhotos(serverP);
+  hydrateRosterProfiles(serverP);
   preserveMissionPhotosOnSync(serverP,localP);
   if(typeof window.grPreserveMyTimeMasters2026==='function'){
     try{window.grPreserveMyTimeMasters2026(serverP,localP)}catch{}
@@ -757,12 +1146,16 @@ function setupAliasesOf(m){
 }
 
 window.grOpenSetup=()=>{
-  const p=loadPlatoonLocal();
+  const p=hydrateRosterProfiles(loadPlatoonLocal());
   let photos=clubhousePhotosOf(p).map(x=>({...x}));
   let pendingLogo=p.logoData||'';
   let logoCleared=false;
   p.members=Array.isArray(p.members)?p.members:[];
-  const coOptions=['<option value="">No Co-Chief selected</option>',...(p.members||[]).filter(m=>m.role!=='chief').map(m=>`<option value="${E(m.id)}" ${String(p.coChief||'')===String(m.id)?'selected':''}>${E(m.name||'Cadet')}</option>`)].join('');
+  const hqEmails=(p.hqMeta&&typeof p.hqMeta==='object'&&p.hqMeta.rosterEmails&&typeof p.hqMeta.rosterEmails==='object')?p.hqMeta.rosterEmails:{};
+  for(const m of p.members){
+    if(!m.email&&hqEmails[m.id])m.email=String(hqEmails[m.id]||'').trim().toLowerCase();
+  }
+  const coOptions=['<option value="">No Co-Chief selected</option>',...(p.members||[]).filter(m=>m.role!=='chief').map(m=>`<option value="${E(m.id)}" ${String(p.coChief||'')===String(m.id)?'selected':''}>${E(memberLabel(m))}</option>`)].join('');
   const d=modal(`<div class="dialog-head"><div><div class="eyebrow">PLATOON</div><h2>Setup</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
     <label>Name<input id="grPName" value="${E(p.name||'')}"></label>
     <label>Motto<input id="grPMotto" value="${E(p.motto||'')}"></label>
@@ -772,7 +1165,7 @@ window.grOpenSetup=()=>{
       <label>Visibility<select id="grPVis"><option ${p.visibility==='Private'?'selected':''}>Private</option><option ${p.visibility==='Invite only'?'selected':''}>Invite only</option></select></label>
     </div>
     <div class="grid two">
-      <label>Platoon Chief<input value="${E((p.members||[]).find(m=>m.role==='chief')?.name||p.chief||'')}" disabled></label>
+      <label>Platoon Chief<input value="${E(memberLabel((p.members||[]).find(m=>m.role==='chief'))||p.chief||'')}" disabled></label>
       <label>Co-Chief<select id="grPCoChief">${coOptions}</select></label>
     </div>
     <div class="gr-logo-setup-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
@@ -795,11 +1188,12 @@ window.grOpenSetup=()=>{
     </div>
     <div id="grGuestPoolRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
     <div class="gr155-roster-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:18px">
-      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Names used for screenshot recognition. Recognition names can be comma-separated.</div></div>
+      <div><div class="eyebrow">MASTER ROSTER</div><div class="muted" style="font-size:var(--fs-data)">Put each player's real email here, then Save. They create a Golf Recon account with that same email → claim this seat, join My Time, and pull their Mission rounds into their own Rounds history. Alias matches scorecards. Display name is what boards show (they can change it in Account).</div></div>
       <button class="button secondary" id="grAddRoster" type="button">+ Player</button>
     </div>
     <div id="grRosterRows" class="gr155-roster" style="display:grid;gap:8px;margin-top:8px"></div>
     <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grPSave">Save</button></div>`);
+  d.classList.add('gr-setup-wide');
   const thumbs=d.querySelector('#grClubhouseThumbs');
   const roster=d.querySelector('#grRosterRows');
   const logoRemove=d.querySelector('#grPLogoRemove');
@@ -811,7 +1205,19 @@ window.grOpenSetup=()=>{
     clearBtn.hidden=!photos.length;
   };
   const drawRoster=()=>{
-    roster.innerHTML=(p.members||[]).map((m,i)=>`<div class="gr155-roster-row" data-i="${i}" style="display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.4fr);gap:8px"><label style="margin-top:0">Name<input data-name value="${E(m.name||'')}"></label><label style="margin-top:0">Recognize as<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label></div>`).join('');
+    roster.innerHTML=(p.members||[]).map((m,i)=>{
+      const linked=!!m.linked;
+      const status=linked
+        ? '<span class="linked-pill">Linked · can edit own Account</span>'
+        : '<span class="muted" style="font-size:var(--fs-data)">Waiting to claim · same email + password signup</span>';
+      return `<div class="gr155-roster-row is-player" data-i="${i}">
+        <label style="margin-top:0">Full name<input data-name value="${E(m.name||'')}" placeholder="Ryan Sweeney" autocomplete="name"></label>
+        <label style="margin-top:0">Email<input data-email type="email" value="${E(m.email||'')}" placeholder="ryan@email.com" autocomplete="off"></label>
+        <label style="margin-top:0">Alias<input data-alias value="${E(setupAliasesOf(m).join(', '))}" placeholder="Kevin, Kevin C., Cunny"></label>
+        <label style="margin-top:0">Display name<input data-display value="${E(m.displayName||'')}" placeholder="Sully" autocomplete="nickname"></label>
+        <div class="gr-roster-status">${status}</div>
+      </div>`;
+    }).join('');
   };
   let guestPool=(typeof window.grGuestPoolOf==='function'?window.grGuestPoolOf(p):[]).map(g=>({...g,aliases:[...(g.aliases||[])]}));
   const guestRows=d.querySelector('#grGuestPoolRows');
@@ -822,7 +1228,7 @@ window.grOpenSetup=()=>{
   drawRoster();
   drawGuestPool();
   d.querySelector('#grAddRoster').onclick=()=>{
-    p.members.push({id:'cadet-'+Date.now(),name:'New Player',role:'cadet',linked:false,aliases:[]});
+    p.members.push({id:'cadet-'+Date.now(),name:'New Player',role:'cadet',linked:false,aliases:[],email:'',displayName:''});
     drawRoster();
   };
   d.querySelector('#grAddGuestPool').onclick=()=>{
@@ -953,21 +1359,145 @@ window.grOpenSetup=()=>{
     else if(pendingLogo)p.logoData=pendingLogo;
     p.clubhousePhotos=photos.slice(0,8);
     writeClubhousePhotosSide(p,p.clubhousePhotos);
-    [...roster.querySelectorAll('.gr155-roster-row')].forEach(row=>{
-      const m=p.members[Number(row.dataset.i)];if(!m)return;
+    const emails=[];
+    for(const row of [...roster.querySelectorAll('.gr155-roster-row.is-player')]){
+      const m=p.members[Number(row.dataset.i)];if(!m)continue;
       m.name=row.querySelector('[data-name]').value.trim()||m.name;
+      m.email=(row.querySelector('[data-email]')?.value||'').trim().toLowerCase();
       m.aliases=row.querySelector('[data-alias]').value.split(',').map(x=>x.trim()).filter(Boolean);
       m.nickname=m.aliases.join(', ');
-    });
+      m.displayName=(row.querySelector('[data-display]')?.value||'').trim();
+      if(m.email){
+        if(!m.email.includes('@')){
+          alert(`Check the email for ${m.name||'this player'}.`);
+          return;
+        }
+        emails.push(m.email);
+      }
+    }
+    if(emails.length&&new Set(emails).size!==emails.length){
+      alert('Each player needs a unique email — the same address is on more than one roster seat.');
+      return;
+    }
+    p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+    p.hqMeta.rosterEmails=Object.fromEntries((p.members||[]).filter(m=>m.id&&m.email).map(m=>[m.id,m.email]));
+    p.hqMeta.rosterProfiles=rosterProfilesFromMembers(p.members);
+    if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
     savePlatoonLocal(p);
     if(typeof window.grRefreshAtmos==='function')window.grRefreshAtmos();
     closeModal();
   };
 };
+function sessionEmailHint(){
+  try{
+    const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const direct=String(session?.user?.email||'').trim().toLowerCase();
+    if(direct.includes('@'))return direct;
+    const token=session?.access_token||'';
+    if(!token)return '';
+    const payload=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return String(payload.email||'').trim().toLowerCase();
+  }catch{return ''}
+}
+function findMyRosterSeat(p){
+  const email=sessionEmailHint();
+  const members=Array.isArray(p?.members)?p.members:[];
+  if(email){
+    const byEmail=members.find(m=>String(m.email||'').trim().toLowerCase()===email);
+    if(byEmail)return byEmail;
+  }
+  if(typeof window.grResolveCurrentPlatoonMemberId==='function'){
+    const id=window.grResolveCurrentPlatoonMemberId(p);
+    const hit=members.find(m=>String(m.id)===String(id));
+    if(hit)return hit;
+  }
+  return members.find(m=>m.linked)||null;
+}
+window.grOpenAccountSettings=()=>{
+  const p=hydrateRosterProfiles(loadPlatoonLocal());
+  const me=findMyRosterSeat(p);
+  const email=sessionEmailHint()||me?.email||'';
+  if(!me){
+    modal(`<div class="dialog-head"><div><div class="eyebrow">ACCOUNT</div><h2>My seat</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+      <p class="gr-account-note">No My Time roster seat is linked to this login yet. Ask your Chief to add your email in Platoon Setup, then sign up / sign in with that same email — Golf Recon claims the seat automatically.</p>
+      <label>Signed-in email<input value="${E(email||'—')}" disabled></label>
+      <div class="dialog-actions sticky-actions"><button class="button primary" onclick="grCloseModal()">Got it</button></div>`);
+    return;
+  }
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">ACCOUNT</div><h2>My seat</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div>
+    <p class="gr-account-note">You can edit your own names. Email is your login — only the Chief can change roster emails in Setup.</p>
+    <label>Full name<input id="grAccFull" value="${E(me.name||'')}" placeholder="Ryan Sweeney" autocomplete="name"></label>
+    <label>Display name<input id="grAccDisplay" value="${E(me.displayName||'')}" placeholder="How you show on boards" autocomplete="nickname"></label>
+    <label>Alias<input id="grAccAlias" value="${E(setupAliasesOf(me).join(', '))}" placeholder="Scorecard names, comma-separated"></label>
+    <label>Email<input value="${E(email||me.email||'')}" disabled></label>
+    <div class="dialog-actions sticky-actions"><button class="button secondary" onclick="grCloseModal()">Cancel</button><button class="button primary" id="grAccSave">Save</button></div>`);
+  d.classList.add('gr-account-wide');
+  d.querySelector('#grAccSave').onclick=async()=>{
+    const full=d.querySelector('#grAccFull').value.trim()||me.name;
+    const display=d.querySelector('#grAccDisplay').value.trim();
+    const aliases=d.querySelector('#grAccAlias').value.split(',').map(x=>x.trim()).filter(Boolean);
+    me.name=full;
+    me.displayName=display;
+    me.aliases=aliases;
+    me.nickname=aliases.join(', ');
+    p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
+    p.hqMeta.rosterProfiles=rosterProfilesFromMembers(p.members);
+    if(typeof window.grHqMetaNormalize==='function')p.hqMeta=window.grHqMetaNormalize(p.hqMeta);
+    const btn=d.querySelector('#grAccSave');
+    try{
+      btn.disabled=true;btn.textContent='Saving…';
+      let synced=false;
+      if(typeof callPlatoonFunction==='function'){
+        try{
+          const out=await callPlatoonFunction({
+            action:'update_my_seat',
+            full_name:full,
+            display_name:display,
+            aliases
+          });
+          if(out?.platoon){
+            const merged=typeof window.grPreserveClientPlatoonFields==='function'
+              ?window.grPreserveClientPlatoonFields(out.platoon,p)
+              :out.platoon;
+            if(typeof writePlatoonLocal==='function')writePlatoonLocal(merged);
+            else savePlatoonLocal(merged,false);
+            synced=true;
+          }
+        }catch(err){
+          const msg=String(err?.message||err||'');
+          // Older edge builds reject update_my_seat — Chief can still push via save_state.
+          if(/unsupported platoon action/i.test(msg)&&typeof savePlatoonLocal==='function'){
+            const role=String(me.role||'');
+            if(role==='chief'||role==='co_chief'){
+              savePlatoonLocal(p,true);
+              synced=true;
+            }else{
+              savePlatoonLocal(p,false);
+            }
+          }else throw err;
+        }
+      }
+      if(!synced)savePlatoonLocal(p,false);
+      if(typeof setTopbarDisplayName==='function')setTopbarDisplayName(display||full||me.name);
+      closeModal();
+      if(typeof render==='function')render();
+    }catch(e){
+      // Still keep the local edit so the player is not stuck.
+      savePlatoonLocal(p,false);
+      if(typeof setTopbarDisplayName==='function')setTopbarDisplayName(display||full||me.name);
+      alert('Saved on this device. Server sync will catch up after the Platoon backend redeploys.');
+      closeModal();
+      if(typeof render==='function')render();
+    }
+  };
+};
+
 // Legacy index.html Setup/Mission entry points → canonical v15 dialogs (avoid dual UI wipe).
 window.openPlatoonSetup=()=>window.grOpenSetup();
 window.openMissionEditor=(date='',missionId='')=>window.grOpenMissionEditor(missionId||'','',date?{date}:{});
 window.grCompressImageFile=compressImageFile;
+window.grMemberLabel=memberLabel;
+window.grHydrateRosterProfiles=hydrateRosterProfiles;
 
 window.grOpenMissionEditor=(id='',warId='',opts={})=>{
   const p=loadPlatoonLocal();
@@ -995,7 +1525,7 @@ window.grOpenMissionEditor=(id='',warId='',opts={})=>{
     <div class="gr-date-quick"><button type="button" class="gr-time-chip" data-date-preset="today">Today</button><button type="button" class="gr-time-chip" data-date-preset="sat">Next Sat</button><button type="button" class="gr-time-chip" data-date-preset="sun">Next Sun</button></div>
     <label>Format${formatSelectMarkup(presetFormat)}</label>
     <label>Attach to War<select id="grMWar" class="gr-mission-select">${warOptions}</select></label>
-    <label>Cadets Playing<div class="gr-check-grid">${membersOf(p).map(x=>`<label class="gr-check"><input type="checkbox" data-member="${E(x.id)}" ${memberIds.includes(x.id)?'checked':''}>${E(x.name)}</label>`).join('')}</div></label>
+    <label>Cadets Playing<div class="gr-check-grid">${membersOf(p).map(x=>`<label class="gr-check"><input type="checkbox" data-member="${E(x.id)}" ${memberIds.includes(x.id)?'checked':''}>${E(memberLabel(x))}</label>`).join('')}</div></label>
     <label>Guests<span class="muted" style="font-weight:600;display:block;margin-top:2px">Guest pool keeps returning players without making them members.</span>
       <div class="gr-guest-pool-picks" id="grGuestPoolPicks"></div>
       <div class="gr-guest-add"><input id="grGuestName" placeholder="New guest name"><button class="button secondary" id="grAddGuest" type="button">Add guest</button></div>
@@ -1339,6 +1869,41 @@ window.grDeleteMission=async(id,btn)=>{
 };
 window.grRemoveMission=(id)=>window.grDeleteMission(id);
 
+async function submitBlogComposer(form){
+  if(blogPhotoBusy){alert('Photo is still attaching — wait a second.');return}
+  const p=loadPlatoonLocal();
+  const me=currentBlogAuthor(p);
+  const body=String(form.querySelector('#grBlogBody')?.value||document.getElementById('grBlogBody')?.value||blogPendingBody||'').trim();
+  blogPendingBody=body;
+  if(!body&&!blogPendingPhoto){alert('Write something or attach a photo.');return}
+  const photo=blogPendingPhoto;
+  const id='bp-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  if(photo){
+    try{rememberBlogPhoto(p,id,photo)}
+    catch(err){alert(err?.message||'Could not save photo.');return}
+  }
+  const post={
+    id,
+    authorId:me.id,
+    authorName:me.name,
+    body,
+    tone:blogComposerTone||'trash',
+    hasPhoto:!!photo,
+    photoId:photo?id:'',
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString(),
+    pinned:false,
+    reactions:{fire:[],dead:[],salute:[],cap:[]},
+    replies:[]
+  };
+  // Don't use blogPostsSorted here — that hydrates every old photo into memory and can block the save.
+  const existing=typeof window.grBlogPostsOf==='function'?window.grBlogPostsOf(p):(p?.hqMeta?.blogPosts||[]);
+  const posts=[post,...(existing||[]).filter(x=>x&&x.id!==post.id)];
+  blogPendingPhoto=null;
+  blogPendingBody='';
+  blogPhotoBusy=false;
+  saveBlogPosts(p,posts);
+}
 if(!document.body.dataset.grPlatoonShellBound){
   document.body.dataset.grPlatoonShellBound='1';
   document.addEventListener('click',e=>{
@@ -1351,7 +1916,161 @@ if(!document.body.dataset.grPlatoonShellBound){
     if(missionChip&&window.grViewMission){e.preventDefault();e.stopPropagation();window.grViewMission(missionChip.dataset.mission);return}
     const calDay=e.target.closest('[data-cal-iso]');
     if(calDay&&window.grOpenMissionEditor){e.preventDefault();window.grOpenMissionEditor('','',{date:calDay.dataset.calIso});return}
+
+    const toneBtn=e.target.closest('[data-blog-tone]');
+    if(toneBtn){blogComposerTone=toneBtn.getAttribute('data-blog-tone')||'trash';renderGroups();return}
+    const promptBtn=e.target.closest('[data-blog-prompt]');
+    if(promptBtn){
+      const ta=document.getElementById('grBlogBody');
+      const text=promptBtn.getAttribute('data-blog-prompt')||'';
+      blogPendingBody=text;
+      if(ta){ta.value=text;ta.focus()}
+      return;
+    }
+    if(e.target.closest('[data-blog-clear-photo]')){blogPendingPhoto=null;blogPhotoBusy=false;renderGroups();return}
+    const replyToggle=e.target.closest('[data-blog-reply-toggle]');
+    if(replyToggle){
+      const id=replyToggle.getAttribute('data-blog-reply-toggle')||'';
+      blogReplyOpenId=blogReplyOpenId===id?'':id;
+      renderGroups();
+      if(blogReplyOpenId)queueMicrotask(()=>document.querySelector(`[data-blog-reply-form="${blogReplyOpenId}"] input`)?.focus());
+      return;
+    }
+    const replyCancel=e.target.closest('[data-blog-reply-cancel]');
+    if(replyCancel){blogReplyOpenId='';renderGroups();return}
+    const openPhoto=e.target.closest('[data-blog-open-photo]');
+    if(openPhoto){
+      const p=loadPlatoonLocal();
+      const post=blogPostsSorted(p).find(x=>String(x.id)===String(openPhoto.getAttribute('data-blog-open-photo')));
+      const src=post?blogPhotoOf(p,post):'';
+      if(!src)return;
+      const box=ensureBlogLightbox();
+      const img=box.querySelector('img');
+      if(img)img.src=src;
+      try{box.showModal()}catch{}
+      return;
+    }
+    const reactBtn=e.target.closest('[data-blog-react]');
+    if(reactBtn){
+      const p=loadPlatoonLocal();
+      const me=currentBlogAuthor(p);
+      const postId=reactBtn.getAttribute('data-blog-post');
+      const key=reactBtn.getAttribute('data-blog-react');
+      const posts=blogPostsSorted(p);
+      const post=posts.find(x=>String(x.id)===String(postId));
+      if(!post||!key)return;
+      post.reactions=post.reactions||{fire:[],dead:[],salute:[],cap:[]};
+      const arr=Array.isArray(post.reactions[key])?post.reactions[key]:[];
+      post.reactions[key]=arr.some(id=>String(id)===String(me.id))
+        ?arr.filter(id=>String(id)!==String(me.id))
+        :[...arr,me.id];
+      post.updatedAt=new Date().toISOString();
+      saveBlogPosts(p,posts);
+      return;
+    }
+    const pinBtn=e.target.closest('[data-blog-pin]');
+    if(pinBtn){
+      const p=loadPlatoonLocal();
+      if(!canModerateBlog(p))return;
+      const posts=blogPostsSorted(p);
+      const post=posts.find(x=>String(x.id)===String(pinBtn.getAttribute('data-blog-pin')));
+      if(!post)return;
+      post.pinned=!post.pinned;
+      post.updatedAt=new Date().toISOString();
+      saveBlogPosts(p,posts);
+      return;
+    }
+    const delBtn=e.target.closest('[data-blog-delete]');
+    if(delBtn){
+      const p=loadPlatoonLocal();
+      const postId=delBtn.getAttribute('data-blog-delete');
+      const posts=blogPostsSorted(p);
+      const post=posts.find(x=>String(x.id)===String(postId));
+      if(!post||!canModerateBlog(p,post))return;
+      if(!confirm('Delete this locker post?'))return;
+      const next=posts.filter(x=>String(x.id)!==String(postId));
+      const map=readBlogPhotosSide(p);
+      if(post.photoId)delete map[post.photoId];
+      delete map[post.id];
+      writeBlogPhotosSide(p,map);
+      saveBlogPosts(p,next);
+      return;
+    }
   });
+  document.addEventListener('submit',e=>{
+    if(e.target&&e.target.id==='grBlogComposer'){
+      e.preventDefault();
+      submitBlogComposer(e.target);
+      return;
+    }
+    const replyForm=e.target.closest('[data-blog-reply-form]');
+    if(!replyForm)return;
+    e.preventDefault();
+    const p=loadPlatoonLocal();
+    const me=currentBlogAuthor(p);
+    const postId=replyForm.getAttribute('data-blog-reply-form');
+    const input=replyForm.querySelector('input[name="reply"]');
+    const body=String(input?.value||'').trim();
+    if(!body)return;
+    const posts=blogPostsSorted(p);
+    const post=posts.find(x=>String(x.id)===String(postId));
+    if(!post)return;
+    post.replies=Array.isArray(post.replies)?post.replies:[];
+    post.replies.push({
+      id:'br-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      authorId:me.id,
+      authorName:me.name,
+      body:body.slice(0,400),
+      createdAt:new Date().toISOString()
+    });
+    post.updatedAt=new Date().toISOString();
+    blogReplyOpenId='';
+    saveBlogPosts(p,posts);
+  });
+  document.addEventListener('input',e=>{
+    if(e.target&&e.target.id==='grBlogBody')blogPendingBody=String(e.target.value||'');
+  });
+  const attachLockerPhoto=async(file)=>{
+    if(!file||blogPhotoBusy)return;
+    const ta=document.getElementById('grBlogBody');
+    if(ta)blogPendingBody=String(ta.value||'');
+    const attachId=Date.now();
+    blogPhotoBusy=attachId;
+    blogPendingPhoto=null;
+    // Snapshot bytes immediately — iOS can invalidate the live File after UI re-render.
+    let snapshot=file;
+    try{
+      const buf=await file.arrayBuffer();
+      snapshot=new File([buf],file.name||'photo.jpg',{type:file.type||'application/octet-stream',lastModified:file.lastModified||Date.now()});
+    }catch{/* keep original File */}
+    renderGroups();
+    try{
+      // Warm HEIC converters while we start decode (iPhone Photos often sends HEIC).
+      try{loadHeicTo()}catch{}
+      try{loadHeic2Any()}catch{}
+      const dataUrl=await compressImageFile(snapshot,{max:720,quality:.55});
+      if(!dataUrl||!String(dataUrl).startsWith('data:'))throw new Error('Photo decode failed.');
+      if(blogPhotoBusy!==attachId)return; // a newer attach started
+      blogPendingPhoto=dataUrl;
+    }catch(err){
+      if(blogPhotoBusy===attachId)blogPendingPhoto=null;
+      alert(err?.message||'Could not read that photo.');
+    }finally{
+      if(blogPhotoBusy===attachId)blogPhotoBusy=false;
+      renderGroups();
+    }
+  };
+  const onLockerPhotoPick=e=>{
+    if(!e.target||e.target.id!=='grBlogPhoto')return;
+    const f=e.target.files&&e.target.files[0];
+    // Reset so picking the same photo again still fires.
+    try{e.target.value=''}catch{}
+    if(!f)return;
+    attachLockerPhoto(f);
+  };
+  document.addEventListener('change',onLockerPhotoPick);
+  // iOS Safari sometimes surfaces the pick on input instead of change.
+  document.addEventListener('input',onLockerPhotoPick);
 }
 
 /* App-wide: date/time open native picker; block keyboard typing (no readonly — that breaks pickers) */

@@ -27,21 +27,32 @@ function aliasesOf(m){
   return [...new Set(a)];
 }
 
+/** Public board name: Display Name when set, otherwise Full name. */
+function memberLabel(m){
+  const show=String(m?.displayName||'').trim();
+  if(show)return show;
+  return String(m?.name||'').trim()||'Player';
+}
+
 function canonicalMember(p,raw){
   const n=norm(raw);if(!n)return null;
   const exact=[];
   for(const m of (p?.members||[])){
-    const vals=[m.name,...aliasesOf(m)].map(norm).filter(Boolean);
+    const vals=[m.name,m.displayName,...aliasesOf(m)].map(norm).filter(Boolean);
     if(vals.includes(n))exact.push(m);
   }
   if(exact.length===1)return exact[0];
   const first=n.split(' ')[0];
-  const firstMatches=(p?.members||[]).filter(m=>norm(m.name).split(' ')[0]===first);
+  const firstMatches=(p?.members||[]).filter(m=>{
+    const keys=[m.name,m.displayName].map(norm).filter(Boolean);
+    return keys.some(k=>k.split(' ')[0]===first);
+  });
   return firstMatches.length===1?firstMatches[0]:null;
 }
 
 function displayName(p,raw){
-  return canonicalMember(p,raw)?.name||raw||'Player';
+  const hit=canonicalMember(p,raw);
+  return hit?memberLabel(hit):(raw||'Player');
 }
 
 function memberById(p,id){
@@ -469,7 +480,8 @@ function standingsTableMarkup(p,m){
   const rows=missionStandingsRows(m);
   const body=rows.map((r,i)=>{
     const pos=finite(r.finish_position)?Number(r.finish_position):i+1;
-    const net=finite(r.net)?Number(r.net):'—';
+    const resolved=typeof window.grResolveOfficialNet==='function'?window.grResolveOfficialNet(r,r.holes||[]):null;
+    const net=finite(r.net)?Number(r.net):(finite(resolved)?Number(resolved):'—');
     const gross=finite(r.gross)?Number(r.gross):'—';
     const pts=finite(r.raw_points)?Number(r.raw_points):0;
     return `<div class="grstd-row"><div class="grstd-name"><b>${pos}</b><span>${esc(labeledName(p,m,r.player_name))}</span></div><div>${net}</div><div>${gross}</div><div>${pts}</div></div>`;
@@ -637,12 +649,12 @@ function installStyles(){
   .gr-hsc-chips{margin-left:auto;flex:0 1 auto;justify-content:flex-end}
 }
 .gr-hsc-chip{
-  display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:2px;
+  display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:2px;
   background:rgba(0,0,0,.42);border:1px solid rgba(154,122,69,.85);color:#d4b878;
-  font-size:var(--fs-data);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;
+  font-size:calc(var(--fs-data) + 3px);font-weight:850;font-variant-numeric:tabular-nums;line-height:1.15;
   font-family:var(--font-display,Cormorant Garamond,Georgia,serif);
 }
-.gr-hsc-chip em{font-style:normal;color:#b08a48;font-size:10px;letter-spacing:.06em;font-weight:900}
+.gr-hsc-chip em{font-style:normal;color:#b08a48;font-size:calc(var(--fs-data) + 1px);letter-spacing:.06em;font-weight:900}
 .gr-hsc-sub{
   margin:-1px 4px 6px;padding:0 2px;
   font-family:var(--hsc-serif);
@@ -762,7 +774,8 @@ function installStyles(){
   .gr-hsc-nameplate{gap:5px;margin:0 0 5px;padding:6px 7px}
   .gr-hsc-nameplate strong{flex-basis:100%;letter-spacing:.08em;font-size:calc(var(--fs-subtitle) - 1px)}
   .gr-hsc-chips{flex-basis:100%;margin-left:0}
-  .gr-hsc-chip{padding:2px 5px}
+  .gr-hsc-chip{padding:3px 7px;font-size:calc(var(--fs-data) + 2px)}
+  .gr-hsc-chip em{font-size:var(--fs-data)}
   .gr-hsc-gross{font-size:calc(var(--fs-data) + 1px);min-width:1.1em;min-height:1.1em}
   .gr-hsc-scroll{padding:3px 2px 4px}
 }
@@ -815,6 +828,7 @@ window.grFinite=finite;
 window.grAliasesOf=aliasesOf;
 window.grCanonicalMember=canonicalMember;
 window.grDisplayName=displayName;
+window.grMemberLabel=memberLabel;
 window.grCleanCourseName=cleanCourseName;
 window.grMissionStandingsRows=missionStandingsRows;
 window.grMissionStandingsMarkup=(m,p)=>standingsTableMarkup(p,m);

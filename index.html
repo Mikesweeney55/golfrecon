@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Golf Recon V16.4</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="favicon.svg" />
   <script src="gr-test-env.js?v=1"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
@@ -238,7 +240,7 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .direction-viz{position:relative;width:min(100%,300px);aspect-ratio:1/1;margin:0 auto}
 .direction-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:58%;height:58%;border-radius:50%;border:16px solid rgba(110,160,230,.12);box-sizing:border-box}
 .direction-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36%;height:36%;border-radius:50%;background:#4f73ff;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:900}
-.direction-center .check{font-size:var(--fs-title);line-height:1}.direction-center .pct{font-size:var(--fs-subtitle);line-height:1.1;margin-top:3px}
+.direction-center .pct{font-size:var(--fs-subtitle);line-height:1}.direction-center .check{font-size:var(--fs-data);line-height:1.1;margin-top:3px;letter-spacing:.06em;opacity:.92;text-transform:uppercase}
 .dir-label{position:absolute;font-size:var(--fs-data);line-height:1.2;text-align:center;color:var(--text);min-width:62px}
 .dir-label strong{display:block;font-size:var(--fs-data)}
 .dir-top{left:50%;top:3%;transform:translateX(-50%)}.dir-bottom{left:50%;bottom:2%;transform:translateX(-50%)}
@@ -433,8 +435,34 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .auth-foot{font-size:var(--fs-data);color:var(--muted);text-align:center;margin-top:18px}.auth-message{display:none;margin-top:14px;padding:9px 10px;border-radius:10px;font-size:var(--fs-data)}
 .auth-message.error{display:block;background:rgba(255,59,48,.10);color:#ff9b96;border:1px solid rgba(255,59,48,.2)}
 .auth-message.ok{display:block;background:rgba(35,197,82,.08);color:#8ee8aa;border:1px solid rgba(35,197,82,.2)}
-.user-tools{display:flex;align-items:center;gap:7px}.user-chip{font-size:var(--fs-data);font-weight:850;color:var(--accent);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-tools{display:flex;align-items:center;gap:7px}
+.user-chip{font-size:var(--fs-data);font-weight:850;color:var(--accent);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini-link{border:0;background:none;color:var(--muted);font-size:var(--fs-data);font-weight:800;padding:2px;cursor:pointer}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.user-menu{position:relative;z-index:6}
+.user-menu-btn{
+  display:inline-flex;align-items:center;gap:6px;max-width:160px;
+  border:1px solid rgba(212,175,106,.28);background:rgba(20,17,14,.55);
+  color:var(--text);border-radius:999px;padding:6px 10px 6px 12px;
+  font:inherit;cursor:pointer;line-height:1.1
+}
+.user-menu-btn:hover,.user-menu-btn[aria-expanded="true"]{border-color:rgba(212,175,106,.5);background:rgba(42,34,24,.7)}
+.user-menu-btn .user-chip{max-width:92px;color:var(--accent)}
+.user-menu-gear{font-size:15px;opacity:.9;line-height:1}
+.user-menu-panel{
+  position:absolute;right:0;top:calc(100% + 6px);min-width:168px;
+  display:grid;gap:2px;padding:6px;
+  border:1px solid rgba(212,175,106,.28);border-radius:12px;
+  background:rgba(18,15,12,.97);box-shadow:0 12px 28px rgba(0,0,0,.45);
+}
+.user-menu-panel[hidden]{display:none!important}
+.user-menu-panel button{
+  border:0;background:transparent;color:var(--text);text-align:left;
+  font:inherit;font-size:var(--fs-data);font-weight:800;padding:10px 11px;border-radius:8px;cursor:pointer
+}
+.user-menu-panel button:hover{background:rgba(212,175,106,.12);color:var(--accent)}
+.user-menu-panel .user-menu-signout{color:#ffb4ae}
+.user-menu-panel .user-menu-signout:hover{background:rgba(255,90,80,.12);color:#ffd0cc}
 .swing-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .swing-card{padding:14px}.swing-card h3{margin:0 0 4px;font-size:var(--fs-data)}.swing-card p{margin:0 0 9px;font-size:var(--fs-data);color:var(--muted)}
 .swing-card textarea{width:100%;min-height:86px;resize:vertical;border:1px solid var(--line);background:#0d1713;color:var(--text);border-radius:11px;padding:10px;font:inherit;font-size:var(--fs-data);line-height:1.45;outline:none}
@@ -443,7 +471,14 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);width:min(620
 .game-keys-card{margin:12px 0}.game-key-group{padding:10px 0;border-bottom:1px solid var(--line)}.game-key-group:last-child{border-bottom:0}
 .game-key-group strong{font-size:var(--fs-subtitle)}.game-key-list{margin-top:5px;display:flex;gap:6px;flex-wrap:wrap}.game-key-pill{font-size:var(--fs-data);border:1px solid rgba(184,234,104,.22);background:rgba(184,234,104,.05);padding:6px 10px;border-radius:999px;text-transform:capitalize}
 .groups-hero{padding:20px}.groups-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.group-feature{padding:14px}.group-feature h3{font-size:var(--fs-data);margin:5px 0}.coming-badge{display:inline-block;border:1px solid rgba(184,234,104,.25);color:var(--accent);border-radius:999px;padding:4px 7px;font-size:var(--fs-data);font-weight:900}
-@media(max-width:640px){.swing-grid,.groups-grid{grid-template-columns:1fr}.user-chip{display:none}.user-tools{gap:3px}.mini-link{font-size:var(--fs-data)}}
+@media(max-width:640px){
+  .swing-grid,.groups-grid{grid-template-columns:1fr}
+  .user-tools{gap:3px}
+  .mini-link{font-size:var(--fs-data)}
+  .topbar-right{gap:6px}
+  .user-menu-btn{padding:6px 8px;max-width:132px}
+  .user-menu-btn .user-chip{max-width:72px}
+}
 
 .gr-brand{display:flex;align-items:center;gap:10px;justify-self:start}.gr-mark{width:48px;height:48px;border:2px solid var(--accent);border-radius:50%;display:grid;place-items:center;position:relative;background:#102019;box-shadow:inset 0 0 0 3px #102019,0 0 0 1px rgba(184,234,104,.2)}.gr-mark:before,.gr-mark:after{content:"";position:absolute;background:var(--accent);opacity:.55}.gr-mark:before{width:1px;height:100%;left:50%}.gr-mark:after{height:1px;width:100%;top:50%}.gr-cross{font-size:var(--fs-subtitle);font-weight:950;letter-spacing:-.06em;color:#f5f7f6;z-index:1}.gr-flag{position:absolute;font-size:var(--fs-data);color:var(--accent);right:4px;top:4px;z-index:2}.gr-word{display:grid;line-height:1}.gr-word strong{font-size:var(--fs-subtitle);letter-spacing:.08em}.gr-word small{font-size:var(--fs-data);letter-spacing:.12em;color:var(--accent);margin-top:5px;font-weight:850}@media(max-width:520px){.gr-word small{display:none}.gr-word strong{font-size:var(--fs-data)}.gr-mark{width:42px;height:42px}}
 
@@ -492,8 +527,10 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 
 /* v13.0 Mapbox Course Preview */
 .preview-hero-grid{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:12px;align-items:stretch}
+.preview-hero-grid-wide{grid-template-columns:minmax(0,1.05fr) minmax(280px,.95fr);align-items:start}
 .preview-hero-grid .course-preview-map{min-width:0}
 .preview-stats-column{display:flex;flex-direction:column;gap:7px;min-width:0}
+.preview-stats-rich{display:block}
 .preview-stats-only{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:7px}
 .preview-stats-only .preview-read-card,.preview-stats-only .risk-card{grid-column:1/-1}
 .preview-side-card{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:42px}
@@ -501,12 +538,40 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .preview-side-card.risk-card{min-height:48px}.preview-side-card.risk-card strong{display:flex;align-items:center;gap:8px;font-size:var(--fs-data)}
 .preview-read-card{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-top:1px;flex:1;min-height:92px;overflow:hidden}
 .preview-read-card .eyebrow{font-size:var(--fs-data)}.preview-read-card p{font-size:var(--fs-data);line-height:1.35;margin:6px 0 0;color:#dce6e1}
+.hole-preview-panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.hole-play-call{background:linear-gradient(160deg,rgba(28,42,34,.98),rgba(14,22,18,.98));border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.hole-play-call .eyebrow{margin-bottom:4px}
+.hole-play-call-line{font-size:clamp(1.05rem,2.4vw,1.35rem);font-weight:900;line-height:1.25;letter-spacing:-.01em;color:var(--text);margin:0 0 6px}
+.hole-play-call-meta{font-size:var(--fs-data);color:var(--muted);line-height:1.4}
+.hole-score-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.hole-strike-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+@media(max-width:520px){.hole-score-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hole-stat{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:10px 11px;min-width:0}
+.hole-stat strong{display:block;font-size:var(--fs-subtitle);line-height:1.1}
+.hole-stat span{display:block;margin-top:4px;font-size:var(--fs-data);color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.hole-stat.is-warn strong{color:#ff8a84}
+.hole-stat.is-good strong{color:#9ef0b4}
+.hole-preview-block{background:rgba(21,32,28,.96);border:1px solid var(--line);border-radius:14px;padding:11px 12px}
+.hole-preview-block .eyebrow{margin-bottom:8px}
+.hole-recent-strip{display:flex;flex-wrap:wrap;gap:6px}
+.hole-recent-pip{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:34px;padding:0 8px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-weight:900;font-size:var(--fs-data);color:var(--text)}
+.hole-recent-pip.birdie,.hole-recent-pip.eagle{background:rgba(126,228,154,.16);border-color:rgba(126,228,154,.35);color:#9ef0b4}
+.hole-recent-pip.bogey{background:rgba(255,230,92,.1);border-color:rgba(255,230,92,.28);color:#ffe65c}
+.hole-recent-pip.double,.hole-recent-pip.worse{background:rgba(239,100,97,.14);border-color:rgba(239,100,97,.35);color:#ff8a84}
+.hole-dir-grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:560px){.hole-dir-grid{grid-template-columns:1fr 1fr}}
+.direction-card.is-compact .direction-viz{width:min(100%,240px)}
+.direction-card .dir-label.is-hot{color:#ffb0ab}
+.direction-card .dir-label.is-hot strong{color:#ff8a84;font-size:calc(var(--fs-data) + 1px)}
+.direction-card .dir-wedge.is-hot{background:rgba(239,100,97,.42)}
+.direction-bias{margin-top:8px;font-size:var(--fs-data);color:var(--muted);text-align:center}
+.direction-bias strong{color:#ffb0ab;font-weight:900}
 .mapbox-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 9px;font-size:var(--fs-data);color:var(--muted)}
 .mapbox-row button{border:1px solid var(--line);background:#13211b;color:var(--text);border-radius:999px;padding:5px 9px;font-size:var(--fs-data);font-weight:800}
 .mapbox-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;background:var(--warning)}.mapbox-dot.ready{background:var(--good)}
 .mapbox-missing{border:1px solid rgba(255,212,0,.32);background:rgba(255,212,0,.06);border-radius:12px;padding:8px 10px;font-size:var(--fs-data);color:#eadf9d;margin-bottom:9px}
 .satellite-stack.mapbox-live:after{content:'MAPBOX SATELLITE';position:absolute;left:10px;bottom:10px;z-index:2;background:rgba(5,12,9,.72);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:4px 7px;color:#fff;font-size:var(--fs-data);font-weight:900;letter-spacing:.04em;backdrop-filter:blur(5px)}
-@media(max-width:760px){.preview-hero-grid{grid-template-columns:1fr}.preview-stats-column{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.preview-read-card{grid-column:1/-1}.preview-side-card{min-height:48px}.course-preview-map,.course-preview-map svg,.preview-map-empty{min-height:390px;height:390px}}
+@media(max-width:760px){.preview-hero-grid,.preview-hero-grid-wide{grid-template-columns:1fr}.preview-stats-column:not(.preview-stats-rich){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.preview-read-card{grid-column:1/-1}.preview-side-card{min-height:48px}.course-preview-map,.course-preview-map svg,.preview-map-empty{min-height:390px;height:390px}}
 
 
 /* v13.1 Interactive Course Preview */
@@ -522,8 +587,10 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .preview-map-tools button{border:1px solid var(--line);background:#13211b;color:var(--text);border-radius:999px;padding:6px 10px;font-size:var(--fs-data);font-weight:850}
 .preview-map-tools span{min-width:0}
 .preview-hero-grid{grid-template-columns:minmax(0,1fr) 258px}
+.preview-hero-grid-wide{grid-template-columns:minmax(0,1.05fr) minmax(300px,.95fr)}
 .preview-side-card{min-height:41px}
 .preview-read-card{min-height:88px}
+@media(max-width:980px){.preview-hero-grid-wide{grid-template-columns:1fr}}
 @media(max-width:760px){.course-preview-map{height:430px;min-height:430px}.preview-map-tools{align-items:flex-start;flex-direction:column}.preview-map-tools button{align-self:flex-start}}
 
 
@@ -1656,7 +1723,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=196">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=220">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1698,7 +1765,7 @@ body::before,body::after{opacity:0!important}
 
       <button id="forgotPasswordBtn" class="auth-link auth-link-secondary" type="button">Forgot password?</button>
       <button id="authModeToggle" class="auth-link" type="button">New to Golf Recon? Create account</button>
-      <div class="auth-foot">Each Golf Recon account has its own private rounds, stats and game keys.</div>
+      <div class="auth-foot">My Time players: sign up with the roster email your Chief saved — that claims your seat. Each account keeps its own rounds and game keys.</div>
     </div>
   </div>
 
@@ -1714,11 +1781,17 @@ body::before,body::after{opacity:0!important}
       </div>
 
       <div class="topbar-right">
-        <div class="user-tools">
-          <span id="userChip" class="user-chip"></span>
-          <button id="logoutBtn" class="mini-link" type="button">Sign out</button>
-        </div>
         <button id="importBtn" class="button secondary">Import Round</button>
+        <div class="user-menu" id="userMenu">
+          <button id="userMenuBtn" class="user-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Account menu">
+            <span id="userChip" class="user-chip">Player</span>
+            <span class="user-menu-gear" aria-hidden="true">⚙</span>
+          </button>
+          <div id="userMenuPanel" class="user-menu-panel" role="menu" hidden>
+            <button type="button" id="accountSettingsBtn" role="menuitem">Account settings</button>
+            <button type="button" id="logoutBtn" class="user-menu-signout" role="menuitem">Sign out</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -1847,7 +1920,7 @@ body::before,body::after{opacity:0!important}
           <span>Scorecard, stats, putting, or miss-pattern screens</span>
         </label>
         <div id="backfillFileList" class="file-list"></div>
-        <div class="backfill-note">GolfRecon will only fill fields that are currently blank. Existing round data will not be replaced.</div>
+        <div class="backfill-note">GolfRecon will only fill fields that are currently blank — including hole-by-hole fairway/green miss arrows when those screenshots show them. Existing scores and stats are not replaced.</div>
         <div id="backfillStatus" class="import-status"></div>
         <div class="dialog-actions">
           <button id="analyzeBackfill" class="button primary" type="button">Analyze Screenshots</button>
@@ -1890,7 +1963,11 @@ const stddev = arr => { if(!arr || !arr.length) return null; const m=avg(arr); r
 const sum = arr => (arr||[]).reduce((a,b)=>a+(Number(b)||0),0);
 const fmtDate = d => new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 const shortDate = d => new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'numeric',day:'numeric'});
-const courseShort = n => ({"Campbell's Scot. Highlands":"Campbell’s","Bill Flynn's Windham":"Windham","Birch Hill Country Club":"Birch Hill","Hidden Creek":"Hidden Crk","Hickory Hills":"Hickory","Passaconaway":"Passac.","Butter Brook":"Butter Brk","Four Oaks":"Four Oaks","Candia Woods":"Candia","Gold":"Kingswood"}[n] || n.split(' ').slice(0,2).join(' '));
+const courseShort = n => ({"Campbell's Scot. Highlands":"Campbell’s","Bill Flynn's Windham":"Windham","Birch Hill Country Club":"Birch Hill","Hidden Creek":"Hidden Crk","Hickory Hills":"Hickory","Passaconaway":"Passac.","Butter Brook":"Butter Brk","Four Oaks":"Four Oaks","Candia Woods":"Candia","Gold":"Kingswood - Gold","Kingswood - Gold":"Kingswood","Kingswood Golf Club":"Kingswood","Owl's Nest":"Owl's Nest","Owls Nest":"Owl's Nest"}[n] || n.split(' ').slice(0,2).join(' '));
+/** Tee-only course names that 18Birdies sometimes saves without the club. */
+const TEE_ONLY_COURSE_FIX={
+  gold:{club:'Kingswood',tees:'Gold',label:'Kingswood - Gold'}
+};
 
 const CALUSA_BLUE_TEE_RATINGS={
   'I':{rating:75.3,slope:143},
@@ -1988,6 +2065,148 @@ function puttingForCourse(c){
 function puttingCourseOptions(){
   return [...new Set(db.puttingDetails.map(p=>p.course))].sort((a,b)=>a.localeCompare(b));
 }
+const ROUND_DIR_PATCH_KEY='golfreconRoundDirPatchesV1';
+function loadRoundDirPatches(){
+  try{return JSON.parse(localStorage.getItem(ROUND_DIR_PATCH_KEY)||'{}')||{}}catch{return{}}
+}
+function writeRoundDirPatches(all){
+  try{localStorage.setItem(ROUND_DIR_PATCH_KEY,JSON.stringify(all||{}))}catch{}
+}
+function roundFingerprint(r){
+  if(!r)return '';
+  const c=course(r.courseId);
+  return [
+    String(r.date||''),
+    String(r.gross??''),
+    normalizeCourseName(c?.baseName||c?.name||'')
+  ].join('|');
+}
+function roundDirPatchKeys(r){
+  const keys=[];
+  if(r?.id!=null)keys.push(String(r.id));
+  if(r?.supabaseImportId)keys.push('import:'+String(r.supabaseImportId));
+  const fp=roundFingerprint(r);
+  if(fp&&fp!=='||')keys.push('sig:'+fp);
+  return keys;
+}
+function persistRoundDirectionPatch(r){
+  if(!r)return;
+  const all=loadRoundDirPatches();
+  const patch={
+    fairwayDirections:Array.isArray(r.fairwayDirections)?r.fairwayDirections.slice():null,
+    girDirections:Array.isArray(r.girDirections)?r.girDirections.slice():null,
+    fairwayDistribution:r.fairwayDistribution||null,
+    girDistribution:r.girDistribution||null,
+    fingerprint:roundFingerprint(r),
+    updatedAt:Date.now()
+  };
+  for(const k of roundDirPatchKeys(r))all[k]=patch;
+  writeRoundDirPatches(all);
+}
+function padDirectionArray(arr,n){
+  const out=Array.isArray(arr)?arr.slice():[];
+  while(out.length<n)out.push(null);
+  return out.slice(0,n);
+}
+/** True when this round (or a just-parsed scorecard) has any miss-direction signal. */
+function roundHasDirectionalSignal(r,parsed){
+  if(r?.fairwayDistribution||r?.girDistribution)return true;
+  if((r?.fairwayDirections||[]).some(v=>normalizeDirection(v)))return true;
+  if((r?.girDirections||[]).some(v=>normalizeDirection(v)))return true;
+  const pr=parsed?.round||parsed;
+  if(!pr)return false;
+  if(pr.fairway_distribution||pr.gir_distribution)return true;
+  const hd=pr.holes_detail||pr.hole_details||[];
+  return hd.some(h=>holeDirection(h,'fairway')||holeDirection(h,'gir'));
+}
+/**
+ * Fill undirected FH/GIR holes from binary hit/miss: hits → hit, misses → short.
+ * Real L/R/Long arrows (when present) are never overwritten.
+ * This clears "Miss detail missing" for rounds that already have FH/GIR filled.
+ */
+function ensureImpliedDirections(r){
+  if(!r)return false;
+  const c=course(r.courseId);
+  const n=r.holes||c?.holeNumbers?.length||0;
+  if(!n)return false;
+  const pars=c?.pars||[];
+  r.fairwayDirections=padDirectionArray(r.fairwayDirections,n);
+  r.girDirections=padDirectionArray(r.girDirections,n);
+  let changed=false;
+  for(let i=0;i<n;i++){
+    if(pars[i]!==3 && validBinaryStat(r.fairways?.[i])){
+      const hit=binaryStatValue(r.fairways[i])===1;
+      if(!normalizeDirection(r.fairwayDirections[i])){
+        r.fairwayDirections[i]=hit?'hit':'short';
+        changed=true;
+      }
+    }
+    if(validBinaryStat(r.gir?.[i])){
+      const hit=binaryStatValue(r.gir[i])===1;
+      if(!normalizeDirection(r.girDirections[i])){
+        r.girDirections[i]=hit?'hit':'short';
+        changed=true;
+      }
+    }
+  }
+  return changed;
+}
+/** Hydrate every loaded round so Completeness badges clear without another backfill. */
+function hydrateImpliedDirectionsForAllRounds(){
+  for(const r of db.rounds||[]){
+    if(ensureImpliedDirections(r))persistRoundDirectionPatch(r);
+  }
+}
+function applyStoredRoundDirectionPatches(){
+  const all=loadRoundDirPatches();
+  for(const r of db.rounds||[]){
+    let patch=null;
+    for(const k of roundDirPatchKeys(r)){if(all[k]){patch=all[k];break}}
+    if(!patch)continue;
+    if(Array.isArray(patch.fairwayDirections)){
+      r.fairwayDirections=fillBlankArray(r.fairwayDirections,patch.fairwayDirections).map(v=>normalizeDirection(v)||v);
+    }
+    if(Array.isArray(patch.girDirections)){
+      r.girDirections=fillBlankArray(r.girDirections,patch.girDirections).map(v=>normalizeDirection(v)||v);
+    }
+    if(patch.fairwayDistribution&&!r.fairwayDistribution)r.fairwayDistribution=patch.fairwayDistribution;
+    if(patch.girDistribution&&!r.girDistribution)r.girDistribution=patch.girDistribution;
+  }
+  hydrateImpliedDirectionsForAllRounds();
+}
+/** Fill blank hole-direction / distribution fields on an existing round from a parsed scorecard. Never overwrites known dirs. */
+function applyParsedDirectionsToRound(r,parsed){
+  if(!r||!parsed)return false;
+  const pr=parsed.round||parsed;
+  const hd=pr.holes_detail||pr.hole_details||[];
+  let changed=false;
+  const fd=pr.fairway_distribution;
+  if(fd&&!r.fairwayDistribution){
+    // Fold "other" into short — X misses are treated as short.
+    const other=Number(fd.other_pct)||0;
+    r.fairwayDistribution={hitPct:Number(fd.hit_pct)||0,missLeftPct:Number(fd.left_pct)||0,missRightPct:Number(fd.right_pct)||0,missShortPct:(Number(fd.short_pct)||0)+other,missLongPct:Number(fd.long_pct)||0,missFairwaysHitPct:0};
+    changed=true;
+  }
+  const gd=pr.gir_distribution;
+  if(gd&&!r.girDistribution){
+    const other=Number(gd.other_pct)||0;
+    r.girDistribution={hitPct:Number(gd.hit_pct)||0,missShortPct:(Number(gd.short_pct)||0)+other,missLeftPct:Number(gd.left_pct)||0,missRightPct:Number(gd.right_pct)||0,missLongPct:Number(gd.long_pct)||0,missGirPct:0,noChancePct:Number(gd.no_chance_pct)||0};
+    changed=true;
+  }
+  if(hd.length){
+    const cc=course(r.courseId);
+    const nums=cc?.holeNumbers||Array.from({length:r.holes||hd.length},(_,i)=>i+1);
+    const fwDirs=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'fairway'));
+    const girDirs=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'gir'));
+    const nextFw=fillBlankArray(r.fairwayDirections,fwDirs);
+    const nextGir=fillBlankArray(r.girDirections,girDirs);
+    if(JSON.stringify(nextFw)!==JSON.stringify(r.fairwayDirections||[])){r.fairwayDirections=nextFw;changed=true}
+    if(JSON.stringify(nextGir)!==JSON.stringify(r.girDirections||[])){r.girDirections=nextGir;changed=true}
+  }
+  if(ensureImpliedDirections(r))changed=true;
+  if(changed)persistRoundDirectionPatch(r);
+  return changed;
+}
 function applyDirectionalDataFromImports(imports){
   for(const row of (imports||[])){
     const pr=row?.parsed?.round||row?.parsed;
@@ -2000,18 +2219,19 @@ function applyDirectionalDataFromImports(imports){
       });
     }
     if(!r)continue;
-    const fd=pr.fairway_distribution;
-    if(fd)r.fairwayDistribution={hitPct:Number(fd.hit_pct)||0,missLeftPct:Number(fd.left_pct)||0,missRightPct:Number(fd.right_pct)||0,missShortPct:Number(fd.short_pct)||0,missLongPct:Number(fd.long_pct)||0,missFairwaysHitPct:Number(fd.other_pct)||0};
-    const gd=pr.gir_distribution;
-    if(gd)r.girDistribution={hitPct:Number(gd.hit_pct)||0,missShortPct:Number(gd.short_pct)||0,missLeftPct:Number(gd.left_pct)||0,missRightPct:Number(gd.right_pct)||0,missLongPct:Number(gd.long_pct)||0,missGirPct:Number(gd.other_pct)||0,noChancePct:Number(gd.no_chance_pct)||0};
-    const hd=pr.holes_detail||pr.hole_details||[];
-    if(hd.length){
-      const cc=course(r.courseId);
-      const nums=cc?.holeNumbers||Array.from({length:r.holes||hd.length},(_,i)=>i+1);
-      r.fairwayDirections=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'fairway'));
-      r.girDirections=nums.map(n=>holeDirection(hd.find(h=>Number(h.hole)===Number(n)),'gir'));
-    }
+    applyParsedDirectionsToRound(r,row.parsed||pr);
   }
+  applyStoredRoundDirectionPatches();
+}
+function findRoundAfterBackfill(roundId,parsed){
+  let r=db.rounds.find(x=>String(x.id)===String(roundId));
+  if(r)return r;
+  const pr=parsed?.round||parsed;
+  if(!pr)return null;
+  return db.rounds.find(x=>{
+    const c=course(x.courseId);
+    return String(x.date||'')===String(pr.date||'') && Number(x.gross)===Number(pr.gross_score??pr.gross) && normalizeCourseName(c?.name||c?.baseName)===normalizeCourseName(pr.course_name);
+  })||null;
 }
 
 function weightedDistribution(courseId,key){
@@ -2064,22 +2284,84 @@ function weightedDistributionAll(key){
   totals.rounds=rs.length;
   return totals;
 }
-function directionGraphic(title,d,isGir=false){
-  if(!d)return `<div class="direction-card"><div class="direction-title">${title}</div><div class="pregame-no-data">No directional data yet.</div></div>`;
-  const top=isGir?(d.missLongPct||0):(d.missLongPct||0);
-  const bottom=isGir?(d.missShortPct||0):(d.missShortPct||0);
+function directionGraphic(title,d,isGir=false,{compact=false,emptyHint=null}={}){
+  if(!d)return `<div class="direction-card ${compact?'is-compact':''}"><div class="direction-title">${title}</div><div class="pregame-no-data">${safeText(emptyHint||'No directional data yet.')}</div></div>`;
+  const top=d.missLongPct||0;
+  const bottom=d.missShortPct||0;
   const left=d.missLeftPct||0,right=d.missRightPct||0,hit=d.hitPct||0;
-  const wedge=(cls,v)=>v>0?`<div class="dir-wedge ${cls}" style="opacity:${Math.max(.16,Math.min(.75,v/45))}"></div>`:'';
-  return `<div class="direction-card"><div class="direction-title">${title}</div><div class="direction-sub">${d.rounds} round${d.rounds===1?'':'s'}</div>
+  const sample=d.rounds||d.samples||0;
+  const hot=dominantMissLabel(d,{minPct:18});
+  const hotSide=hot?.side||null;
+  const wedge=(cls,side,v)=>{
+    if(!(v>0))return '';
+    const isHot=hotSide===side;
+    return `<div class="dir-wedge ${cls}${isHot?' is-hot':''}" style="opacity:${Math.max(.18,Math.min(.82,v/(isHot?38:52)))}"></div>`;
+  };
+  const label=(cls,side,v,name)=>{
+    const isHot=hotSide===side&&v>=18;
+    return `<div class="dir-label ${cls}${isHot?' is-hot':''}"><strong>${v.toFixed(0)}%</strong>${name}</div>`;
+  };
+  const unit=isGir?'approach':'tee shot';
+  const hitLabel=isGir?'GIR':'FH';
+  const bias=hot?`<div class="direction-bias">Miss bias · <strong>${hot.side}</strong> (${hot.pct.toFixed(0)}%)</div>`:`<div class="direction-bias">No strong miss bias yet</div>`;
+  return `<div class="direction-card ${compact?'is-compact':''}"><div class="direction-title">${title}</div><div class="direction-sub">${sample} ${unit}${sample===1?'':'s'} tracked</div>
     <div class="direction-viz">
-      ${wedge('top',top)}${wedge('right',right)}${wedge('bottom',bottom)}${wedge('left',left)}
+      ${wedge('top','long',top)}${wedge('right','right',right)}${wedge('bottom','short',bottom)}${wedge('left','left',left)}
       <div class="direction-ring"></div>
-      <div class="direction-center"><div class="check">✓</div><div class="pct">${hit.toFixed(0)}%</div></div>
-      <div class="dir-label dir-top"><strong>${top.toFixed(0)}%</strong>${isGir?'Long':'Long'}</div>
-      <div class="dir-label dir-right"><strong>${right.toFixed(0)}%</strong>Right</div>
-      <div class="dir-label dir-bottom"><strong>${bottom.toFixed(0)}%</strong>${isGir?'Short':'Short'}</div>
-      <div class="dir-label dir-left"><strong>${left.toFixed(0)}%</strong>Left</div>
-    </div></div>`;
+      <div class="direction-center"><div class="pct">${hit.toFixed(0)}%</div><div class="check">${hitLabel}</div></div>
+      ${label('dir-top','long',top,'Long')}
+      ${label('dir-right','right',right,'Right')}
+      ${label('dir-bottom','short',bottom,'Short')}
+      ${label('dir-left','left',left,'Left')}
+    </div>
+    ${bias}</div>`;
+}
+/** Aggregate hit/left/right/short/long for one hole index across rounds. */
+function holeDirectionBreakdown(rounds,index,{directionsKey,hitKey}={}){
+  const counts={hit:0,left:0,right:0,short:0,long:0,other:0};
+  let n=0;
+  for(const r of rounds||[]){
+    const raw=Array.isArray(r?.[directionsKey])?r[directionsKey][index]:null;
+    let d=normalizeDirection(raw);
+    if(!d){
+      const hitFlag=Array.isArray(r?.[hitKey])?r[hitKey][index]:null;
+      if(hitFlag===1||hitFlag===true)d='hit';
+      else continue;
+    }
+    if(d==='other')d='short'; // legacy X / non-directional → short
+    if(d==='hit')counts.hit++;
+    else if(d==='left')counts.left++;
+    else if(d==='right')counts.right++;
+    else if(d==='short')counts.short++;
+    else if(d==='long')counts.long++;
+    else counts.other++;
+    n++;
+  }
+  if(!n)return null;
+  const pctOf=v=>100*v/n;
+  return {
+    rounds:n,
+    samples:n,
+    hitPct:pctOf(counts.hit),
+    missLeftPct:pctOf(counts.left),
+    missRightPct:pctOf(counts.right),
+    missShortPct:pctOf(counts.short),
+    missLongPct:pctOf(counts.long),
+    missGirPct:pctOf(counts.other),
+    missFairwaysHitPct:pctOf(counts.other),
+    counts
+  };
+}
+function dominantMissLabel(d,{minPct=22}={}){
+  if(!d)return null;
+  const entries=[
+    ['short',d.missShortPct||0],
+    ['long',d.missLongPct||0],
+    ['left',d.missLeftPct||0],
+    ['right',d.missRightPct||0]
+  ].sort((a,b)=>b[1]-a[1]);
+  if(entries[0][1]<minPct)return null;
+  return {side:entries[0][0],pct:entries[0][1]};
 }
 function pregameTendencies(c){
   const p=puttingForCourse(c);
@@ -2103,7 +2385,16 @@ function holeMemory(courseId){
     let risk='low'; if(avgScore-par>=1.3 || doubleRate>=40) risk='high'; else if(avgScore-par>=.7 || doubleRate>=20) risk='medium';
     const fwVals=vals.map(v=>v.fw).filter(v=>v!=null), girVals=vals.map(v=>v.gir).filter(v=>v!=null);
     const strategy=risk==='high'?'Respect this hole. Favor the safe side and remove the big number.':risk==='medium'?'Play to your normal target. Avoid forcing a recovery shot.':'Green-light hole. Stick with the plan that has worked.';
-    return {hole:c.holeNumbers?.[i]??i+1,par,played:scores.length,avgScore,stdev:stddev(scores),best:Math.min(...scores),worst:Math.max(...scores),recent:scores,fw:pct(fwVals),gir:pct(girVals),putts:avg(vals.map(v=>v.putts).filter(v=>v!=null)),doubleRate,risk,strategy};
+    const fwDir=par===3?null:holeDirectionBreakdown(rounds,i,{directionsKey:'fairwayDirections',hitKey:'fairways'});
+    const girDir=holeDirectionBreakdown(rounds,i,{directionsKey:'girDirections',hitKey:'gir'});
+    const birdieRate=Math.round(100*over.filter(x=>x<=-1).length/scores.length);
+    const bogeyPlusRate=Math.round(100*over.filter(x=>x>=1).length/scores.length);
+    return {
+      hole:c.holeNumbers?.[i]??i+1,par,played:scores.length,avgScore,stdev:stddev(scores),
+      best:Math.min(...scores),worst:Math.max(...scores),recent:scores,
+      fw:pct(fwVals),gir:pct(girVals),putts:avg(vals.map(v=>v.putts).filter(v=>v!=null)),
+      doubleRate,birdieRate,bogeyPlusRate,risk,strategy,fwDir,girDir
+    };
   }).filter(Boolean);
 }
 
@@ -2147,17 +2438,40 @@ function scoreClass(score,par){const d=score-par; return d<=-2?'eagle':d===-1?'b
 
 
 function courseMenuLabel(c){
-  const dupes=db.courses.filter(x=>x.name===c.name);
-  return dupes.length>1 ? `${c.name} · ${c.tees}` : c.name;
+  if(!c)return 'Course';
+  const name=String(c.name||'').trim()||'Course';
+  const base=String(c.baseName||'').trim();
+  const tees=String(c.tees||'').trim();
+  const teeOk=tees&&!/^unknown$/i.test(tees);
+  const teeOnly=/^(blue|white|red|gold|black|green|championship|forward|member)$/i.test(name);
+  if(teeOnly&&base)return `${base} - ${teeOk?tees:name}`;
+  if(base&&teeOk&&(name===base||name===tees))return `${base} - ${tees}`;
+  if(base&&teeOk&&base!==name&&!name.toLowerCase().includes(tees.toLowerCase()))return `${name} - ${tees}`;
+  const dupes=(db.courses||[]).filter(x=>x&&x.name===c.name);
+  return dupes.length>1&&teeOk?`${name} · ${tees}`:name;
 }
 function courseDropdownOptions(selectedId,includeAll=false,allLabel='All courses'){
   const list=sortedCourses();
   return `${includeAll?`<option value="all" ${selectedId==='all'?'selected':''}>${allLabel}</option>`:''}${list.map(c=>`<option value="${c.id}" ${selectedId===c.id?'selected':''}>${safeText(courseMenuLabel(c))}</option>`).join('')}`;
 }
+/** Keep selected/game/round course ids pointing at a real course (default Four Oaks id may not exist for every account). */
+function ensureSelectedCourse(){
+  const list=(db.courses||[]).filter(c=>c&&c.id!=null&&c.id!=='');
+  if(!list.length){
+    state.selectedCourseId=null;
+    return null;
+  }
+  const has=id=>list.some(c=>String(c.id)===String(id));
+  if(!has(state.selectedCourseId))state.selectedCourseId=list[0].id;
+  if(state.gameCourseId!=='all'&&!has(state.gameCourseId))state.gameCourseId=state.selectedCourseId;
+  if(state.roundCourseId!=='all'&&!has(state.roundCourseId))state.roundCourseId=state.selectedCourseId;
+  return course(state.selectedCourseId);
+}
 function refreshGlobalCourseSelector(){
   const sel=document.getElementById('globalCourseSelect');
   const label=document.getElementById('globalCourseName');
   if(!sel)return;
+  ensureSelectedCourse();
   const list=sortedCourses();
   sel.innerHTML=list.map(c=>`<option value="${c.id}" ${c.id===state.selectedCourseId?'selected':''}>${safeText(courseMenuLabel(c))}</option>`).join('');
   sel.disabled=!list.length;
@@ -2192,6 +2506,8 @@ async function setGlobalCourse(id){
     db.puttingDetails=data.puttingDetails||db.puttingDetails;
     db.clubStats=data.clubStats||db.clubStats;
     try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){console.warn('Directional import hydration failed',e)}
+    repairKnownCourseLabels();
+    ensureCoursesForOrphanRounds();
     if(!db.courses.some(c=>c.id===id)) state.selectedCourseId=db.courses[0]?.id||null;
     if(state.gameCourseId!=='all') state.gameCourseId=state.selectedCourseId;
     if(state.roundCourseId!=='all') state.roundCourseId=state.selectedCourseId;
@@ -2217,12 +2533,99 @@ function usefulHoleInsight(h){
   if(h.gir!=null && h.gir<=25) bits.push(`GIR ${h.gir}%`);
   if(h.fw!=null && h.fw<=30 && h.par!==3) bits.push(`FH ${h.fw}%`);
   if(h.putts!=null && h.putts>=2.3) bits.push(`${h.putts.toFixed(1)} putts avg`);
+  const greenMiss=dominantMissLabel(h.girDir,{minPct:24});
+  if(greenMiss) bits.push(`greens miss ${greenMiss.side} (${greenMiss.pct.toFixed(0)}%)`);
+  const teeMiss=h.par===3?null:dominantMissLabel(h.fwDir,{minPct:24});
+  if(teeMiss) bits.push(`tees miss ${teeMiss.side} (${teeMiss.pct.toFixed(0)}%)`);
   if(h.avgScore-h.par>=1.2 && !bits.length) bits.push(`+${(h.avgScore-h.par).toFixed(1)} vs par`);
   return bits.join(' · ');
 }
+function holeReconRead(h){
+  if(!h)return 'More history will sharpen the hole-specific read.';
+  const parts=[];
+  const over=Number.isFinite(h.avgScore)&&Number.isFinite(h.par)?h.avgScore-h.par:null;
+  if(over!=null)parts.push(`You're averaging ${over>=0?'+':''}${over.toFixed(1)} vs par over ${h.played} round${h.played===1?'':'s'}.`);
+  const greenMiss=dominantMissLabel(h.girDir,{minPct:22});
+  if(greenMiss)parts.push(`Approach miss bias is ${greenMiss.side} (${greenMiss.pct.toFixed(0)}% of tracked shots).`);
+  else if(h.gir!=null)parts.push(`GIR is ${h.gir}% — not enough miss-direction samples yet for a side bias.`);
+  const teeMiss=h.par===3?null:dominantMissLabel(h.fwDir,{minPct:22});
+  if(teeMiss)parts.push(`Off the tee you miss ${teeMiss.side} (${teeMiss.pct.toFixed(0)}%).`);
+  if(h.doubleRate>=30)parts.push(`Protect against the big number — doubles show up ${h.doubleRate}% of the time.`);
+  else if(h.strategy)parts.push(h.strategy);
+  return parts.join(' ')||usefulHoleInsight(h)||'More history will sharpen the hole-specific read.';
+}
+/** One-line play call a golfer can absorb in a second. */
+function holePlayCall(h){
+  if(!h)return {line:'No history on this hole yet.',meta:'Play it once (or import a scorecard) to unlock the read.'};
+  const bits=[];
+  const teeMiss=h.par===3?null:dominantMissLabel(h.fwDir,{minPct:22});
+  const greenMiss=dominantMissLabel(h.girDir,{minPct:22});
+  if(teeMiss)bits.push(`Miss ${teeMiss.side} off the tee`);
+  if(greenMiss)bits.push(`Miss ${greenMiss.side} of the green`);
+  const over=Number.isFinite(h.avgScore)&&Number.isFinite(h.par)?h.avgScore-h.par:null;
+  if(!bits.length){
+    if(h.doubleRate>=40)bits.push('Protect against the double');
+    else if(over!=null&&over>=1)bits.push(`Playing ${over>=0?'+':''}${over.toFixed(1)} vs par`);
+    else if(h.strategy)bits.push(h.strategy.replace(/\.$/,''));
+    else bits.push('Still learning this hole');
+  }
+  const meta=[];
+  if(over!=null)meta.push(`${over>=0?'+':''}${over.toFixed(1)} avg · ${h.played} round${h.played===1?'':'s'}`);
+  if(h.risk)meta.push(riskLabel(h));
+  if(h.doubleRate>=30)meta.push(`${h.doubleRate}% doubles`);
+  return {line:bits.join(' · '),meta:meta.join(' · ')};
+}
+/** Shared Hole Preview / Hole Insights stats panel. */
+function holePreviewStatsHtml(c,hole,h,last,{showDirections=true,yardageText=''}={}){
+  const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
+  const call=holePlayCall(h);
+  const stat=(label,value,cls='')=>`<div class="hole-stat ${cls}"><strong>${value}</strong><span>${label}</span></div>`;
+  const recent=(h?.recent||[]).slice(0,8);
+  const recentHtml=recent.length
+    ?`<div class="hole-recent-strip" aria-label="Recent scores">${recent.map(s=>{
+        const cls=scoreClass(s,h.par);
+        return `<span class="hole-recent-pip ${cls}" title="Newer scores on the left">${s}</span>`;
+      }).join('')}</div>`
+    :`<div class="muted" style="font-size:var(--fs-data)">No scored history on this hole yet.</div>`;
+  const dirGrid=showDirections?`<div class="hole-dir-grid">
+      ${h?.par===3?'':directionGraphic('Off the tee',h?.fwDir,false,{compact:true,emptyHint:'Import a scorecard with fairway arrows to unlock tee miss trends.'})}
+      ${directionGraphic('Approach',h?.girDir,true,{compact:true,emptyHint:'Import a scorecard with GIR arrows to unlock green miss trends.'})}
+    </div>`:'';
+  const metaBits=[`Hole ${hole}`];
+  if(h?.par)metaBits.push(`Par ${h.par}`);
+  if(yardageText)metaBits.push(yardageText);
+  return `
+    <div class="hole-preview-panel">
+      <div class="hole-play-call">
+        <div class="eyebrow">PLAY CALL</div>
+        <p class="hole-play-call-line">${safeText(call.line)}</p>
+        <div class="hole-play-call-meta">${safeText([call.meta,metaBits.join(' · ')].filter(Boolean).join(' · '))}</div>
+      </div>
+      <div class="hole-score-row">
+        ${stat('Avg',h?.avgScore==null?'—':h.avgScore.toFixed(1))}
+        ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`,over!=null&&over>=1?'is-warn':over!=null&&over<=0?'is-good':'')}
+        ${stat('Last',last?.score??'—')}
+        ${stat('Doubles',h?.doubleRate==null?'—':h.doubleRate+'%',h?.doubleRate>=40?'is-warn':'')}
+      </div>
+      <div class="hole-strike-row">
+        ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'),h?.par!==3&&h?.fw!=null&&h.fw<=30?'is-warn':'')}
+        ${stat('GIR',h?.gir==null?'—':h.gir+'%',h?.gir!=null&&h.gir<=25?'is-warn':'')}
+        ${stat('Putts',h?.putts==null?'—':h.putts.toFixed(1),h?.putts!=null&&h.putts>=2.3?'is-warn':'')}
+      </div>
+      ${dirGrid}
+      <div class="hole-preview-block">
+        <div class="eyebrow">RECENT SCORES</div>
+        ${recentHtml}
+      </div>
+      <div class="preview-read-card"><div class="eyebrow">RECON READ</div><p>${safeText(holeReconRead(h))}</p></div>
+    </div>`;
+}
 
 function sortedCourses(){
-  return db.courses.slice().sort((a,b)=>a.name.localeCompare(b.name)||a.tees.localeCompare(b.tees));
+  return (db.courses||[]).filter(c=>c&&c.id!=null&&c.id!=='').slice().sort((a,b)=>{
+    const an=courseMenuLabel(a),bn=courseMenuLabel(b);
+    return an.localeCompare(bn)||String(a.tees||'').localeCompare(String(b.tees||''))||String(a.id).localeCompare(String(b.id));
+  });
 }
 function parTypeSummary(courseId,limit=3){
   const c=course(courseId);
@@ -3160,36 +3563,20 @@ function pregameHoleInsightsHtml(c,priority=[]){
   state.coursePreviewHole=hole;
   const mem=holeMemory(c.id),h=mem.find(x=>Number(x.hole)===hole);
   const last=h?holeLastRound(c.id,hole):null;
-  const avgScore=h?.avgScore;
-  const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
   const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
   const holePar=h?.par??c.pars?.[holeIdx]??'—';
   const holeHcp=c.handicaps?.[holeIdx]??'—';
   const holeYd=previewHoleYardage(c,hole,null);
   const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
-  const insight=h?usefulHoleInsight(h):'';
-  const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
-  // Hole Preview map paused for a few revs — keep stats / risk / recon only.
   return `
     <section id="pregameHoleInsights" class="pregame-hole-insights">
       <div class="section-head">
         <div><div class="eyebrow">HOLE INSIGHTS</div><h2>Hole ${hole}</h2></div>
         <button class="button secondary" type="button" onclick="toggleCoursePreviewHoles()">${state.coursePreviewShowAll?'Hide holes':'Show all holes'}</button>
       </div>
-      ${state.coursePreviewShowAll?`<div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>`:''}
-      <div class="preview-hole-title" style="margin:0 0 10px"><strong>Hole ${hole}</strong><span>Par ${holePar} · ${yardageText} · HCP ${holeHcp}</span></div>
-      <aside class="preview-stats-column preview-stats-only" aria-label="Hole ${hole} statistics">
-        ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
-        ${stat('Rounds',h?.played??'—')}
-        ${stat('Avg score',avgScore==null?'—':avgScore.toFixed(1))}
-        ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`)}
-        ${stat('Double+',h?.doubleRate==null?'—':h.doubleRate+'%')}
-        ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'))}
-        ${stat('GIR',h?.gir==null?'—':h.gir+'%')}
-        ${stat('Avg putts',h?.putts==null?'—':h.putts.toFixed(1))}
-        ${stat('Last score',last?.score??'—')}
-        <div class="preview-read-card"><div class="eyebrow">RECON READ</div><p>${safeText(insight||'More history will sharpen the hole-specific read.')}</p></div>
-      </aside>
+      <div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>
+      <div class="preview-hole-title" style="margin:0 0 12px"><strong>Hole ${hole}</strong><span>Par ${holePar} · ${yardageText} · HCP ${holeHcp}</span></div>
+      ${holePreviewStatsHtml(c,hole,h,last,{yardageText})}
     </section>`;
 }
 window.toggleCoursePreviewHoles=()=>{
@@ -3199,7 +3586,11 @@ window.toggleCoursePreviewHoles=()=>{
 };
 
 function pregame(){
-  const c=course(state.selectedCourseId), rounds=roundsFor(c.id), priority=priorityHoles(c.id);
+  const c=ensureSelectedCourse();
+  if(!c){
+    return `<div class="card bootstrap-card"><div class="eyebrow">PREGAME</div><h2 style="margin:8px 0 6px">No course in memory yet</h2><div class="muted">Import a round so Pregame has a course to plan against.</div><button class="button primary" style="margin-top:16px" type="button" onclick="document.getElementById('importBtn').click()">Import Round</button></div>`;
+  }
+  const rounds=roundsFor(c.id), priority=priorityHoles(c.id);
   const latest=rounds[0], keys=deepPregameInsights(c.id);
   const lastStats=courseRoundStats(c.id,'last'), allStats=courseRoundStats(c.id,'all');
   const pctVal=v=>v==null?'—':`${v}%`, numVal=v=>v==null?'—':v.toFixed(1);
@@ -3339,8 +3730,6 @@ function coursePreviewView(){
     coursePreviewCache.delete(`preview:${c.id}:${hole}`);
     cached=null;
   }
-  const avgScore=h?.avgScore;
-  const over=(h&&Number.isFinite(h.avgScore)&&Number.isFinite(h.par))?h.avgScore-h.par:null;
   const mb=mapboxToken();
   const mapBody=holePreviewMapBodyHtml(c,hole,cached);
   const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
@@ -3349,8 +3738,6 @@ function coursePreviewView(){
   const holeHcp=c.handicaps?.[holeIdx]??'—';
   const holeYd=previewHoleYardage(c,hole,titleBuilt);
   const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
-  const insight=h?usefulHoleInsight(h):'';
-  const stat=(label,value)=>`<div class="preview-side-card"><strong>${value}</strong><span>${label}</span></div>`;
   const interactive=Boolean(mb&&cached?.geom);
   return `
     <div class="preview-page-head">
@@ -3362,7 +3749,7 @@ function coursePreviewView(){
     ${mb?'':`<div class="mapbox-missing">Hole Preview works with free satellite tiles now. Optional: tap <strong>Set Mapbox token</strong> for interactive pan/zoom.</div>`}
     <div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>
 
-    <div class="preview-hero-grid">
+    <div class="preview-hero-grid preview-hero-grid-wide">
       <div>
         <div class="course-preview-map">
           <div class="preview-map-head">
@@ -3374,18 +3761,8 @@ function coursePreviewView(){
         <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom · use + / − for step zoom':'Satellite overlay · set Mapbox for interactive pan/zoom'}</span>${interactive?`<button type="button" onclick="resetCoursePreviewMap()">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
         <div class="preview-attribution">Satellite imagery © ${interactive?'Mapbox / providers':'Esri / providers'} · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
       </div>
-
-      <aside class="preview-stats-column" aria-label="Hole ${hole} statistics">
-        ${h?`<div class="preview-side-card risk-card"><strong><span class="risk-dot" title="${riskLabel(h)}">${riskLetter(h)}</span> ${safeText(riskLabel(h))}</strong><span>Risk</span></div>`:''}
-        ${stat('Rounds',h?.played??'—')}
-        ${stat('Avg score',avgScore==null?'—':avgScore.toFixed(1))}
-        ${stat('Vs par',over==null?'—':`${over>=0?'+':''}${over.toFixed(1)}`)}
-        ${stat('Double+',h?.doubleRate==null?'—':h.doubleRate+'%')}
-        ${stat('Fairways',h?.par===3?'—':(h?.fw==null?'—':h.fw+'%'))}
-        ${stat('GIR',h?.gir==null?'—':h.gir+'%')}
-        ${stat('Avg putts',h?.putts==null?'—':h.putts.toFixed(1))}
-        ${stat('Last score',last?.score??'—')}
-        <div class="preview-read-card"><div class="eyebrow">RECON READ</div><p>${safeText(insight||'More history will sharpen the hole-specific read.')}</p></div>
+      <aside class="preview-stats-column preview-stats-rich" aria-label="Hole ${hole} statistics">
+        ${holePreviewStatsHtml(c,hole,h,last,{yardageText})}
       </aside>
     </div>
 
@@ -3417,8 +3794,8 @@ function loadPlatoonLocal(){
     if(!x)p=d;
     else{
       p={...d,...x};
-      p.members=Array.isArray(x.members)&&x.members.length?x.members:d.members;
-      p.missions=Array.isArray(x.missions)?x.missions:[];
+      p.members=Array.isArray(x.members)&&x.members.length?x.members.filter(m=>m&&typeof m==='object'):d.members;
+      p.missions=Array.isArray(x.missions)?x.missions.filter(m=>m&&typeof m==='object'):[];
       if(x.hqMeta&&typeof x.hqMeta==='object')p.hqMeta=x.hqMeta;
       else if(!p.hqMeta)p.hqMeta=(typeof window.grHqMetaDefault==='function'?window.grHqMetaDefault():{version:1,modes:{},records:[],eagleBalances:[],eagleDetails:[],suppressedAuto:[]});
     }
@@ -3432,9 +3809,17 @@ function loadPlatoonLocal(){
       }
     }catch{}
   }
+  if(typeof window.grHydrateBlogPhotos==='function'){
+    try{window.grHydrateBlogPhotos(p)}catch{}
+  }
   return p;
 }
-function writePlatoonLocal(p){try{localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(p))}catch{}}
+function writePlatoonLocal(p){
+  try{
+    const toStore=typeof window.grPreparePlatoonForLocalWrite==='function'?window.grPreparePlatoonForLocalWrite(p):p;
+    localStorage.setItem(PLATOON_LOCAL_KEY,JSON.stringify(toStore));
+  }catch(e){console.warn('writePlatoonLocal failed',e)}
+}
 function savePlatoonLocal(p,push=true){writePlatoonLocal(p);render();if(push)queuePlatoonServerSave(p)}
 function queuePlatoonServerSave(p){
   if(window.grTestEnvActive){console.warn('[gr-test-env] Platoon server save skipped (TEST build)');return}
@@ -3443,17 +3828,24 @@ function queuePlatoonServerSave(p){
 async function pushPlatoonServer(p){
   if(window.grTestEnvActive){console.warn('[gr-test-env] Platoon server push skipped (TEST build)');return}
   try{
-    const out=await callPlatoonFunction({action:'save_state',snapshot:p});
+    const snapshot=typeof window.grSnapshotPlatoonForServer==='function'?window.grSnapshotPlatoonForServer(p):p;
+    const out=await callPlatoonFunction({action:'save_state',snapshot});
     if(out?.platoon){
       let merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,p):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||p.hqMeta});
       if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,p);
+      if(typeof window.grHydrateBlogPhotos==='function')window.grHydrateBlogPhotos(merged);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
     }
     platoonSyncError='';
     if(state.view==='groups')render();
   }catch(e){
-    platoonSyncError=String(e?.message||e||'Platoon sync unavailable');
+    const msg=String(e?.message||e||'Platoon sync unavailable');
+    platoonSyncError=msg==='ROSTER_EMAIL_DUPLICATE'
+      ?'Each roster email must be unique.'
+      :msg==='ROSTER_EMAIL_ALREADY_LINKED'
+        ?'That email is already linked to another Golf Recon account.'
+        :msg;
     if(state.view==='groups')render();
   }
 }
@@ -3466,10 +3858,14 @@ async function syncPlatoonFromServer(){
     if(out?.platoon){
       let merged=typeof window.grMergeHqMetaPreserve==='function'?window.grMergeHqMetaPreserve(out.platoon,localBefore):Object.assign({},out.platoon,{hqMeta:out.platoon.hqMeta||localBefore.hqMeta});
       if(typeof window.grPreserveClientPlatoonFields==='function')merged=window.grPreserveClientPlatoonFields(merged,localBefore);
+      if(typeof window.grHydrateBlogPhotos==='function')window.grHydrateBlogPhotos(merged);
+      if(typeof window.grHydrateAllScorecardSeeds==='function')window.grHydrateAllScorecardSeeds(merged);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
+      // Cadet claimed/linked: pull their mission scorecards into THEIR personal rounds.
       try{
         if(typeof claimAndPersistMissionRounds==='function')await claimAndPersistMissionRounds(merged);
+        else if(typeof persistClaimedPersonalRoundsFromPlatoon==='function')await persistClaimedPersonalRoundsFromPlatoon(merged);
       }catch(e){console.warn('Mission → Rounds claim after platoon sync failed',e)}
     }
     platoonSyncError='';
@@ -3646,23 +4042,18 @@ function openMissionImport(id){
       const member=roster.find(x=>x.id===memberId);
       const name=member?.name||String(tr.querySelector('[data-name]')?.value||'').trim();
       if(!name)continue;
+      const payload={
+        player_name:name,
+        handicap:numOrNull(tr.querySelector('[data-hcp]')?.value),
+        gross:numOrNull(tr.querySelector('[data-gross]')?.value),
+        net:numOrNull(tr.querySelector('[data-net]')?.value),
+        finish_position:numOrNull(tr.querySelector('[data-pos]')?.value),
+        raw_points:numOrNull(tr.querySelector('[data-pts]')?.value),
+        eagle_count:numOrNull(tr.querySelector('[data-eagles]')?.value)
+      };
       reviewed.push(typeof window.grNormalizeOfficialResultRow==='function'
-        ? window.grNormalizeOfficialResultRow({
-            player_name:name,
-            gross:numOrNull(tr.querySelector('[data-gross]')?.value),
-            net:numOrNull(tr.querySelector('[data-net]')?.value),
-            finish_position:numOrNull(tr.querySelector('[data-pos]')?.value),
-            raw_points:numOrNull(tr.querySelector('[data-pts]')?.value),
-            eagle_count:numOrNull(tr.querySelector('[data-eagles]')?.value)
-          })
-        : {
-            player_name:name,
-            gross:numOrNull(tr.querySelector('[data-gross]')?.value),
-            net:numOrNull(tr.querySelector('[data-net]')?.value),
-            finish_position:numOrNull(tr.querySelector('[data-pos]')?.value),
-            raw_points:numOrNull(tr.querySelector('[data-pts]')?.value),
-            eagle_count:numOrNull(tr.querySelector('[data-eagles]')?.value)
-          });
+        ? window.grNormalizeOfficialResultRow(payload)
+        : payload);
     }
     return reviewed;
   };
@@ -3706,13 +4097,16 @@ function openMissionImport(id){
     btn.disabled=true;btn.textContent='Parsing…';out.innerHTML='<div class="platoon-notice">Reading Mission results…</div>';
     try{
       const images=[];for(const f of files)images.push(await platoonFilePayload(f));
-      const parsed=await callPlatoonFunction({action:'parse_results',mission:{date:m.date,locationName:m.locationName,title:m.title},images});
-      const rows=parsed.results||[];
+      const parsed=await callPlatoonFunction({action:'parse_results',mission:{date:m.date,locationName:m.locationName,title:m.title,format:m.format},images});
+      const rows=(parsed.results||[]).map(r=>{
+        const norm=typeof window.grNormalizeOfficialResultRow==='function'?window.grNormalizeOfficialResultRow(r):r;
+        return {...r,...norm};
+      });
       out.innerHTML=`<div class="platoon-notice">Confidence ${Math.round(100*(parsed.confidence||0))}%${(parsed.warnings||[]).length?` · ${safeText(parsed.warnings.join(' · '))}`:''}</div>
         <div class="eyebrow" style="margin-top:10px">REVIEW BEFORE SAVE</div>
-        <table class="platoon-results-table gr-import-review"><thead><tr><th>Player</th><th>Match</th><th>Gross</th><th>Net</th><th>Pos</th><th>Pts</th><th>Eagles</th></tr></thead><tbody>${rows.map((r,i)=>{
+        <table class="platoon-results-table gr-import-review"><thead><tr><th>Player</th><th>Match</th><th>HCP</th><th>Gross</th><th>Net</th><th>Pos</th><th>Pts</th><th>Eagles</th></tr></thead><tbody>${rows.map((r,i)=>{
           const hit=typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,r.player_name):null;
-          return `<tr data-import-row="${i}"><td><input data-name value="${safeText(r.player_name||'')}"></td><td><select data-match><option value="">—</option>${roster.map(x=>`<option value="${safeText(x.id)}" ${hit?.id===x.id?'selected':''}>${safeText(x.name)}</option>`).join('')}</select></td><td><input data-gross inputmode="decimal" value="${r.gross??''}"></td><td><input data-net inputmode="decimal" value="${r.net??''}"></td><td><input data-pos inputmode="numeric" value="${r.finish_position??''}"></td><td><input data-pts inputmode="decimal" value="${r.raw_points??''}"></td><td><input data-eagles inputmode="numeric" value="${r.eagle_count??''}"></td></tr>`;
+          return `<tr data-import-row="${i}"><td><input data-name value="${safeText(r.player_name||'')}"></td><td><select data-match><option value="">—</option>${roster.map(x=>`<option value="${safeText(x.id)}" ${hit?.id===x.id?'selected':''}>${safeText(x.name)}</option>`).join('')}</select></td><td><input data-hcp inputmode="decimal" value="${r.handicap??''}"></td><td><input data-gross inputmode="decimal" value="${r.gross??''}"></td><td><input data-net inputmode="decimal" value="${r.net??''}"></td><td><input data-pos inputmode="numeric" value="${r.finish_position??''}"></td><td><input data-pts inputmode="decimal" value="${r.raw_points??''}"></td><td><input data-eagles inputmode="numeric" value="${r.eagle_count??''}"></td></tr>`;
         }).join('')}</tbody></table>
         <div class="dialog-actions sticky-actions"><button class="button secondary" id="discardParsedMissionResults" type="button">Discard</button><button class="button primary" id="saveParsedMissionResults" type="button">Save Official Results</button></div>`;
       out.querySelector('#discardParsedMissionResults').onclick=()=>{out.innerHTML=''};
@@ -3732,7 +4126,10 @@ function groupsView(){
   }
   let n=1;while(cells.length%7)cells.push(`<div class="calendar-day muted-day">${n++}</div>`);
   const chief=(p.members||[]).find(m=>m.role==='chief'),co=(p.members||[]).find(m=>m.role==='co_chief');
-  const roster=(p.members||[]).map(m=>`<div class="roster-row"><div><div class="roster-name">${safeText(m.name)}</div><div class="roster-role">${m.linked?'Golf Recon linked':'Cadet profile'}</div></div><span class="platoon-role ${m.role}">${safeText(platoonRoleLabel(m.role))}</span></div>`).join('');
+  const roster=(p.members||[]).map(m=>{
+    const label=(typeof window.grMemberLabel==='function'?window.grMemberLabel(m):null)||m.displayName||m.name;
+    return `<div class="roster-row"><div><div class="roster-name">${safeText(label)}</div><div class="roster-role">${m.linked?'Golf Recon linked':'Cadet profile'}${m.name&&m.displayName&&m.name!==m.displayName?` · ${safeText(m.name)}`:''}</div></div><span class="platoon-role ${m.role}">${safeText(platoonRoleLabel(m.role))}</span></div>`;
+  }).join('');
   const missionCard=nextMission?`<section class="card mission-card"><div class="mission-banner"><span class="mission-tag ${nextMission.type}">${platoonMissionTypeLabel(nextMission.type)}</span></div><div class="mission-empty"><div class="mission-hero-line"><div><div class="mission-hero-title">${safeText(nextMission.title||nextMission.locationName)}</div><div class="mission-meta">${safeText(platoonMissionDate(nextMission.date))}${nextMission.teeTime?` · ${safeText(nextMission.teeTime)}`:''} · ${safeText(nextMission.locationName)}</div></div></div><div class="mission-actions"><button class="button primary" type="button" onclick="openMissionDetail('${safeText(nextMission.id)}')">Open Mission</button><button class="button secondary" type="button" onclick="openMissionEditor()">Create Mission</button></div></div></section>`:`<section class="card mission-card"><div class="mission-banner"><span class="mission-tag battle">MISSION CONTROL</span></div><div class="mission-empty"><strong>No upcoming mission scheduled.</strong><div class="mission-actions"><button class="button primary" type="button" onclick="openMissionEditor()">Create Mission</button></div></div></section>`;
   const resultCount=missions.filter(m=>Array.isArray(m.results)&&m.results.length).length;
   const syncMsg=platoonSyncError?`<div class="platoon-sync-error">${safeText(platoonSyncError)}</div>`:'';
@@ -3890,8 +4287,7 @@ function roundsView(){
  const selectedCourse=state.roundCourseId==='all'?null:course(state.roundCourseId);
  const list=sorted.map(r=>{
    const c=course(r.courseId),diff=scoreDifferential(r),sel=String(state.selectedRoundId)===String(r.id);
-   const g=missingRoundStats(r),basicMissing=g.fw+g.gir+g.putts;
-   const status=basicMissing?`<span class="round-status missing">Missing stats</span>`:g.firstPutts?`<span class="round-status warn">Putt detail missing</span>`:`<span class="round-status complete">Complete ✓</span>`;
+   const status=roundCompletenessStatusHtml(r);
    const expand=sel?`<div class="round-scorecard-expand" data-round-expand="${r.id}">${personalRoundScorecardHtml(r)}</div>`:'';
    return `<div class="round-block ${sel?'is-open':''}">
      <div class="round-row round-summary has-edit ${sel?'selected':''}" data-round-row="${r.id}" role="button" tabindex="0" aria-expanded="${sel?'true':'false'}" aria-label="${safeText(c?.name||'Round')} ${fmtDate(r.date)}, score ${r.gross}">
@@ -4098,9 +4494,17 @@ function render(){
    app.innerHTML=`<div class="card bootstrap-card"><div class="eyebrow">WELCOME TO GOLF RECON</div><h2 style="margin:8px 0 6px">Your account is ready.</h2><div class="muted">Import your first round to start building your golf memory.</div><button class="button primary" style="margin-top:16px" type="button" onclick="document.getElementById('importBtn').click()">Import First Round</button></div>`;
    return;
  }
+ ensureSelectedCourse();
  const globalCourseBar=document.querySelector('.global-course-bar');
  if(globalCourseBar)globalCourseBar.style.display=['pregame','groups'].includes(state.view)?'none':'grid';
- app.innerHTML=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():myGame();
+ let viewHtml='';
+ try{
+   viewHtml=state.view==='pregame'?pregame():state.view==='rounds'?roundsView():state.view==='groups'?groupsView():myGame();
+ }catch(e){
+   console.error('View render failed',state.view,e);
+   viewHtml=`<div class="card bootstrap-card"><strong>Could not open this screen.</strong><div class="bootstrap-error">${safeText(e?.message||e)}</div><div class="muted" style="margin-top:10px">Try another tab, or refresh. If it keeps failing, tell Chief which tab broke.</div></div>`;
+ }
+ app.innerHTML=viewHtml;
  document.querySelectorAll('[data-hole-preview]').forEach(b=>b.addEventListener('click',e=>{
    e.preventDefault();e.stopPropagation();openHolePreview(Number(b.dataset.holePreview),state.selectedCourseId);
  }));
@@ -4174,7 +4578,7 @@ function render(){
  });
 
 }
-window.setView = v => {state.view=v; render();};
+window.setView = v => {state.view=v; try{render()}catch(e){console.error('setView render failed',v,e)}};
 
 window.openCourseMemory=()=>{
   state.roundCourseId=state.selectedCourseId;
@@ -4182,7 +4586,12 @@ window.openCourseMemory=()=>{
   render();
   requestAnimationFrame(()=>document.getElementById('courseMemorySection')?.scrollIntoView({behavior:'smooth',block:'start'}));
 };
-document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>{setView(b.dataset.view);if(b.dataset.view==='groups')syncPlatoonFromServer()}));
+document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>{
+  const view=b.dataset.view;
+  setView(view);
+  // Never block navigation on sync — fire and forget after the screen paints.
+  if(view==='groups')Promise.resolve().then(()=>syncPlatoonFromServer()).catch(e=>console.warn('Platoon sync after nav failed',e));
+}));
 
 const globalCourseSelect=document.getElementById('globalCourseSelect');
 if(globalCourseSelect)globalCourseSelect.addEventListener('change',()=>setGlobalCourse(globalCourseSelect.value));
@@ -4214,15 +4623,35 @@ function missingRoundStats(r){
   const c=course(r.courseId);
   const n=r.holes||c?.holeNumbers?.length||0;
   const pars=c?.pars||[];
-  let fw=0,gir=0,putts=0;
+  let fw=0,gir=0,putts=0,fwDir=0,girDir=0;
   for(let i=0;i<n;i++){
     if(pars[i]!==3 && !validBinaryStat(r.fairways?.[i]))fw++;
     if(!validBinaryStat(r.gir?.[i]))gir++;
     if(!validCountStat(r.putts?.[i]))putts++;
+    // Miss directions: hit is implied by FH/GIR ✓; a miss needs L/R/Short/Long.
+    if(pars[i]!==3 && validBinaryStat(r.fairways?.[i])){
+      const hit=binaryStatValue(r.fairways[i])===1;
+      const d=normalizeDirection(r.fairwayDirections?.[i]);
+      if(!hit && !d)fwDir++;
+    }
+    if(validBinaryStat(r.gir?.[i])){
+      const hit=binaryStatValue(r.gir[i])===1;
+      const d=normalizeDirection(r.girDirections?.[i]);
+      if(!hit && !d)girDir++;
+    }
   }
   const puttingKnown=new Set(db.puttingDetails.filter(p=>p.date===r.date && normalizeCourseName(p.course)===normalizeCourseName(c?.name) && Number.isFinite(Number(p.distance))).map(p=>Number(p.hole)));
   const firstPutts=Math.max(0,n-puttingKnown.size);
-  return {fw,gir,putts,firstPutts};
+  return {fw,gir,putts,firstPutts,fwDir,girDir,missDirs:fwDir+girDir};
+}
+/** Round list badge: Complete when FH/GIR/putts are filled (miss arrows imputed from hit/miss). First-putt distances stay optional in backfill. */
+function roundCompletenessStatusHtml(r){
+  // FH/GIR hit/miss already on the scorecard → treat blank arrows as short/hit so Candia-style rounds clear.
+  if(ensureImpliedDirections(r))persistRoundDirectionPatch(r);
+  const g=missingRoundStats(r);
+  if(g.fw+g.gir+g.putts)return `<span class="round-status missing">Missing stats</span>`;
+  if(g.missDirs)return `<span class="round-status warn">Miss arrows missing</span>`;
+  return `<span class="round-status complete">Complete ✓</span>`;
 }
 function openBackfillRound(roundId){
   const r=db.rounds.find(x=>String(x.id)===String(roundId));
@@ -4237,6 +4666,8 @@ function openBackfillRound(roundId){
       <span class="backfill-gap">${g.fw} FH gaps</span>
       <span class="backfill-gap">${g.gir} GIR gaps</span>
       <span class="backfill-gap">${g.putts} putt gaps</span>
+      <span class="backfill-gap">${g.fwDir} FH miss-dir gaps</span>
+      <span class="backfill-gap">${g.girDir} GIR miss-dir gaps</span>
       <span class="backfill-gap">${g.firstPutts} first-putt gaps</span>
     </div>`;
   backfillFiles.value='';
@@ -4248,7 +4679,6 @@ function openBackfillRound(roundId){
   if(editDlg?.open)editDlg.close();
   backfillDlg.showModal();
 }
-document.getElementById('closeBackfill').onclick=()=>backfillDlg.close();
 document.getElementById('backBackfill').onclick=()=>{
   backfillReviewStep.style.display='none';
   backfillUploadStep.style.display='';
@@ -4278,9 +4708,17 @@ document.getElementById('analyzeBackfill').onclick=async()=>{
       action:'parse',
       mode:'backfill',
       source:'18Birdies',
-      note:`Backfill target only: ${c.name}; date ${target.date}; tees ${c.tees}; gross ${target.gross}; ${target.holes} holes. Extract only data actually visible in the screenshots.`,
+      note:`Backfill target only: ${c.name}; date ${target.date}; tees ${c.tees}; gross ${target.gross}; ${target.holes} holes. Extract only data actually visible in the screenshots. Prefer hole-by-hole fairway_direction and gir_direction (hit/left/right/short/long) when miss arrows are visible.`,
       images
     });
+    normalizeParsedRound(result);
+    try{
+      backfillStatus.textContent='Reading hole-by-hole miss directions…';
+      const directional=await callPlatoonFunction({action:'parse_personal_round_directions',images});
+      mergeHoleDirectionsIntoParsed(result,directional);
+    }catch(e){
+      console.warn('Directional hole parser unavailable during backfill; continuing with standard parse.',e);
+    }
     pendingBackfill=result;
     backfillReview.innerHTML=reviewHtml(result);
     backfillUploadStep.style.display='none';
@@ -4293,23 +4731,55 @@ document.getElementById('analyzeBackfill').onclick=async()=>{
   }
 };
 
+function resetBackfillDialogUi(){
+  pendingBackfill=null;
+  try{
+    backfillReviewStep.style.display='none';
+    backfillUploadStep.style.display='';
+    backfillFiles.value='';
+    backfillFileList.innerHTML='';
+    backfillStatus.textContent='';
+    backfillStatus.className='import-status';
+    const btn=document.getElementById('saveBackfill');
+    if(btn){btn.disabled=false;btn.textContent='Add Missing Stats'}
+  }catch{}
+}
 document.getElementById('saveBackfill').onclick=async()=>{
   const roundId=document.getElementById('backfillRoundId').value;
   if(!roundId||!pendingBackfill)return;
   const btn=document.getElementById('saveBackfill');
+  const parsed=pendingBackfill;
   try{
     btn.disabled=true;btn.textContent='Adding…';
-    const result=await callImportFunction({action:'backfill',round_id:roundId,parsed:pendingBackfill});
+    const result=await callImportFunction({action:'backfill',round_id:roundId,parsed});
     btn.textContent='Added ✓';
+    // Close immediately so the modal never hangs on "Added ✓".
+    try{backfillDlg.close()}catch{}
+    resetBackfillDialogUi();
     await bootstrapGolfRecon();
-    backfillDlg.close();
-    if(result?.filled){
-      setTimeout(()=>alert(`Backfill complete. Added ${result.filled} missing stat${result.filled===1?'':'s'}.`),150);
+    const local=findRoundAfterBackfill(roundId,parsed);
+    if(local){
+      applyParsedDirectionsToRound(local,parsed);
+      // Impute short/hit from binary FH/GIR so Completeness clears without arrow screenshots.
+      if(ensureImpliedDirections(local))persistRoundDirectionPatch(local);
+      applyStoredRoundDirectionPatches();
+      render();
     }
+    const filled=Number(result?.filled)||0;
+    const still=local?missingRoundStats(local):null;
+    setTimeout(()=>alert(still?.missDirs
+      ?`Backfill saved, but ${still.missDirs} miss-direction hole${still.missDirs===1?'':'s'} still look blank.`
+      :(filled
+        ?`Backfill complete. Added ${filled} missing stat${filled===1?'':'s'}. Existing values were left alone.`
+        :'Backfill complete. Miss directions were filled from hit/miss where arrows were blank.')),150);
   }catch(e){
     alert(e.message);
     btn.disabled=false;btn.textContent='Add Missing Stats';
   }
+};
+document.getElementById('closeBackfill').onclick=()=>{
+  resetBackfillDialogUi();
+  try{backfillDlg.close()}catch{}
 };
 
 
@@ -4368,13 +4838,46 @@ document.getElementById('authForm').addEventListener('submit',async e=>{
     btn.textContent=authMode==='recovery'?'Update password':authMode==='signup'?'Create account':'Sign in';
   }
 });
+function setUserMenuOpen(open){
+  const btn=document.getElementById('userMenuBtn');
+  const panel=document.getElementById('userMenuPanel');
+  if(!btn||!panel)return;
+  btn.setAttribute('aria-expanded',open?'true':'false');
+  panel.hidden=!open;
+}
+function setTopbarDisplayName(label){
+  const chip=document.getElementById('userChip');
+  if(!chip)return;
+  const clean=String(label||'').trim().replace(/^@+/,'');
+  chip.textContent=clean||'Player';
+  chip.title=clean||'Player';
+}
+document.getElementById('userMenuBtn').onclick=e=>{
+  e.stopPropagation();
+  const open=document.getElementById('userMenuBtn')?.getAttribute('aria-expanded')==='true';
+  setUserMenuOpen(!open);
+};
+document.addEventListener('click',e=>{
+  const menu=document.getElementById('userMenu');
+  if(!menu||menu.contains(e.target))return;
+  setUserMenuOpen(false);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')setUserMenuOpen(false);
+});
 document.getElementById('logoutBtn').onclick=async()=>{
+  setUserMenuOpen(false);
   try{
     if(authSession?.access_token)await authRequest('logout',{},authSession.access_token);
   }catch{}
   resetUserScopedData();
   saveAuthSession(null);
   showAuth('signin','Signed out.','ok');
+};
+document.getElementById('accountSettingsBtn').onclick=()=>{
+  setUserMenuOpen(false);
+  if(typeof window.grOpenAccountSettings==='function')window.grOpenAccountSettings();
+  else alert('Account settings load with Platoons. Open the Platoons tab once, then try again.');
 };
 
 const editDlg=document.getElementById('editRoundDialog');
@@ -4504,8 +5007,13 @@ function normalizeDirection(v){
   if(s.includes('left')||s==='l'||s==='←')return 'left';
   if(s.includes('right')||s==='r'||s==='→')return 'right';
   if(s.includes('short')||s==='s'||s==='↓')return 'short';
-  if(s.includes('long')||s==='long'||s==='↑')return 'long';
-  if(s.includes('other')||s.includes('x')||s==='miss')return 'other';
+  if(s.includes('long')||s==='↑')return 'long';
+  // 18Birdies red X / non-directional miss → count as short (not a separate "other" bucket).
+  if(
+    s==='other'||s==='miss'||s==='x'||s==='✕'||s==='×'||s==='❌'||
+    s.includes('✕')||s.includes('❌')||s.includes('non-directional')||
+    (s.includes('x')&&!s.includes('ex'))
+  )return 'short';
   return null;
 }
 function holeDirection(h,type){
@@ -4530,13 +5038,29 @@ function normalizeParsedRound(x){
       h.putting_sg=null;
       h.zero_putt_chip_in=true;
     }
+    for(const k of ['fairway_direction','fairway_miss_direction','fh_direction','fairway_result_direction','gir_direction','gir_miss_direction','green_direction','gir_result_direction']){
+      const d=normalizeDirection(h?.[k]);
+      if(d)h[k]=d;
+    }
   });
-  if(!r.fairway_distribution){const d=distributionFromHoles(holes,'fairway');if(d)r.fairway_distribution=d}
-  if(!r.gir_distribution){const d=distributionFromHoles(holes,'gir');if(d)r.gir_distribution=d}
+  // Rebuild from coerced hole dirs so X/other land in short.
+  const fd=distributionFromHoles(holes,'fairway');if(fd)r.fairway_distribution=fd;
+  const gd=distributionFromHoles(holes,'gir');if(gd)r.gir_distribution=gd;
+  if(r.fairway_distribution&&r.fairway_distribution.other_pct){
+    r.fairway_distribution.short_pct=(Number(r.fairway_distribution.short_pct)||0)+(Number(r.fairway_distribution.other_pct)||0);
+    r.fairway_distribution.other_pct=0;
+  }
+  if(r.gir_distribution&&r.gir_distribution.other_pct){
+    r.gir_distribution.short_pct=(Number(r.gir_distribution.short_pct)||0)+(Number(r.gir_distribution.other_pct)||0);
+    r.gir_distribution.other_pct=0;
+  }
   const cleanWarnings=a=>(Array.isArray(a)?a:[]).filter(w=>{
     const s=String(w||'').toLowerCase();
     if(s.includes('zero putt')||s.includes('zero putts')||s.includes('0 putt')||s.includes('first-putt distance')&&s.includes('null'))return false;
-    if((s.includes('red x')||s.includes('red ×'))&&s.includes('gir'))return false;
+    if((s.includes('red x')||s.includes('red ×')||s.includes('✕'))&&(s.includes('gir')||s.includes('fairway')||s.includes('direction')||s.includes('percent')))return false;
+    if(s.includes('cannot')&&s.includes('direction'))return false;
+    if(s.includes('x')&&s.includes('percent'))return false;
+    if(s.includes('other')&&s.includes('direction'))return false;
     return true;
   });
   if(x?.round){x.warnings=cleanWarnings(x.warnings);r.warnings=cleanWarnings(r.warnings)}
@@ -4559,7 +5083,7 @@ function mergeHoleDirectionsIntoParsed(parsed,directional){
 }
 function directionMark(v){
   const d=normalizeDirection(v);
-  return d==='left'?'←':d==='right'?'→':d==='short'?'↓':d==='long'?'↑':d==='hit'?'✓':d==='other'?'✕':'—';
+  return d==='left'?'←':d==='right'?'→':d==='short'?'↓':d==='long'?'↑':d==='hit'?'✓':'—';
 }
 function reviewHtml(x){
   x=normalizeParsedRound(x);
@@ -4692,7 +5216,7 @@ function showAuth(mode='signin',message='',kind=''){
   document.getElementById('confirmPasswordWrap').style.display=(signup||recovery)?'grid':'none';
   document.getElementById('forgotPasswordBtn').style.display=mode==='signin'?'block':'none';
   document.getElementById('authTitle').textContent=recovery?'Choose a new password':signup?'Create your Golf Recon account':'Sign in';
-  document.getElementById('authSubtitle').textContent=recovery?'Set a new password for your account.':signup?'Pick a username for Platoons, events and leaderboards.':'Your golf memory, game plan and round history.';
+  document.getElementById('authSubtitle').textContent=recovery?'Set a new password for your account.':signup?'Use the email your Chief put on the My Time roster, then pick a username.':'Your golf memory, game plan and round history.';
   document.getElementById('authSubmit').textContent=recovery?'Update password':signup?'Create account':'Sign in';
   document.getElementById('authModeToggle').textContent=recovery?'Back to sign in':signup?'Already have an account? Sign in':'New to Golf Recon? Create account';
   document.getElementById('authPassword').setAttribute('autocomplete',(signup||recovery)?'new-password':'current-password');
@@ -4738,20 +5262,21 @@ async function bootstrapGolfRecon(){
     db.rounds=data.rounds||[];
     db.puttingDetails=data.puttingDetails||[];
     db.clubStats=data.clubStats||[];
-    try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){console.warn('Directional import hydration failed',e)}
-    const userChip=document.getElementById('userChip');
-    if(userChip)userChip.textContent='@'+(db.player.username||db.player.name||'golfer');
+    try{const rawImports=await callImportFunction({action:'list'});applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){
+      console.warn('Directional import hydration failed',e);
+      applyStoredRoundDirectionPatches();
+    }
+    applyStoredRoundDirectionPatches();
+    repairKnownCourseLabels();
+    ensureCoursesForOrphanRounds();
+    setTopbarDisplayName(db.player.username||db.player.name||'golfer');
 
     let savedCourse=null;
     try{savedCourse=localStorage.getItem('golfreconSelectedCourseId')}catch{}
-    if(savedCourse && db.courses.some(c=>c.id===savedCourse)){
+    if(savedCourse && db.courses.some(c=>c&&String(c.id)===String(savedCourse))){
       state.selectedCourseId=savedCourse;
-    }else if(!db.courses.some(c=>c.id===state.selectedCourseId)){
-      state.selectedCourseId=db.courses[0]?.id||null;
     }
-
-    if(state.gameCourseId!=='all')state.gameCourseId=state.selectedCourseId;
-    if(state.roundCourseId!=='all')state.roundCourseId=state.selectedCourseId;
+    ensureSelectedCourse();
 
     refreshGlobalCourseSelector();
     try{
@@ -4764,6 +5289,16 @@ async function bootstrapGolfRecon(){
     if(pill)pill.classList.add('ok');
     if(txt)txt.textContent='Synced';
     render();
+    // Claim My Time seat on login — don't wait until the player opens Platoons.
+    try{syncPlatoonFromServer().then(()=>{
+      try{
+        const p=loadPlatoonLocal();
+        const meId=typeof resolveCurrentPlatoonMemberId==='function'?resolveCurrentPlatoonMemberId(p):null;
+        const me=(p?.members||[]).find(m=>String(m.id)===String(meId));
+        const label=(typeof window.grMemberLabel==='function'&&me)?window.grMemberLabel(me):'';
+        if(label&&label!=='Player')setTopbarDisplayName(label);
+      }catch{}
+    }).catch(e=>console.warn('Platoon seat claim deferred',e))}catch(e){console.warn('Platoon seat claim deferred',e)}
     return data;
   }catch(e){
     if(pill)pill.classList.add('err');
@@ -4780,15 +5315,86 @@ function slugify(s){
 function normalizeCourseName(s){
   return String(s||'')
     .toLowerCase()
+    .replace(/['’]/g,'') // Owl's Nest ≡ Owls Nest
     .replace(/&/g,' and ')
     .replace(/\bscottish\b/g,'scot')
     .replace(/\bcountry\s+club\b/g,'cc')
     .replace(/\bgolf\s+club\b/g,'')
     .replace(/\bgolf\s+course\b/g,'')
+    .replace(/\bgolf\s+links\b/g,'')
     .replace(/\bthe\b/g,'')
     .replace(/[^a-z0-9]+/g,' ')
     .trim()
     .replace(/\s+/g,' ');
+}
+/** Expand tee-only import names (e.g. "Gold") into club + tee. */
+function expandTeeOnlyCourseName(courseName,tees){
+  const raw=String(courseName||'').trim();
+  const teeRaw=String(tees||'').trim();
+  const key=normalizeCourseName(raw);
+  const hit=TEE_ONLY_COURSE_FIX[key];
+  if(hit){
+    return {
+      course_name:hit.label,
+      baseName:hit.club,
+      tees:teeRaw&&!/^unknown$/i.test(teeRaw)?teeRaw:hit.tees
+    };
+  }
+  // "Kingswood Golf Club" + Gold tees → keep club, label with tee
+  if(raw&&teeRaw&&!/^unknown$/i.test(teeRaw)&&!raw.toLowerCase().includes(teeRaw.toLowerCase())){
+    const club=raw.replace(/\s+Golf(?:\s+Club|\s+Course|\s+Links)?\s*$/i,'').trim()||raw;
+    if(/^(blue|white|red|gold|black|green)$/i.test(teeRaw)){
+      return {course_name:`${club} - ${teeRaw}`,baseName:club,tees:teeRaw};
+    }
+  }
+  return {course_name:raw,baseName:raw,tees:teeRaw||'Unknown'};
+}
+/** Fix already-saved tee-only courses (Gold → Kingswood - Gold) after bootstrap. */
+function repairKnownCourseLabels(){
+  let changed=false;
+  for(const c of (db.courses||[])){
+    if(!c)continue;
+    const expanded=expandTeeOnlyCourseName(c.name||c.baseName,c.tees);
+    const key=normalizeCourseName(c.name||'');
+    const baseKey=normalizeCourseName(c.baseName||'');
+    if(TEE_ONLY_COURSE_FIX[key]||TEE_ONLY_COURSE_FIX[baseKey]){
+      if(c.name!==expanded.course_name||c.baseName!==expanded.baseName||c.tees!==expanded.tees){
+        c.name=expanded.course_name;
+        c.baseName=expanded.baseName;
+        c.tees=expanded.tees;
+        changed=true;
+      }
+    }
+  }
+  return changed;
+}
+/** Rebuild stub courses for rounds whose courseId vanished from the course list. */
+function ensureCoursesForOrphanRounds(){
+  let added=0;
+  for(const r of (db.rounds||[])){
+    if(!r||r.courseId==null||r.courseId==='')continue;
+    if(course(r.courseId))continue;
+    const putt=db.puttingDetails.find(p=>p&&String(p.date||'')===String(r.date||'')&&p.course);
+    const guess=String(putt?.course||r.courseName||r.course_name||'Recovered course').trim()||'Recovered course';
+    const expanded=expandTeeOnlyCourseName(guess,r.tees||'');
+    const holes=Number(r.holes)||18;
+    const stub={
+      id:String(r.courseId),
+      name:expanded.course_name,
+      baseName:expanded.baseName||expanded.course_name,
+      tees:expanded.tees||'Unknown',
+      yardage:0,slope:null,rating:null,par:null,
+      pars:Array(holes).fill(null),
+      holeNumbers:Array.from({length:holes},(_,i)=>i+1),
+      handicaps:Array(holes).fill(null),
+      segment:holes===18?'18 holes':'9 holes',
+      imported:true,
+      recovered:true
+    };
+    db.courses.push(stub);
+    added++;
+  }
+  return added;
 }
 function normalizeTee(s){
   return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
@@ -4808,10 +5414,18 @@ function findCourseForImport(r){
     const exact=db.courses.find(c=>c.id===r.course_id);
     if(exact)return exact;
   }
-  const incoming=r.course_name||'';
-  const tee=normalizeTee(r.tees);
+  const expanded=expandTeeOnlyCourseName(r.course_name||'',r.tees);
+  const incoming=expanded.course_name||r.course_name||'';
+  const tee=normalizeTee(expanded.tees||r.tees);
   const ranked=db.courses.map(c=>{
-    const nameScore=Math.max(courseNameScore(incoming,c.name),courseNameScore(incoming,c.baseName));
+    const nameScore=Math.max(
+      courseNameScore(incoming,c.name),
+      courseNameScore(incoming,c.baseName),
+      courseNameScore(expanded.baseName,c.baseName),
+      courseNameScore(expanded.baseName,c.name),
+      courseNameScore(r.course_name,c.name),
+      courseNameScore(r.course_name,c.baseName)
+    );
     const teeScore=tee && normalizeTee(c.tees)===tee ? 12 : 0;
     return {c,score:nameScore+teeScore,nameScore,teeMatch:teeScore>0};
   }).filter(x=>x.nameScore>=58).sort((a,b)=>b.score-a.score);
@@ -4822,14 +5436,18 @@ function findCourseForImport(r){
   if(tee){
     const exactTee=ranked.find(x=>x.teeMatch);
     if(exactTee)return exactTee.c;
+    const byLabel=ranked.find(x=>normalizeCourseName(x.c.name)===normalizeCourseName(incoming));
+    if(byLabel)return byLabel.c;
     return null;
   }
   return ranked[0].c;
 }
 function createCourseFromImport(r){
   const hd=(r.holes_detail||r.hole_details||[]).slice().sort((a,b)=>Number(a.hole)-Number(b.hole));
-  const holes=Number(r.holes)||hd.length;
-  if(!r.course_name || !holes)return null;
+  // Default to 18 when the scorecard shell is missing — still keep the course in the dropdown.
+  const holes=Number(r.holes)||hd.length||18;
+  if(!r.course_name)return null;
+  const expanded=expandTeeOnlyCourseName(r.course_name,r.tees);
 
   const holeNumbers=hd.length?hd.map(h=>Number(h.hole)):Array.from({length:holes},(_,i)=>i+1);
   const pars=hd.length?hd.map(h=>h.par==null?null:Number(h.par)):Array(holes).fill(null);
@@ -4841,12 +5459,15 @@ function createCourseFromImport(r){
   const rating=Number.isFinite(Number(r.course_rating))?Number(r.course_rating):null;
   const slope=Number.isFinite(Number(r.course_slope))?Number(r.course_slope):null;
   const segment=holes===18?'18 holes':(holeNumbers[0]===1?'Front 9':'9 holes');
-  let id=slugify(`${r.course_name}-${r.tees||'tees'}-${segment}`);
+  let id=slugify(`${expanded.course_name}-${expanded.tees||'tees'}-${segment}`);
   let n=2,base=id;
   while(db.courses.some(c=>c.id===id))id=`${base}-${n++}`;
 
   const c={
-    id,name:r.course_name,baseName:r.course_name,tees:r.tees||'Unknown',
+    id,
+    name:expanded.course_name,
+    baseName:expanded.baseName||expanded.course_name,
+    tees:expanded.tees||'Unknown',
     yardage:0,slope,rating,par,pars,holeNumbers,handicaps,segment,imported:true
   };
   db.courses.push(c);
@@ -4962,12 +5583,15 @@ function missionSeedToParsed(seed){
       mission_id:seed.mission_id||null,
       mission_title:seed.mission_title||null,
       mission_fingerprint:seed.fingerprint||null,
+      missionFingerprint:seed.fingerprint||null,
       raw_points:seed.raw_points??null,
       finish_position:seed.finish_position??null,
       limited_from_mission:!!seed.limited
     }
   };
 }
+/** Alias for callers that still use the older name. */
+function parsedFromMissionSeed(seed){return missionSeedToParsed(seed)}
 
 function tagRoundFromMissionSeed(round,seed){
   if(!round||!seed)return round;
@@ -5000,7 +5624,7 @@ function mergeMissionSeedIntoPersonal(seed,resultRow){
       // duplicate path — locate again
       existing=findExistingRoundForParsed(fakeParsed)||findPersonalRoundForMissionSeed(seed);
     }
-    if(!existing)return {claimed:false};
+    if(!existing)return {claimed:false,parsed:fakeParsed};
     // Fill blanks only onto the existing personal round.
     const hd=fakeParsed.round.holes_detail||[];
     const holes=existing.holes||hd.length||18;
@@ -5035,7 +5659,7 @@ async function persistClaimedMissionRounds(created){
   let saved=0;
   for(const row of created){
     const parsed=row?.parsed;if(!parsed?.round)continue;
-    const fp=row.seed?.fingerprint||parsed.round.mission_fingerprint;
+    const fp=row.seed?.fingerprint||parsed.round.mission_fingerprint||parsed.round.missionFingerprint;
     if(fp&&db.rounds.some(r=>r.missionFingerprint&&String(r.missionFingerprint)===String(fp)&&r.supabaseImportId)){
       continue;
     }
@@ -5070,8 +5694,9 @@ async function claimAndPersistMissionRounds(p,{currentMemberId=null}={}){
       try{writePlatoonLocal(p)}catch{}
     }
     let persist={saved:0};
-    if(claim?.created?.length){
-      persist=await persistClaimedMissionRounds(claim.created);
+    const toPersist=(claim?.created?.length?claim.created:null)||(claim?.seeds||[]).filter(x=>x?.parsed);
+    if(toPersist.length){
+      persist=await persistClaimedMissionRounds(toPersist);
       if(persist.saved){
         try{
           // Refresh personal rounds from cloud so Mission-tagged rows stick with import ids.
@@ -5082,21 +5707,42 @@ async function claimAndPersistMissionRounds(p,{currentMemberId=null}={}){
         }catch(e){console.warn('Post-claim bootstrap refresh failed',e)}
       }
     }
-    return {...claim,persist};
+    return {...claim,persist,saved:persist.saved||0};
   }finally{
     missionClaimBusy=false;
   }
 }
+/** Alias used by older sync callers. */
+async function persistClaimedPersonalRoundsFromPlatoon(p){
+  return claimAndPersistMissionRounds(p);
+}
+window.grPersistClaimedPersonalRoundsFromPlatoon=persistClaimedPersonalRoundsFromPlatoon;
+function sessionEmailFromAuth(){
+  try{
+    const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const direct=String(session?.user?.email||'').trim().toLowerCase();
+    if(direct.includes('@'))return direct;
+    const token=session?.access_token||'';
+    if(!token)return '';
+    const payload=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return String(payload.email||'').trim().toLowerCase();
+  }catch{return ''}
+}
 function resolveCurrentPlatoonMemberId(p){
   try{
     const session=typeof loadAuthSession==='function'?loadAuthSession():(typeof authSession!=='undefined'?authSession:null);
+    const members=p?.members||[];
+    const email=sessionEmailFromAuth();
+    if(email){
+      const byEmail=members.find(m=>String(m.email||'').trim().toLowerCase()===email);
+      if(byEmail)return byEmail.id;
+    }
     const meta=session?.user?.user_metadata||{};
     const names=[meta.username,meta.display_name,meta.full_name,db?.player?.username,db?.player?.name,p?.chief]
       .map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
-    const members=p?.members||[];
-    // Prefer an explicit name match (aliases included via display/roster names).
+    // Prefer an explicit name match (aliases + displayName).
     for(const m of members){
-      const vals=[m.name,...(Array.isArray(m.aliases)?m.aliases:[])]
+      const vals=[m.name,m.displayName,...(Array.isArray(m.aliases)?m.aliases:[])]
         .map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
       if(!vals.length)continue;
       if(names.some(n=>vals.some(v=>v===n||v.includes(n)||n.includes(v))))return m.id;
@@ -5104,7 +5750,7 @@ function resolveCurrentPlatoonMemberId(p){
     // Single linked Golf Recon account on this roster → that seat is "me".
     const linked=members.filter(m=>m.linked);
     if(linked.length===1)return linked[0].id;
-    return members.find(m=>m.role==='chief')?.id||null;
+    return members.find(m=>m.linked)?.id||members.find(m=>m.role==='chief')?.id||null;
   }catch{return (p?.members||[]).find(m=>m.role==='chief')?.id||null}
 }
 window.grResolveCurrentPlatoonMemberId=resolveCurrentPlatoonMemberId;
@@ -5257,7 +5903,7 @@ document.getElementById('analyzeImport').onclick=async()=>{
     }
     importStatus.textContent='Reading round data…';
     const userNote=document.getElementById('importNote').value;
-    const parserHint='18Birdies scorecard summary now shows per-hole directional misses in the Fairway Hit and Green in Regulation rows. Read those arrows hole-by-hole when visible: left, right, short, long, hit, or other/X. Preserve them on each hole as fairway_direction and gir_direction and use them to build directional distributions. A hole with 0 putts is valid and means a chip-in/holed shot from off the green; do not warn, do not invent a first-putt distance, and keep putts=0.';
+    const parserHint='18Birdies scorecard summary now shows per-hole directional misses in the Fairway Hit and Green in Regulation rows. Read those arrows hole-by-hole when visible: left, right, short, long, hit. A red X / ✕ / non-directional miss MUST be stored as short (not other, not null). Preserve fairway_direction and gir_direction and use them to build directional distributions. Never warn that an X prevents directional percentages. A hole with 0 putts is valid and means a chip-in/holed shot from off the green; do not warn, do not invent a first-putt distance, and keep putts=0.';
     const result=await callImportFunction({
       action:'parse',
       source:document.getElementById('sourceSelect').value,
@@ -5289,6 +5935,7 @@ document.getElementById('saveImport').onclick=async()=>{
   const btn=document.getElementById('saveImport');
   try{
     btn.disabled=true;
+    let targetId=existing?.id||null;
     if(existing){
       btn.textContent='Updating…';
       await callImportFunction({action:'backfill',round_id:existing.id,parsed:pendingImport});
@@ -5299,6 +5946,7 @@ document.getElementById('saveImport').onclick=async()=>{
       if(result.duplicate){
         const nowExisting=findExistingRoundForParsed(pendingImport);
         if(nowExisting){
+          targetId=nowExisting.id;
           btn.textContent='Updating…';
           await callImportFunction({action:'backfill',round_id:nowExisting.id,parsed:pendingImport});
           btn.textContent='Updated ✓';
@@ -5308,7 +5956,16 @@ document.getElementById('saveImport').onclick=async()=>{
       }else btn.textContent='Saved ✓';
     }
     await bootstrapGolfRecon();
-    setTimeout(()=>{dlg.close()},400);
+    const local=targetId
+      ? (db.rounds.find(x=>String(x.id)===String(targetId))||findRoundAfterBackfill(targetId,pendingImport))
+      : findExistingRoundForParsed(pendingImport);
+    if(local){
+      applyParsedDirectionsToRound(local,pendingImport);
+      if(ensureImpliedDirections(local))persistRoundDirectionPatch(local);
+      applyStoredRoundDirectionPatches();
+      render();
+    }
+    setTimeout(()=>{try{dlg.close()}catch{}},200);
   }catch(e){
     alert(e.message);
     btn.disabled=false;btn.textContent='Save Round';
@@ -5391,10 +6048,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=205"></script>
-  <script src="platoon-mission-core.js?v=197"></script>
-  <script src="platoon-hq-records.js?v=197"></script>
-  <script src="platoons-v15-real.js?v=201"></script>
+  <script src="platoon-recap-shared.js?v=221"></script>
+  <script src="platoon-mission-core.js?v=221"></script>
+  <script src="platoon-hq-records.js?v=221"></script>
+  <script src="platoons-v15-real.js?v=221"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>

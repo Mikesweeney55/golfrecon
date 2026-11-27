@@ -30,6 +30,7 @@ function cleanHoles(holes){
       par:finite(h?.par)?Number(h.par):null,
       score:finite(h?.score)?Number(h.score):null
     };
+    if(finite(h?.net))row.net=Number(h.net);
     // Preserve richer scorecard fields when present (personal merge / later OCR).
     for(const key of ['putts','fairway_hit','gir','chips','sand','penalties','fairway_direction','gir_direction','first_putt_distance_ft']){
       if(h?.[key]!=null&&h[key]!=='')row[key]=h[key];
@@ -37,6 +38,26 @@ function cleanHoles(holes){
     map.set(hole,row);
   }
   return [...map.values()].sort((a,b)=>a.hole-b.hole);
+}
+/** Prefer an explicit net; fall back to hole nets or gross − tournament handicap when those are present. */
+function resolveOfficialNet(r,holes=[]){
+  if(finite(r?.net))return Number(r.net);
+  if(finite(r?.net_score))return Number(r.net_score);
+  if(finite(r?.scorecard_seed?.net))return Number(r.scorecard_seed.net);
+  const list=Array.isArray(holes)?holes:[];
+  const withNet=list.filter(h=>finite(h?.net));
+  if(withNet.length>=9){
+    const scored=list.filter(h=>finite(h?.score));
+    if(!scored.length||withNet.length>=scored.length){
+      return withNet.reduce((s,h)=>s+Number(h.net),0);
+    }
+  }
+  const gross=finite(r?.gross)?Number(r.gross):(finite(r?.gross_score)?Number(r.gross_score):null);
+  const hcp=finite(r?.handicap)?Number(r.handicap)
+    :(finite(r?.course_handicap)?Number(r.course_handicap)
+    :(finite(r?.t_hcp)?Number(r.t_hcp):null));
+  if(gross!=null&&hcp!=null)return Math.round(gross-hcp);
+  return null;
 }
 
 /** Union holes by number; keep existing non-empty values, fill blanks from incoming. */
@@ -73,11 +94,15 @@ function normalizeOfficialResultRow(r){
     const derived=holes.filter(h=>finite(h.par)&&finite(h.score)&&h.score<=h.par-2).length;
     if(derived>0)eagleCount=derived;
   }
+  const handicap=finite(r?.handicap)?Number(r.handicap)
+    :(finite(r?.course_handicap)?Number(r.course_handicap)
+    :(finite(r?.t_hcp)?Number(r.t_hcp):null));
+  const gross=finite(r?.gross)?Number(r.gross):(finite(r?.gross_score)?Number(r.gross_score):null);
   const row={
     player_name:String(r?.player_name||'').trim()||'Player',
-    handicap:finite(r?.handicap)?Number(r.handicap):null,
-    gross:finite(r?.gross)?Number(r.gross):null,
-    net:finite(r?.net)?Number(r.net):null,
+    handicap,
+    gross,
+    net:resolveOfficialNet({...r,gross,handicap},holes),
     finish_position:finite(r?.finish_position)?Number(r.finish_position):null,
     raw_points:finite(r?.raw_points)?Number(r.raw_points):null,
     eagle_count:eagleCount
@@ -87,6 +112,8 @@ function normalizeOfficialResultRow(r){
   if(r?.hole_detail_saved_at)row.hole_detail_saved_at=r.hole_detail_saved_at;
   if(r?.hole_detail_source_name)row.hole_detail_source_name=r.hole_detail_source_name;
   if(r?.hole_detail_canonical_id)row.hole_detail_canonical_id=r.hole_detail_canonical_id;
+  if(r?.scorecard_seed&&typeof r.scorecard_seed==='object')row.scorecard_seed=clone(r.scorecard_seed);
+  if(r?.personal_round_id)row.personal_round_id=r.personal_round_id;
   return row;
 }
 
@@ -264,12 +291,13 @@ function attachScorecardSeeds(mission,p){
     const holes=Array.isArray(r.holes)?cleanHoles(r.holes):[];
     const priorHoles=Array.isArray(r.scorecard_seed?.holes)?cleanHoles(r.scorecard_seed.holes):[];
     const mergedHoles=holes.length?holes:priorHoles;
+    // Leaderboard-only rows (gross/net/points) still get a seed so cadets can claim Rounds.
     const hasTotals=finite(r.gross)||finite(r.net)||finite(r.raw_points)||mergedHoles.length>0;
     if(!hasTotals)continue;
     const scoreKey=finite(r.gross)?Number(r.gross):(finite(r.net)?Number(r.net):(finite(r.raw_points)?Number(r.raw_points):''));
-    r.scorecard_seed={
+    const next={
       member_id:member.id,
-      member_name:member.name||r.player_name,
+      member_name:(typeof window.grMemberLabel==='function'?window.grMemberLabel(member):null)||member.name||r.player_name,
       mission_id:mission.id,
       mission_title:mission.title||mission.locationName||'Mission',
       date:mission.date||'',
@@ -285,6 +313,10 @@ function attachScorecardSeeds(mission,p){
       fingerprint:missionRoundFingerprint(mission,member.id,scoreKey),
       updated_at:new Date().toISOString()
     };
+    const prev=r.scorecard_seed&&typeof r.scorecard_seed==='object'?r.scorecard_seed:null;
+    // Prefer richer hole detail when re-attaching.
+    if(prev&&Array.isArray(prev.holes)&&prev.holes.length&&!holes.length)continue;
+    r.scorecard_seed=next;
   }
   return mission;
 }
@@ -294,16 +326,18 @@ function ensurePlatoonScorecardSeeds(p){
   let seeded=0;
   for(const m of (p?.missions||[])){
     if(!m||m.type==='war')continue;
+    if(!Array.isArray(m.results)||!m.results.length)continue;
     attachScorecardSeeds(m,p);
     seeded+=(m.results||[]).filter(r=>r?.scorecard_seed?.fingerprint).length;
   }
   return {seeded};
 }
+/** Alias used by bootstrap / sync callers. */
+function hydrateAllScorecardSeeds(p){
+  ensurePlatoonScorecardSeeds(p);
+  return p;
+}
 
-/**
- * Claim matching mission scorecard seeds into the signed-in user's personal db.rounds.
- * Never overwrites richer personal data — fills blanks only.
- */
 function resolveCurrentPlatoonMemberId(p){
   if(typeof window.grResolveCurrentPlatoonMemberId==='function'){
     try{const id=window.grResolveCurrentPlatoonMemberId(p);if(id)return id}catch{}
@@ -322,11 +356,12 @@ function resolveCurrentPlatoonMemberId(p){
  * Never overwrites richer personal data — fills blanks only.
  */
 function claimMissionScorecardsIntoPersonalDb(p,{currentMemberId=null}={}){
-  if(typeof window.grMergeMissionSeedIntoPersonal!=='function')return {claimed:0};
+  if(typeof window.grMergeMissionSeedIntoPersonal!=='function')return {claimed:0,seeds:[],created:[]};
+  hydrateAllScorecardSeeds(p);
   const selfId=currentMemberId||resolveCurrentPlatoonMemberId(p);
-  if(!selfId)return {claimed:0,skipped:'no-member'};
-  ensurePlatoonScorecardSeeds(p);
+  if(!selfId)return {claimed:0,skipped:'no-member',seeds:[],created:[]};
   let claimed=0;
+  const seeds=[];
   const created=[];
   for(const m of (p?.missions||[])){
     if(m?.type==='war')continue;
@@ -337,11 +372,13 @@ function claimMissionScorecardsIntoPersonalDb(p,{currentMemberId=null}={}){
       if(out?.claimed||out?.merged){
         claimed++;
         if(out.roundId)r.personal_round_id=String(out.roundId);
+        const item={seed,roundId:out.roundId||null,parsed:out.parsed||null};
+        seeds.push(item);
         if(out.created&&out.parsed)created.push({seed,parsed:out.parsed,roundId:out.roundId});
       }
     }
   }
-  return {claimed,memberId:selfId,created};
+  return {claimed,memberId:selfId,seeds,created};
 }
 
 /**
@@ -388,6 +425,21 @@ function readOnlyMission(mission){
 /** Standings / highlights / AAR input = official results only (Phase 1 renderer consumes this). */
 function officialResultsForRecap(mission){
   return normalizeOfficialResults(mission?.results||[]);
+}
+
+/**
+ * Fill blank official net values from aliases / hole nets / gross−hcp already on the row.
+ * Returns true when any row changed (caller may persist). Does not invent handicaps.
+ */
+function hydrateMissingOfficialNets(mission){
+  if(!mission||!Array.isArray(mission.results)||!mission.results.length)return false;
+  let changed=false;
+  mission.results=mission.results.map(r=>{
+    const next=normalizeOfficialResultRow(r);
+    if(Number(r?.net)!==Number(next.net)||Number(r?.handicap)!==Number(next.handicap)||Number(r?.gross)!==Number(next.gross))changed=true;
+    return {...r,...next};
+  });
+  return changed;
 }
 
 /* ── Phase 3–5 workflow helpers (persist extras in notes tags; no DB schema change) ── */
@@ -706,8 +758,10 @@ window.grMissionUid=uid;
 window.grFindMission=findMission;
 window.grCleanHoles=cleanHoles;
 window.grMergeHolesRich=mergeHolesRich;
+window.grResolveOfficialNet=resolveOfficialNet;
 window.grNormalizeOfficialResultRow=normalizeOfficialResultRow;
 window.grNormalizeOfficialResults=normalizeOfficialResults;
+window.grHydrateMissingOfficialNets=hydrateMissingOfficialNets;
 window.grPrepareMissionDraft=prepareMissionDraft;
 window.grUpsertMission=upsertMission;
 window.grSetOfficialResults=setOfficialResults;
@@ -715,6 +769,7 @@ window.grLockOfficialResults=lockOfficialResults;
 window.grMergeHoleDetailsOntoOfficial=mergeHoleDetailsOntoOfficial;
 window.grAttachScorecardSeeds=attachScorecardSeeds;
 window.grEnsurePlatoonScorecardSeeds=ensurePlatoonScorecardSeeds;
+window.grHydrateAllScorecardSeeds=hydrateAllScorecardSeeds;
 window.grClaimMissionScorecardsIntoPersonalDb=claimMissionScorecardsIntoPersonalDb;
 window.grMissionRoundFingerprint=missionRoundFingerprint;
 window.grBuildCompletedMissionFromImport=buildCompletedMissionFromImport;

@@ -28,36 +28,39 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Apply platoons-v4 hq_meta migration
+      - name: Apply platoons SQL migrations (v4 hq_meta + v5 invite_email)
         run: |
           set -euo pipefail
-          SQL_FILE=supabase/platoons-v4-hq-meta.sql
-          # Prefer Management API (PAT) so we do not need a stored postgres password.
-          # Fall back to CLI db query when SUPABASE_DB_PASSWORD is present.
-          BODY=$(python3 - <<'PY'
+          apply_sql() {
+            local SQL_FILE="$1"
+            local LABEL="$2"
+            BODY=$(python3 - <<PY
           import json, pathlib
-          print(json.dumps({"query": pathlib.Path("supabase/platoons-v4-hq-meta.sql").read_text()}))
+          print(json.dumps({"query": pathlib.Path("$SQL_FILE").read_text()}))
           PY
-          )
-          HTTP=$(curl -sS -o /tmp/hqmeta-migrate.json -w '%{http_code}' \
-            -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/database/query" \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$BODY" || true)
-          echo "Management API HTTP $HTTP"
-          cat /tmp/hqmeta-migrate.json || true
-          if [ "$HTTP" = "201" ] || [ "$HTTP" = "200" ]; then
-            echo "hq_meta migration applied via Management API"
-            exit 0
-          fi
-          if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
-            echo "Management API failed; retrying with supabase db query + DB password"
-            export PGPASSWORD="$SUPABASE_DB_PASSWORD"
-            supabase db query --remote="$SUPABASE_PROJECT_ID" --yes -f "$SQL_FILE"
-            exit 0
-          fi
-          echo "::error::Could not apply hq_meta migration. Paste supabase/platoons-v4-hq-meta.sql in the Supabase SQL editor, or add SUPABASE_DB_PASSWORD repo secret."
-          exit 1
+            )
+            HTTP=$(curl -sS -o "/tmp/${LABEL}-migrate.json" -w '%{http_code}' \
+              -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/database/query" \
+              -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "$BODY" || true)
+            echo "$LABEL Management API HTTP $HTTP"
+            cat "/tmp/${LABEL}-migrate.json" || true
+            if [ "$HTTP" = "201" ] || [ "$HTTP" = "200" ]; then
+              echo "$LABEL migration applied via Management API"
+              return 0
+            fi
+            if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
+              echo "$LABEL Management API failed; retrying with supabase db query + DB password"
+              export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+              supabase db query --remote="$SUPABASE_PROJECT_ID" --yes -f "$SQL_FILE"
+              return 0
+            fi
+            echo "::error::Could not apply $LABEL. Paste $SQL_FILE in the Supabase SQL editor, or add SUPABASE_DB_PASSWORD repo secret."
+            return 1
+          }
+          apply_sql supabase/platoons-v4-hq-meta.sql hqmeta
+          apply_sql supabase/platoons-v5-invite-email.sql inviteemail
 
   deploy:
     runs-on: ubuntu-latest

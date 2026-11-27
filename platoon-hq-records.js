@@ -19,7 +19,8 @@ const MODES=['combined','automatic','manual'];
 function getP(){try{return loadPlatoonLocal()}catch{return null}}
 function canon(p,raw){return typeof window.grCanonicalMember==='function'?window.grCanonicalMember(p,raw):null}
 function memberById(p,id){return (p?.members||[]).find(m=>String(m.id)===String(id))||null}
-function displayName(p,raw){return typeof window.grDisplayName==='function'?window.grDisplayName(p,raw):(canon(p,raw)?.name||raw||'Player')}
+function memberLabel(m){return typeof window.grMemberLabel==='function'?window.grMemberLabel(m):(String(m?.displayName||'').trim()||String(m?.name||'').trim()||'Player')}
+function displayName(p,raw){return typeof window.grDisplayName==='function'?window.grDisplayName(p,raw):(canon(p,raw)?memberLabel(canon(p,raw)):(raw||'Player'))}
 function aliasesOf(m){return typeof window.grAliasesOf==='function'?window.grAliasesOf(m):[]}
 function cleanHoles(holes){
   if(typeof window.grCleanHoles==='function')return window.grCleanHoles(holes);
@@ -41,8 +42,80 @@ function defaultHqMeta(){
     eagleDetails:[],
     suppressedAuto:[],
     constitution:'',
-    guestPool:[]
+    guestPool:[],
+    rosterEmails:{},
+    rosterProfiles:{},
+    blogPosts:[]
   };
+}
+const BLOG_TONES=new Set(['trash','flex','recap','prop','chatter']);
+function normalizeBlogReply(r){
+  if(!r||typeof r!=='object')return null;
+  const body=String(r.body||'').trim().slice(0,400);
+  if(!body)return null;
+  return {
+    id:String(r.id||uid('br')),
+    authorId:String(r.authorId||'').trim(),
+    authorName:String(r.authorName||'').trim()||'Cadet',
+    body,
+    createdAt:r.createdAt||new Date().toISOString()
+  };
+}
+function normalizeBlogReactions(raw){
+  const out={fire:[],dead:[],salute:[],cap:[]};
+  if(!raw||typeof raw!=='object')return out;
+  for(const key of Object.keys(out)){
+    const arr=Array.isArray(raw[key])?raw[key]:[];
+    out[key]=[...new Set(arr.map(x=>String(x||'').trim()).filter(Boolean))].slice(0,40);
+  }
+  return out;
+}
+function normalizeBlogPost(post){
+  if(!post||typeof post!=='object')return null;
+  const body=String(post.body||'').trim().slice(0,800);
+  const tone=BLOG_TONES.has(post.tone)?post.tone:'chatter';
+  const replies=Array.isArray(post.replies)?post.replies.map(normalizeBlogReply).filter(Boolean).slice(0,40):[];
+  const photoData=(typeof post.photoData==='string'&&post.photoData.startsWith('data:'))?post.photoData:'';
+  const hasPhoto=!!post.hasPhoto||!!photoData;
+  return {
+    id:String(post.id||uid('bp')),
+    authorId:String(post.authorId||'').trim(),
+    authorName:String(post.authorName||'').trim()||'Cadet',
+    body,
+    tone,
+    hasPhoto,
+    photoId:hasPhoto?String(post.photoId||post.id||''):'',
+    // Keep bytes on the post so Locker photos survive sync/key flips; side storage is a backup.
+    photoData,
+    createdAt:post.createdAt||new Date().toISOString(),
+    updatedAt:post.updatedAt||post.createdAt||new Date().toISOString(),
+    pinned:!!post.pinned,
+    reactions:normalizeBlogReactions(post.reactions),
+    replies
+  };
+}
+function normalizeRosterEmails(raw){
+  const out={};
+  if(!raw||typeof raw!=='object')return out;
+  for(const [id,email] of Object.entries(raw)){
+    const key=String(id||'').trim();
+    const em=String(email||'').trim().toLowerCase();
+    if(key&&em.includes('@'))out[key]=em;
+  }
+  return out;
+}
+function normalizeRosterProfiles(raw){
+  const out={};
+  if(!raw||typeof raw!=='object')return out;
+  for(const [id,prof] of Object.entries(raw)){
+    const key=String(id||'').trim();
+    if(!key||!prof||typeof prof!=='object')continue;
+    const fullName=String(prof.fullName||prof.name||'').trim();
+    const displayName=String(prof.displayName||'').trim();
+    if(!fullName&&!displayName)continue;
+    out[key]={fullName,displayName};
+  }
+  return out;
 }
 function normalizeHqMeta(raw){
   const d=defaultHqMeta(),x=(raw&&typeof raw==='object')?raw:{};
@@ -54,7 +127,33 @@ function normalizeHqMeta(raw){
   d.suppressedAuto=Array.isArray(x.suppressedAuto)?x.suppressedAuto.filter(s=>s&&s.fingerprint):[];
   d.constitution=String(x.constitution||'').trim();
   d.guestPool=Array.isArray(x.guestPool)?x.guestPool.map(normalizeGuestPoolEntry).filter(Boolean):[];
+  d.rosterEmails=normalizeRosterEmails(x.rosterEmails);
+  d.rosterProfiles=normalizeRosterProfiles(x.rosterProfiles);
+  d.blogPosts=Array.isArray(x.blogPosts)?x.blogPosts.map(normalizeBlogPost).filter(Boolean).slice(0,120):[];
   return d;
+}
+function blogPostsOf(p){return hqMetaOf(p).blogPosts||[]}
+function mergeBlogPosts(serverPosts,localPosts){
+  const byId=new Map();
+  for(const post of [...(serverPosts||[]),...(localPosts||[])]){
+    if(!post?.id)continue;
+    const prev=byId.get(post.id);
+    if(!prev){byId.set(post.id,post);continue}
+    const newer=String(post.updatedAt||'')>=String(prev.updatedAt||'')?post:prev;
+    const older=newer===post?prev:post;
+    const photoData=newer.photoData||older.photoData||'';
+    byId.set(post.id,{
+      ...newer,
+      photoData,
+      hasPhoto:!!(newer.hasPhoto||older.hasPhoto||photoData),
+      photoId:newer.photoId||older.photoId||(photoData?newer.id:''),
+      reactions:newer.reactions||older.reactions,
+      replies:(Array.isArray(newer.replies)&&newer.replies.length>=(older.replies||[]).length)?newer.replies:older.replies
+    });
+  }
+  return [...byId.values()]
+    .sort((a,b)=>Number(b.pinned)-Number(a.pinned)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')))
+    .slice(0,120);
 }
 function normalizeGuestPoolEntry(g){
   if(!g||typeof g!=='object')return null;
@@ -179,7 +278,7 @@ function writeHqMeta(p,meta){
 }
 function hqMetaWeight(meta){
   const m=normalizeHqMeta(meta);
-  return (m.eagleBalances?.length||0)+(m.eagleDetails?.length||0)+(m.records?.length||0);
+  return (m.eagleBalances?.length||0)+(m.eagleDetails?.length||0)+(m.records?.length||0)+(m.blogPosts?.length||0);
 }
 function mergeHqMetaPreserve(serverP,localP){
   if(!serverP)return localP||serverP;
@@ -194,7 +293,7 @@ function mergeHqMetaPreserve(serverP,localP){
   }else{
     serverP.hqMeta=serverMeta;
   }
-  // Always preserve Constitution + Guest Pool text/lists (do not wipe on lagging server).
+  // Always preserve Constitution + Guest Pool + Blog + roster emails (do not wipe on lagging server).
   const out=normalizeHqMeta(serverP.hqMeta);
   if(localMeta){
     if((localMeta.constitution||'').length>=(out.constitution||'').length)out.constitution=localMeta.constitution||out.constitution;
@@ -207,6 +306,9 @@ function mergeHqMetaPreserve(serverP,localP){
       }else byId.set(g.id,g);
     }
     out.guestPool=[...byId.values()];
+    out.blogPosts=mergeBlogPosts(out.blogPosts,localMeta.blogPosts);
+    out.rosterEmails={...(localMeta.rosterEmails||{}),...(out.rosterEmails||{})};
+    out.rosterProfiles={...(localMeta.rosterProfiles||{}),...(out.rosterProfiles||{})};
   }
   serverP.hqMeta=out;
   return serverP;
@@ -449,7 +551,7 @@ function renderStandingsBubble(p,standingRows){
   const lead=active[0];
   const hero=lead?`<div class="gr-eagle-spotlight gr-standings-spotlight"><div class="gr-eagle-spotlight-label">Cup lead</div><div class="gr-eagle-spotlight-name">${esc(lead.member?.name||lead.name)}</div><div class="gr-eagle-spotlight-count">${lead.points}<span> /rnd</span></div><div class="gr-standings-hero-meta">${Number(lead.totalPoints||0)} 18Birdies · ${Number(lead.played||0)} round${Number(lead.played)===1?'':'s'}</div></div>`:'';
   const rows=active.length
-    ? active.map((x,i)=>`<div class="gr155-recap-row gr-standings-row ${i===0?'is-lead':''}"><span><b>${i+1}</b> ${esc(x.member?.name||x.name)}<small class="gr-standings-meta">${Number(x.totalPoints||0)} pts · ${Number(x.played||0)} rnd</small></span><span class="gr-standings-pts">${x.points}</span></div>`).join('')
+    ? active.map((x,i)=>`<div class="gr155-recap-row gr-standings-row ${i===0?'is-lead':''}"><span><b>${i+1}</b> ${esc(x.member?memberLabel(x.member):(x.name||'Player'))}<small class="gr-standings-meta">${Number(x.totalPoints||0)} pts · ${Number(x.played||0)} rnd</small></span><span class="gr-standings-pts">${x.points}</span></div>`).join('')
     : '<div class="gr155-empty">No My Time ⛳ Points yet — finish a Mission to open the cup.</div>';
   return `<section class="gr155-recap-block gr-honor-card gr-honor-standings-card" data-gr-hq="standings">${lockup}${hero}${rows}</section>`;
 }
@@ -1029,9 +1131,9 @@ function detailStatsLocal(r){
   return {holes,birds,eagles};
 }
 function platoonRecapMarkup(p){
-  const complete=(p.missions||[]).filter(m=>m.type!=='war'&&m.status==='completed');
+  const complete=(p.missions||[]).filter(m=>m&&m.type!=='war'&&m.status==='completed');
   const cup=typeof window.grMyTimePointsStandings==='function'?window.grMyTimePointsStandings(p):{rows:[]};
-  const map=new Map((p.members||[]).map(m=>[m.id,{member:m,points:0,played:0,totalPoints:0,birds:0,eagles:0,wins:0}]));
+  const map=new Map((p.members||[]).filter(m=>m&&m.id!=null).map(m=>[m.id,{member:m,points:0,played:0,totalPoints:0,birds:0,eagles:0,wins:0}]));
   for(const c of (cup.rows||[])){
     if(!map.has(c.id))continue;
     const x=map.get(c.id);
@@ -1114,6 +1216,9 @@ window.grUpsertGuestPool=upsertGuestPool;
 window.grConstitutionOf=constitutionOf;
 window.grSetConstitution=setConstitution;
 window.grOpenConstitutionEditor=openConstitutionEditor;
+window.grBlogPostsOf=blogPostsOf;
+window.grNormalizeBlogPost=normalizeBlogPost;
+window.grMergeBlogPosts=mergeBlogPosts;
 window.grHqRecordsReady=true;
 
 installStyles();
