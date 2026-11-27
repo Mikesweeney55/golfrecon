@@ -1715,7 +1715,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=231">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=232">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -1937,12 +1937,43 @@ const SUPABASE_PUBLISHABLE_KEY='sb_publishable_iH2PBfgEpQ4ZhJ-x410_0Q_wqkw3yvg';
 
 const AUTH_STORAGE_KEY='golfreconAuthSessionV1';
 const AUTH_USER_KEY='golfreconAuthUserV1';
+const DB_CACHE_KEY='golfreconDbCacheV1';
 let authSession=null;
 let authMode='signin';
 
 let pendingImport=null;
 
 const db = {player:{id:null,name:"Golfer",username:"",handicap:null},swingThoughts:{driver:[],irons:[],chipping:[],putting:[]},courses:[],rounds:[],puttingDetails:[],clubStats:[]};
+function saveDbCache(){
+  try{
+    const uid=sessionUserId(authSession||loadAuthSession())||localStorage.getItem(AUTH_USER_KEY)||'';
+    localStorage.setItem(DB_CACHE_KEY,JSON.stringify({
+      uid,savedAt:Date.now(),
+      player:db.player,swingThoughts:db.swingThoughts,
+      courses:db.courses,rounds:db.rounds,
+      puttingDetails:db.puttingDetails,clubStats:db.clubStats
+    }));
+  }catch{}
+}
+function loadDbCache(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(DB_CACHE_KEY)||'null');
+    if(!raw||typeof raw!=='object')return null;
+    const uid=sessionUserId(authSession||loadAuthSession())||localStorage.getItem(AUTH_USER_KEY)||'';
+    if(raw.uid&&uid&&String(raw.uid)!==String(uid))return null;
+    return raw;
+  }catch{return null}
+}
+function applyDbCache(cache){
+  if(!cache)return false;
+  if(cache.player)db.player=cache.player;
+  if(cache.swingThoughts)db.swingThoughts=cache.swingThoughts;
+  if(Array.isArray(cache.courses))db.courses=cache.courses;
+  if(Array.isArray(cache.rounds))db.rounds=cache.rounds;
+  if(Array.isArray(cache.puttingDetails))db.puttingDetails=cache.puttingDetails;
+  if(Array.isArray(cache.clubStats))db.clubStats=cache.clubStats;
+  return (db.courses||[]).length>0;
+}
 
 let state = {view:'pregame', selectedCourseId:'four-oaks-white-18-holes', roundStat:'score', roundFilter:'18', roundCourseId:'four-oaks-white-18-holes', selectedRoundId:null, gameCourseId:'four-oaks-white-18-holes', gameRoundLimit:'all', puttingCourse:'all', pregameChats:{}, chatBusy:false, coursePreviewHole:1, coursePreviewReturnView:'pregame', coursePreviewLoading:false, coursePreviewError:null, coursePreviewShowAll:false, coursePreviewCourseId:null};
 const app = document.getElementById('app');
@@ -5207,6 +5238,7 @@ function resetUserScopedData(){
   db.courses=[];db.rounds=[];db.puttingDetails=[];db.clubStats=[];
   state.pregameChats={};state.chatBusy=false;state.selectedRoundId=null;
   pendingImport=null;pendingBackfill=null;
+  try{localStorage.removeItem(DB_CACHE_KEY)}catch{}
 }
 function saveAuthSession(session){
   authSession=session||null;
@@ -5345,77 +5377,107 @@ function withTimeout(promise,ms,label='Request'){
   const timeout=new Promise((_,rej)=>{t=setTimeout(()=>rej(new Error(`${label} timed out`)),ms)});
   return Promise.race([promise,timeout]).finally(()=>{if(t)clearTimeout(t)});
 }
+async function fetchBootstrapPayload(){
+  // One retry — cold edge functions + cellular often need a second try.
+  let lastErr=null;
+  for(const ms of [45000,60000]){
+    try{
+      return await withTimeout(callImportFunction({action:'bootstrap'}),ms,'Sync');
+    }catch(e){
+      lastErr=e;
+      console.warn('Bootstrap attempt failed',e);
+    }
+  }
+  throw lastErr||new Error('Sync timed out');
+}
+function finishBootstrapUi(syncLabel='Synced',syncOk=true){
+  applyStoredRoundDirectionPatches();
+  repairKnownCourseLabels();
+  ensureCoursesForOrphanRounds();
+  consolidateDuplicateCourses();
+  try{scrubCorruptRoundTotals()}catch(e){console.warn('Corrupt round scrub failed',e)}
+  setTopbarDisplayName(db.player.username||db.player.name||'golfer');
+  let savedCourse=null;
+  try{savedCourse=localStorage.getItem('golfreconSelectedCourseId')}catch{}
+  if(savedCourse && db.courses.some(c=>c&&String(c.id)===String(savedCourse))){
+    state.selectedCourseId=savedCourse;
+  }
+  ensureSelectedCourse();
+  refreshGlobalCourseSelector();
+  const pill=document.getElementById('syncPill'),txt=document.getElementById('syncText');
+  if(pill){pill.classList.remove('ok','err');pill.classList.add(syncOk?'ok':'err')}
+  if(txt)txt.textContent=syncLabel;
+  render();
+  try{
+    const p=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
+    if(p&&typeof claimAndPersistMissionRounds==='function'){
+      claimAndPersistMissionRounds(p).then(claim=>{
+        if(claim?.claimed||claim?.saved)try{render()}catch{}
+      }).catch(e=>console.warn('Mission → Rounds claim skipped',e));
+    }
+  }catch(e){console.warn('Mission → Rounds claim skipped',e)}
+  try{syncPlatoonFromServer().then(()=>{
+    try{
+      const p=loadPlatoonLocal();
+      const meId=typeof resolveCurrentPlatoonMemberId==='function'?resolveCurrentPlatoonMemberId(p):null;
+      const me=(p?.members||[]).find(m=>String(m.id)===String(meId));
+      const label=(typeof window.grMemberLabel==='function'&&me)?window.grMemberLabel(me):'';
+      if(label&&label!=='Player')setTopbarDisplayName(label);
+    }catch{}
+  }).catch(e=>console.warn('Platoon seat claim deferred',e))}catch(e){console.warn('Platoon seat claim deferred',e)}
+}
 async function bootstrapGolfRecon(){
   const pill=document.getElementById('syncPill'),txt=document.getElementById('syncText');
-  app.innerHTML=`<div class="card bootstrap-card"><div class="bootstrap-spinner"></div><strong>Loading GolfRecon</strong><div class="muted">Syncing your golf database…</div></div>`;
+  // Open from last good snapshot immediately so phones aren't stuck on a blank sync screen.
+  const cached=loadDbCache();
+  const hadCache=applyDbCache(cached);
+  if(hadCache){
+    try{finishBootstrapUi('Syncing…',true)}catch{}
+  }else{
+    app.innerHTML=`<div class="card bootstrap-card"><div class="bootstrap-spinner"></div><strong>Loading GolfRecon</strong><div class="muted">Syncing your golf database…</div></div>`;
+  }
   try{
     if(txt)txt.textContent='Syncing';
     if(pill)pill.classList.remove('ok','err');
-    const data=await withTimeout(callImportFunction({action:'bootstrap'}),25000,'Sync');
+    const data=await fetchBootstrapPayload();
     db.player=data.player||db.player;
     db.swingThoughts=data.swingThoughts||db.swingThoughts;
     db.courses=data.courses||[];
     db.rounds=data.rounds||[];
     db.puttingDetails=data.puttingDetails||[];
     db.clubStats=data.clubStats||[];
-    try{const rawImports=await withTimeout(callImportFunction({action:'list'}),12000,'Import list');applyDirectionalDataFromImports(rawImports.imports||[])}catch(e){
+    saveDbCache();
+    finishBootstrapUi('Synced',true);
+    // Directional import list is nice-to-have — never block first paint.
+    callImportFunction({action:'list'}).then(rawImports=>{
+      try{
+        applyDirectionalDataFromImports(rawImports.imports||[]);
+        applyStoredRoundDirectionPatches();
+        saveDbCache();
+        if(state.view==='rounds'||state.view==='pregame')render();
+      }catch(e){console.warn('Directional import hydration failed',e)}
+    }).catch(e=>{
       console.warn('Directional import hydration failed',e);
       applyStoredRoundDirectionPatches();
-    }
-    applyStoredRoundDirectionPatches();
-    repairKnownCourseLabels();
-    ensureCoursesForOrphanRounds();
-    consolidateDuplicateCourses();
-    try{await scrubCorruptRoundTotals()}catch(e){console.warn('Corrupt round scrub failed',e)}
-    setTopbarDisplayName(db.player.username||db.player.name||'golfer');
-
-    let savedCourse=null;
-    try{savedCourse=localStorage.getItem('golfreconSelectedCourseId')}catch{}
-    if(savedCourse && db.courses.some(c=>c&&String(c.id)===String(savedCourse))){
-      state.selectedCourseId=savedCourse;
-    }
-    ensureSelectedCourse();
-
-    refreshGlobalCourseSelector();
-    if(pill)pill.classList.add('ok');
-    if(txt)txt.textContent='Synced';
-    // Paint the app first — Mission claim must not block first paint.
-    render();
-    try{
-      const p=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
-      if(p&&typeof claimAndPersistMissionRounds==='function'){
-        claimAndPersistMissionRounds(p).then(claim=>{
-          if(claim?.claimed||claim?.saved)try{render()}catch{}
-        }).catch(e=>console.warn('Mission → Rounds claim skipped',e));
-      }
-    }catch(e){console.warn('Mission → Rounds claim skipped',e)}
-    // Claim My Time seat on login — don't wait until the player opens Platoons.
-    try{syncPlatoonFromServer().then(()=>{
-      try{
-        const p=loadPlatoonLocal();
-        const meId=typeof resolveCurrentPlatoonMemberId==='function'?resolveCurrentPlatoonMemberId(p):null;
-        const me=(p?.members||[]).find(m=>String(m.id)===String(meId));
-        const label=(typeof window.grMemberLabel==='function'&&me)?window.grMemberLabel(me):'';
-        if(label&&label!=='Player')setTopbarDisplayName(label);
-      }catch{}
-    }).catch(e=>console.warn('Platoon seat claim deferred',e))}catch(e){console.warn('Platoon seat claim deferred',e)}
+    });
     return data;
   }catch(e){
+    console.error(e);
+    if(hadCache||applyDbCache(loadDbCache())){
+      try{
+        finishBootstrapUi('Offline',false);
+        app.insertAdjacentHTML('afterbegin',`<div class="card bootstrap-card" style="margin-bottom:12px"><strong>Sync paused</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:8px">Showing last data on this device. Tap Retry when you have a better connection.</div><button class="button primary" style="margin-top:12px" type="button" id="bootRetry">Retry sync</button></div>`);
+        document.getElementById('bootRetry')?.addEventListener('click',()=>bootstrapGolfRecon());
+        return null;
+      }catch{}
+    }
     if(pill)pill.classList.add('err');
     if(txt)txt.textContent='Database error';
-    // Prefer a usable shell over a dead end when sync fails (stale token / slow phone).
+    app.innerHTML=`<div class="card bootstrap-card"><strong>Could not load GolfRecon</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:10px">Check your connection, then retry. First sync on cellular can take up to a minute.</div><button class="button primary" style="margin-top:14px" type="button" id="bootRetry">Retry</button> <button class="button secondary" style="margin-top:14px" type="button" id="bootSignOut">Sign out</button></div>`;
     try{
-      if((db.courses||[]).length){
-        ensureSelectedCourse();
-        refreshGlobalCourseSelector();
-        render();
-        app.insertAdjacentHTML('afterbegin',`<div class="card bootstrap-card" style="margin-bottom:12px"><strong>Sync paused</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:8px">Showing last data on this device. Pull to refresh or sign in again.</div></div>`);
-        return null;
-      }
+      document.getElementById('bootRetry')?.addEventListener('click',()=>bootstrapGolfRecon());
+      document.getElementById('bootSignOut')?.addEventListener('click',()=>{try{saveAuthSession(null)}catch{};location.reload()});
     }catch{}
-    app.innerHTML=`<div class="card bootstrap-card"><strong>Could not load GolfRecon</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:10px">Hard-refresh, or sign out and back in. If it keeps failing, tell Chief.</div><button class="button primary" style="margin-top:14px" type="button" onclick="location.reload()">Retry</button> <button class="button secondary" style="margin-top:14px" type="button" id="bootSignOut">Sign out</button></div>`;
-    try{document.getElementById('bootSignOut')?.addEventListener('click',()=>{try{saveAuthSession(null)}catch{};location.reload()})}catch{}
-    console.error(e);
     return null;
   }
 }
@@ -6292,10 +6354,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=231"></script>
-  <script src="platoon-mission-core.js?v=231"></script>
-  <script src="platoon-hq-records.js?v=231"></script>
-  <script src="platoons-v15-real.js?v=231"></script>
+  <script src="platoon-recap-shared.js?v=232"></script>
+  <script src="platoon-mission-core.js?v=232"></script>
+  <script src="platoon-hq-records.js?v=232"></script>
+  <script src="platoons-v15-real.js?v=232"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
