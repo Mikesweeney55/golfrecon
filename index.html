@@ -1533,16 +1533,18 @@ dialog .dialog-head{
 body{background:#070806!important}
 body::before,body::after{opacity:0!important}
 .app-shell{position:relative;z-index:1}
-/* Keep sign-in fixed over atmosphere — relative z-index:1 made phones look blank. */
+/* Keep sign-in fixed over atmosphere — but never lock display with !important
+   (that blocked showGolfRecon from hiding the gate after a successful sign-in). */
 .auth-gate{
   position:fixed!important;
   inset:0!important;
   z-index:200!important;
-  display:grid!important;
+  display:grid;
   place-items:center;
   background:transparent!important;
   animation:grRiseIn .7s ease both;
 }
+.auth-gate.is-hidden{display:none!important}
 .auth-card{
   border:1px solid rgba(212,175,106,.28)!important;
   background:linear-gradient(165deg,rgba(28,26,18,.82),rgba(12,14,11,.9))!important;
@@ -1713,7 +1715,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=230">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=231">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -5293,7 +5295,9 @@ async function callImportFunction(payload,retry=true){
 }
 function showAuth(mode='signin',message='',kind=''){
   authMode=mode;
-  document.getElementById('authGate').style.display='grid';
+  const gate=document.getElementById('authGate');
+  gate.classList.remove('is-hidden');
+  gate.style.display='grid';
   document.getElementById('appShell').style.display='none';
   const signup=mode==='signup',recovery=mode==='recovery';
   document.getElementById('usernameWrap').style.display=signup?'grid':'none';
@@ -5311,7 +5315,9 @@ function showAuth(mode='signin',message='',kind=''){
   msg.textContent=message;msg.className=`auth-message ${kind||''}`;
 }
 function showGolfRecon(){
-  document.getElementById('authGate').style.display='none';
+  const gate=document.getElementById('authGate');
+  gate.classList.add('is-hidden');
+  gate.style.display='none';
   document.getElementById('appShell').style.display='';
 }
 async function initializeAuth(){
@@ -6286,10 +6292,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=230"></script>
-  <script src="platoon-mission-core.js?v=230"></script>
-  <script src="platoon-hq-records.js?v=230"></script>
-  <script src="platoons-v15-real.js?v=230"></script>
+  <script src="platoon-recap-shared.js?v=231"></script>
+  <script src="platoon-mission-core.js?v=231"></script>
+  <script src="platoon-hq-records.js?v=231"></script>
+  <script src="platoons-v15-real.js?v=231"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
