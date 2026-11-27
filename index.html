@@ -1715,7 +1715,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=235">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=236">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -3892,6 +3892,14 @@ async function syncPlatoonFromServer(){
       if(typeof window.grHydrateAllScorecardSeeds==='function')window.grHydrateAllScorecardSeeds(merged);
       window.__grHqMetaServer=!!out.platoon.hqMetaSupported;
       writePlatoonLocal(merged);
+      // Phone (or any device) that still has locker photo bytes the server lacks — push so desktop can see them.
+      try{
+        if(typeof window.grLockerPhotosNeedServerPush==='function'
+          &&window.grLockerPhotosNeedServerPush(merged,out.platoon)
+          &&typeof queuePlatoonServerSave==='function'){
+          queuePlatoonServerSave(merged);
+        }
+      }catch(e){console.warn('Locker photo re-push skipped',e)}
       // Cadet claimed/linked: pull their mission scorecards into THEIR personal rounds.
       try{
         if(typeof claimAndPersistMissionRounds==='function')await claimAndPersistMissionRounds(merged);
@@ -6369,10 +6377,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=235"></script>
-  <script src="platoon-mission-core.js?v=235"></script>
-  <script src="platoon-hq-records.js?v=235"></script>
-  <script src="platoons-v15-real.js?v=235"></script>
+  <script src="platoon-recap-shared.js?v=236"></script>
+  <script src="platoon-mission-core.js?v=236"></script>
+  <script src="platoon-hq-records.js?v=236"></script>
+  <script src="platoons-v15-real.js?v=236"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>

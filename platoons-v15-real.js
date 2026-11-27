@@ -227,13 +227,47 @@ function preparePlatoonForLocalWrite(p){
     return slim;
   }
 }
-/** Server snapshot: never ship multi-hundred-KB data URLs in hq_meta. */
+/** True when this device has locker photo bytes the server snapshot is still missing. */
+function lockerPhotosNeedServerPush(hydrated,serverRaw){
+  const serverPosts=Array.isArray(serverRaw?.hqMeta?.blogPosts)?serverRaw.hqMeta.blogPosts:[];
+  const serverHasPhoto=new Set(
+    serverPosts
+      .filter(p=>p&&p.photoData&&String(p.photoData).startsWith('data:'))
+      .map(p=>String(p.photoId||p.id||''))
+      .filter(Boolean)
+  );
+  for(const post of (hydrated?.hqMeta?.blogPosts||[])){
+    if(!post?.photoData||!String(post.photoData).startsWith('data:'))continue;
+    const id=String(post.photoId||post.id||'');
+    if(id&&!serverHasPhoto.has(id))return true;
+  }
+  return false;
+}
+/**
+ * Server snapshot MUST include locker photo bytes so desktop/other devices can render them.
+ * Side storage remains the durable local cache (and survives a thin server reply).
+ */
 function snapshotPlatoonForServer(p){
-  return preparePlatoonForLocalWrite(p);
+  if(!p)return p;
+  const clone={
+    ...p,
+    hqMeta:{
+      ...(p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{}),
+      blogPosts:Array.isArray(p.hqMeta?.blogPosts)?p.hqMeta.blogPosts.map(post=>({...post})):[]
+    }
+  };
+  // Pull any side-stored bytes onto posts before we ship.
+  hydrateBlogPhotos(clone);
+  try{return JSON.parse(JSON.stringify(clone))}
+  catch(e){
+    console.warn('snapshotPlatoonForServer with photos failed; falling back without bytes',e);
+    return preparePlatoonForLocalWrite(p);
+  }
 }
 window.grHydrateBlogPhotos=hydrateBlogPhotos;
 window.grPreparePlatoonForLocalWrite=preparePlatoonForLocalWrite;
 window.grSnapshotPlatoonForServer=snapshotPlatoonForServer;
+window.grLockerPhotosNeedServerPush=lockerPhotosNeedServerPush;
 function relativeBlogTime(iso){
   const t=Date.parse(iso||'');
   if(!Number.isFinite(t))return '';
@@ -315,7 +349,7 @@ function blogPostCard(p,post,me){
       ${tools}
     </div>
     ${post.body?`<p class="gr-blog-body">${E(post.body)}</p>`:''}
-    ${photo?`<button type="button" class="gr-blog-photo" data-blog-open-photo="${E(post.id)}"><img src="${photo.replace(/"/g,'')}" alt="Locker photo from ${E(post.authorName)}"></button>`:''}
+    ${photo?`<button type="button" class="gr-blog-photo" data-blog-open-photo="${E(post.id)}"><img src="${photo.replace(/"/g,'')}" alt="Locker photo from ${E(post.authorName)}"></button>`:(post.hasPhoto?`<div class="gr-blog-photo-missing muted">Photo still syncing from the device that posted it…</div>`:'')}
     <div class="gr-blog-reacts">${reacts}<button type="button" class="gr-blog-react gr-blog-reply-toggle ${blogReplyOpenId===post.id?'is-on':''}" data-blog-reply-toggle="${E(post.id)}" aria-expanded="${blogReplyOpenId===post.id?'true':'false'}">Reply${(post.replies||[]).length?`<span>${(post.replies||[]).length}</span>`:''}</button></div>
     ${replies?`<div class="gr-blog-replies">${replies}</div>`:''}
     ${blogReplyOpenId===post.id?`<form class="gr-blog-reply-form" data-blog-reply-form="${E(post.id)}">

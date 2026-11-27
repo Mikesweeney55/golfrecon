@@ -336,7 +336,11 @@ input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
 .gr-blog-photo{
   display:block;width:100%;margin-top:12px;padding:0;border:0;background:transparent;cursor:zoom-in;border-radius:14px;overflow:hidden;
 }
-.gr-blog-photo img{display:block;width:100%;max-height:360px;object-fit:cover}
+.gr-blog-photo img{display:block;width:100%;max-height:min(520px,70vh);object-fit:contain;background:rgba(8,6,4,.35)}
+.gr-blog-photo-missing{
+  margin-top:12px;padding:18px 14px;border-radius:14px;border:1px dashed rgba(212,175,106,.28);
+  background:rgba(14,12,10,.35);font-size:var(--fs-data);line-height:1.4;
+}
 .gr-blog-reacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .gr-blog-react{
   border:1px solid rgba(255,255,255,.08);background:rgba(14,12,10,.35);color:var(--text);
