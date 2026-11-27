@@ -7,7 +7,6 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="favicon.svg" />
   <script src="gr-test-env.js?v=1"></script>
-  <!-- Mapbox CSS/JS load on demand — a blocking head script freezes phones when the CDN is slow. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Oswald:wght@500;600;700&family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -524,7 +523,7 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .preview-map-head{z-index:3}
 
 
-/* v13.0 Mapbox Course Preview */
+/* v13.0 Course Preview (Esri satellite + OSM geometry) */
 .preview-hero-grid{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:12px;align-items:stretch}
 .preview-hero-grid-wide{grid-template-columns:minmax(0,1.05fr) minmax(280px,.95fr);align-items:start}
 .preview-hero-grid .course-preview-map{min-width:0}
@@ -565,32 +564,19 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .direction-card .dir-wedge.is-hot{background:rgba(239,100,97,.42)}
 .direction-bias{margin-top:8px;font-size:var(--fs-data);color:var(--muted);text-align:center}
 .direction-bias strong{color:#ffb0ab;font-weight:900}
-.mapbox-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 9px;font-size:var(--fs-data);color:var(--muted)}
-.mapbox-row button{border:1px solid var(--line);background:#13211b;color:var(--text);border-radius:999px;padding:5px 9px;font-size:var(--fs-data);font-weight:800}
-.mapbox-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;background:var(--warning)}.mapbox-dot.ready{background:var(--good)}
-.mapbox-missing{border:1px solid rgba(255,212,0,.32);background:rgba(255,212,0,.06);border-radius:12px;padding:8px 10px;font-size:var(--fs-data);color:#eadf9d;margin-bottom:9px}
-.satellite-stack.mapbox-live:after{content:'MAPBOX SATELLITE';position:absolute;left:10px;bottom:10px;z-index:2;background:rgba(5,12,9,.72);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:4px 7px;color:#fff;font-size:var(--fs-data);font-weight:900;letter-spacing:.04em;backdrop-filter:blur(5px)}
 @media(max-width:760px){.preview-hero-grid,.preview-hero-grid-wide{grid-template-columns:1fr}.preview-stats-column:not(.preview-stats-rich){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.preview-read-card{grid-column:1/-1}.preview-side-card{min-height:48px}.course-preview-map,.course-preview-map svg,.preview-map-empty{min-height:390px;height:390px}}
 
 
-/* v13.1 Interactive Course Preview */
+/* v13.1 Course Preview map shell */
 .course-preview-map{height:520px;min-height:520px}
-#coursePreviewMap{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-.course-preview-map .mapboxgl-map{font:inherit}
-.course-preview-map .mapboxgl-ctrl-top-right{top:76px;right:6px}
-.course-preview-map .mapboxgl-ctrl-group{border-radius:11px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.35)}
-.course-preview-map .mapboxgl-ctrl button{width:34px;height:34px}
-.course-preview-map .mapboxgl-ctrl-attrib{background:rgba(5,12,9,.72);color:#dce6e1}
-.course-preview-map .mapboxgl-ctrl-attrib a{color:#dce6e1}
 .preview-map-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:var(--fs-data);color:var(--muted)}
-.preview-map-tools button{border:1px solid var(--line);background:#13211b;color:var(--text);border-radius:999px;padding:6px 10px;font-size:var(--fs-data);font-weight:850}
 .preview-map-tools span{min-width:0}
 .preview-hero-grid{grid-template-columns:minmax(0,1fr) 258px}
 .preview-hero-grid-wide{grid-template-columns:minmax(0,1.05fr) minmax(300px,.95fr)}
 .preview-side-card{min-height:41px}
 .preview-read-card{min-height:88px}
 @media(max-width:980px){.preview-hero-grid-wide{grid-template-columns:1fr}}
-@media(max-width:760px){.course-preview-map{height:430px;min-height:430px}.preview-map-tools{align-items:flex-start;flex-direction:column}.preview-map-tools button{align-self:flex-start}}
+@media(max-width:760px){.course-preview-map{height:430px;min-height:430px}.preview-map-tools{align-items:flex-start;flex-direction:column}}
 
 
 /* v13.4 embedded Pregame Hole Insights */
@@ -598,7 +584,6 @@ button.score-box:hover{outline:1px solid rgba(184,234,104,.45)}
 .pregame-hole-insights .section-head{margin-bottom:10px}
 .pregame-hole-insights .hole-selector{margin-bottom:10px}
 .pregame-hole-insights .preview-hero-grid{margin-top:0}
-.pregame-hole-insights .mapbox-missing{margin-bottom:10px}
 
 
 /* v13.6 Pregame sticky command header */
@@ -1728,7 +1713,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=229">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=230">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -2574,7 +2559,6 @@ async function setGlobalCourse(id){
     state.coursePreviewError=null;
     state.coursePreviewLoading=false;
     state.coursePreviewShowAll=false;
-    try{if(typeof destroyCoursePreviewMap==='function')destroyCoursePreviewMap()}catch{}
   }
   try{localStorage.setItem('golfreconSelectedCourseId',id)}catch{}
   refreshGlobalCourseSelector();
@@ -3161,46 +3145,6 @@ function osmHoleSvg(geom){
 }
 
 
-const MAPBOX_TOKEN_KEY='golfreconMapboxPublicTokenV1';
-const MAPBOX_GL_CSS='https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css';
-const MAPBOX_GL_JS='https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js';
-let mapboxLoadPromise=null;
-function mapboxToken(){
-  try{return String(localStorage.getItem(MAPBOX_TOKEN_KEY)||'').trim()}catch{return ''}
-}
-/** Load Mapbox only when Hole Preview needs it — never block first paint. */
-function ensureMapboxLoaded(){
-  if(window.mapboxgl)return Promise.resolve(true);
-  if(mapboxLoadPromise)return mapboxLoadPromise;
-  mapboxLoadPromise=new Promise(resolve=>{
-    try{
-      if(!document.querySelector(`link[href="${MAPBOX_GL_CSS}"]`)){
-        const link=document.createElement('link');
-        link.rel='stylesheet';link.href=MAPBOX_GL_CSS;
-        document.head.appendChild(link);
-      }
-      const s=document.createElement('script');
-      s.src=MAPBOX_GL_JS;
-      s.async=true;
-      s.onload=()=>resolve(!!window.mapboxgl);
-      s.onerror=()=>{mapboxLoadPromise=null;resolve(false)};
-      document.head.appendChild(s);
-    }catch{mapboxLoadPromise=null;resolve(false)}
-  });
-  return mapboxLoadPromise;
-}
-window.configureMapboxToken=()=>{
-  const existing=mapboxToken();
-  const token=window.prompt('Paste your Mapbox PUBLIC access token (starts with pk.). It is stored only in this browser.',existing);
-  if(token===null)return;
-  const clean=String(token||'').trim();
-  try{
-    if(clean)localStorage.setItem(MAPBOX_TOKEN_KEY,clean);
-    else localStorage.removeItem(MAPBOX_TOKEN_KEY);
-  }catch{}
-  if(clean)ensureMapboxLoaded().finally(()=>render());
-  else render();
-};
 function mercatorWorldPixel(pt,z){
   const lon=Number(pt?.[0]),lat0=Number(pt?.[1]);
   if(!Number.isFinite(lon)||!Number.isFinite(lat0))return [0,0];
@@ -3235,10 +3179,8 @@ function satelliteHoleMap(geom){
     if(ty<0||ty>=tileCount)continue;
     const wrapped=((tx%tileCount)+tileCount)%tileCount;
     const left=Math.round(tx*256-originX),top=Math.round(ty*256-originY);
-    const fallback=`https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${wrapped}`;
-    const token=mapboxToken();
-    const src=token?`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/${z}/${wrapped}/${ty}@2x.webp?access_token=${encodeURIComponent(token)}`:fallback;
-    tiles.push(`<img class="satellite-tile" alt="" draggable="false" src="${src}" data-fallback="${fallback}" onerror="if(this.src!==this.dataset.fallback){this.src=this.dataset.fallback}" style="left:${left}px;top:${top}px" loading="eager">`);
+    const src=`https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${wrapped}`;
+    tiles.push(`<img class="satellite-tile" alt="" draggable="false" src="${src}" style="left:${left}px;top:${top}px" loading="eager">`);
   }
   const project=p=>{const q=mercatorWorldPixel(p,z);return [q[0]-originX,q[1]-originY]};
   const path=pts=>pts.map((p,i)=>{const [x,y]=project(p);return `${i?'L':'M'}${x.toFixed(1)} ${y.toFixed(1)}`}).join(' ');
@@ -3263,16 +3205,9 @@ function satelliteHoleMap(geom){
   const teeLabelY=ty<28?ty+23:ty-11,greenLabelY=gy<28?gy+23:gy-11;
   shapes.push(`<text class="sat-label" x="${(tx+9).toFixed(1)}" y="${teeLabelY.toFixed(1)}">TEE</text>`);
   shapes.push(`<text class="sat-label" x="${(gx+9).toFixed(1)}" y="${greenLabelY.toFixed(1)}">GREEN</text>`);
-  return `<div class="satellite-stack ${mapboxToken()?'mapbox-live':''}">${tiles.join('')}<svg class="satellite-overlay" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Satellite view with GolfRecon hole overlay">${shapes.join('')}</svg><div class="satellite-north">N ↑</div></div>`;
+  return `<div class="satellite-stack">${tiles.join('')}<svg class="satellite-overlay" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Satellite view with GolfRecon hole overlay">${shapes.join('')}</svg><div class="satellite-north">N ↑</div></div>`;
 }
 
-
-let coursePreviewMapInstance=null;
-let coursePreviewMapFocusBounds=null;
-function destroyCoursePreviewMap(){
-  if(coursePreviewMapInstance){try{coursePreviewMapInstance.remove()}catch{}coursePreviewMapInstance=null;}
-  coursePreviewMapFocusBounds=null;
-}
 function ptsCentroid(pts){
   if(!pts?.length)return null;
   return [pts.reduce((a,p)=>a+Number(p[0]),0)/pts.length,pts.reduce((a,p)=>a+Number(p[1]),0)/pts.length];
@@ -3420,57 +3355,6 @@ function buildCoursePreviewGeoJSON(geom){
   const focusPoints=[ctx.start,ctx.end,...(fairway?osmElementPoints(fairway):ctx.path)];
   return {collection:{type:'FeatureCollection',features},focusPoints,ctx,fairway,playLine};
 }
-function previewBounds(points){
-  if(!points?.length)return null;let minLon=Infinity,minLat=Infinity,maxLon=-Infinity,maxLat=-Infinity;
-  points.forEach(p=>{minLon=Math.min(minLon,p[0]);maxLon=Math.max(maxLon,p[0]);minLat=Math.min(minLat,p[1]);maxLat=Math.max(maxLat,p[1])});
-  return [[minLon,minLat],[maxLon,maxLat]];
-}
-function fitCoursePreviewMap(extraZoom=true){
-  if(!coursePreviewMapInstance||!coursePreviewMapFocusBounds)return;
-  try{
-    const camera=coursePreviewMapInstance.cameraForBounds(coursePreviewMapFocusBounds,{padding:{top:54,bottom:54,left:48,right:48}});
-    if(camera){
-      if(extraZoom)camera.zoom=Math.max(14,Math.min(19,(camera.zoom||18)-0.18));
-      coursePreviewMapInstance.jumpTo(camera);
-    }
-  }catch{}
-}
-window.resetCoursePreviewMap=()=>fitCoursePreviewMap(false);
-async function initInteractiveCourseMap(){
-  if(!['pregame','coursePreview'].includes(state.view))return;
-  const container=document.getElementById('coursePreviewMap'),token=mapboxToken();if(!container||!token)return;
-  if(!window.mapboxgl){
-    const ok=await ensureMapboxLoaded();
-    if(!ok||!['pregame','coursePreview'].includes(state.view))return;
-  }
-  if(!window.mapboxgl)return;
-  const cached=coursePreviewCache.get(`preview:${state.selectedCourseId}:${state.coursePreviewHole}`);
-  if(!cached?.geom)return;
-  if(cached.courseId&&String(cached.courseId)!==String(state.selectedCourseId))return;
-  const built=buildCoursePreviewGeoJSON(cached.geom);if(!built)return;
-  destroyCoursePreviewMap();
-  window.mapboxgl.accessToken=token;
-  const center=ptsCentroid(built.focusPoints)||built.ctx.start;
-  const map=new window.mapboxgl.Map({container,style:'mapbox://styles/mapbox/satellite-v9',center,zoom:18.2,bearing:0,pitch:0,attributionControl:false,dragRotate:false,pitchWithRotate:false,touchPitch:false,maxZoom:20.5});
-  coursePreviewMapInstance=map;coursePreviewMapFocusBounds=previewBounds(built.focusPoints);
-  map.addControl(new window.mapboxgl.NavigationControl({showCompass:true,showZoom:true,visualizePitch:false}),'top-right');
-  map.addControl(new window.mapboxgl.AttributionControl({compact:true}),'bottom-right');
-  map.on('load',()=>{
-    if(coursePreviewMapInstance!==map)return;
-    map.addSource('golfiq-hole',{type:'geojson',data:built.collection});
-    const fill=(id,kind,color,opacity)=>map.addLayer({id,type:'fill',source:'golfiq-hole',filter:['==',['get','kind'],kind],paint:{'fill-color':color,'fill-opacity':opacity,'fill-outline-color':color}});
-    fill('golfiq-fairway','fairway','#b8ea68',0.05);
-    fill('golfiq-water','water','#47aef2',0.12);
-    fill('golfiq-bunker','bunker','#ffe06b',0.14);
-    fill('golfiq-tee','tee','#b8ea68',0.10);
-    fill('golfiq-green','green','#d7ff9f',0.16);
-    map.addLayer({id:'golfiq-playline',type:'line',source:'golfiq-hole',filter:['==',['get','kind'],'playline'],layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':'#d7ff9f','line-width':3.5,'line-opacity':0.95,'line-dasharray':[2,2]}});
-    map.addLayer({id:'golfiq-markers',type:'circle',source:'golfiq-hole',filter:['==',['get','kind'],'marker'],paint:{'circle-radius':6,'circle-color':['case',['==',['get','label'],'TEE'],'#b8ea68','#ffffff'],'circle-stroke-color':'#07100c','circle-stroke-width':2}});
-    map.addLayer({id:'golfiq-labels',type:'symbol',source:'golfiq-hole',filter:['==',['get','kind'],'marker'],layout:{'text-field':['get','label'],'text-size':12,'text-offset':[0.9,0],'text-anchor':'left','text-allow-overlap':true},paint:{'text-color':'#ffffff','text-halo-color':'#07100c','text-halo-width':2}});
-    fitCoursePreviewMap(true);
-  });
-}
-
 async function ensureCoursePreviewLoaded(courseId,hole){
   const c=course(courseId); if(!c||!['pregame','coursePreview'].includes(state.view))return;
   const key=`preview:${courseId}:${hole}`;
@@ -3520,17 +3404,12 @@ window.retryCoursePreview=()=>{
   state.coursePreviewLoading=false;
   render();
 };
-/** Interactive Mapbox when token+geom exist; otherwise ArcGIS/static satellite tiles with OSM overlay. */
+/** Esri World Imagery satellite tiles with OpenStreetMap golf geometry overlay. */
 function holePreviewMapBodyHtml(c,hole,cached){
-  const mb=mapboxToken();
   const geomOk=Boolean(cached?.geom&&(!cached.courseId||String(cached.courseId)===String(c.id)));
   const waiting=!cached&&!state.coursePreviewError;
   const emptyMsg=state.coursePreviewError||cached?.error||'GolfRecon is loading the golf-course data for this hole.';
-  if(mb&&geomOk&&window.mapboxgl){
-    return `<div id="coursePreviewMap" aria-label="Interactive satellite view for Hole ${hole}"></div>`;
-  }
   if(geomOk){
-    // ArcGIS (or Mapbox-tile) static satellite stack — works without interactive GL.
     return satelliteHoleMap(cached.geom)||osmHoleSvg(cached.geom)||`<div class="preview-map-empty"><div><strong>Map unavailable</strong><span>Hole geometry loaded but the satellite overlay could not be drawn.</span></div></div>`;
   }
   const emptyTitle=state.coursePreviewLoading||waiting
@@ -3852,7 +3731,6 @@ function coursePreviewView(){
     coursePreviewCache.delete(`preview:${c.id}:${hole}`);
     cached=null;
   }
-  const mb=mapboxToken();
   const mapBody=holePreviewMapBodyHtml(c,hole,cached);
   const titleBuilt=cached?.geom?buildCoursePreviewGeoJSON(cached.geom):null;
   const holeIdx=Math.max(0,holes.map(Number).indexOf(hole));
@@ -3860,15 +3738,12 @@ function coursePreviewView(){
   const holeHcp=c.handicaps?.[holeIdx]??'—';
   const holeYd=previewHoleYardage(c,hole,titleBuilt);
   const yardageText=holeYd?`${holeYd.approx?'~':''}${holeYd.value} yd`:'— yd';
-  const interactive=Boolean(mb&&cached?.geom);
   return `
     <div class="preview-page-head">
       <button class="preview-back" type="button" onclick="closeCoursePreview()">← Back</button>
       <div class="muted">${safeText(c.name)} · ${safeText(c.tees||'')} tees</div>
     </div>
     <div class="section-head"><div><div class="eyebrow">COURSE PREVIEW</div><h2>${safeText(c.name)}</h2></div></div>
-    <div class="mapbox-row"><span><span class="mapbox-dot ${mb?'ready':''}"></span>${mb?'Mapbox Satellite ready':'Free satellite fallback active'}</span><button type="button" onclick="configureMapboxToken()">${mb?'Change token':'Set Mapbox token'}</button></div>
-    ${mb?'':`<div class="mapbox-missing">Hole Preview works with free satellite tiles now. Optional: tap <strong>Set Mapbox token</strong> for interactive pan/zoom.</div>`}
     <div class="hole-selector">${holes.map(n=>`<button type="button" class="${Number(n)===hole?'active':''}" onclick="selectCoursePreviewHole(${Number(n)})">${n}</button>`).join('')}</div>
 
     <div class="preview-hero-grid preview-hero-grid-wide">
@@ -3880,8 +3755,8 @@ function coursePreviewView(){
           </div>
           <div id="coursePreviewMapBody">${mapBody}</div>
         </div>
-        <div class="preview-map-tools"><span>${interactive?'Drag to pan · scroll or pinch to zoom · use + / − for step zoom':'Satellite overlay · set Mapbox for interactive pan/zoom'}</span>${interactive?`<button type="button" onclick="resetCoursePreviewMap()">Fit hole</button>`:`<button type="button" onclick="configureMapboxToken()">Set Mapbox</button>`}</div>
-        <div class="preview-attribution">Satellite imagery © ${interactive?'Mapbox / providers':'Esri / providers'} · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
+        <div class="preview-map-tools"><span>Esri satellite · OpenStreetMap golf geometry</span></div>
+        <div class="preview-attribution">Satellite imagery © Esri / providers · Golf geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
       </div>
       <aside class="preview-stats-column preview-stats-rich" aria-label="Hole ${hole} statistics">
         ${holePreviewStatsHtml(c,hole,h,last,{yardageText})}
@@ -4693,7 +4568,6 @@ function selectRoundFromBar(id,{toggle=true,scrollTo=false}={}){
  });
 }
 function render(){
- destroyCoursePreviewMap();
  if(!db.courses.length){
    app.innerHTML=`<div class="card bootstrap-card"><div class="eyebrow">WELCOME TO GOLF RECON</div><h2 style="margin:8px 0 6px">Your account is ready.</h2><div class="muted">Import your first round to start building your golf memory.</div><button class="button primary" style="margin-top:16px" type="button" onclick="document.getElementById('importBtn').click()">Import First Round</button></div>`;
    return;
@@ -6412,10 +6286,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=229"></script>
-  <script src="platoon-mission-core.js?v=229"></script>
-  <script src="platoon-hq-records.js?v=229"></script>
-  <script src="platoons-v15-real.js?v=229"></script>
+  <script src="platoon-recap-shared.js?v=230"></script>
+  <script src="platoon-mission-core.js?v=230"></script>
+  <script src="platoon-hq-records.js?v=230"></script>
+  <script src="platoons-v15-real.js?v=230"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
