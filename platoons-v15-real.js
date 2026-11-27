@@ -701,8 +701,22 @@ function missionCard(p,m,featured=false){
   return `<div class="gr-mission ${featured?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div>${missionWinnerLine(m)}</div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}${leagueTag(m)}</div></div><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div>${showPrev?previewMarkup(pre):''}${phase==='completed'?`<div class="gr-summary gr-summary-compact">${missionSummaryMarkup(m)}</div>`:''}${missionActions(m,warId)}</div>`;
 }
 
-function completedMissionAccordion(p,m,open=false){
+/** Remember which completed Mission accordions the user opened/closed across sync re-renders. */
+const completedAccordionOpen=new Map();
+function completedAccordionShouldOpen(id,preferOpen=false){
+  const key=String(id||'');
+  if(!key)return !!preferOpen;
+  if(completedAccordionOpen.has(key))return !!completedAccordionOpen.get(key);
+  return !!preferOpen;
+}
+function rememberCompletedAccordion(id,open){
+  const key=String(id||'');
+  if(!key)return;
+  completedAccordionOpen.set(key,!!open);
+}
+function completedMissionAccordion(p,m,preferOpen=false){
   const people=peopleOf(p,m),warId=warIdOf(m),phase=phaseOf(m);
+  const open=completedAccordionShouldOpen(m.id,preferOpen);
   return `<details class="gr-mission gr-mission-accordion ${open?'featured':''}" data-mission-id="${E(m.id)}" data-mission-phase="${E(phase)}" ${open?'open':''}><summary class="gr-mission-accordion-sum"><div class="gr-mission-head">${dateTile(m.date)}<div><div class="gr-mission-title">${E(m.title||'Mission')}</div><div class="gr-mission-course">${E(courseLabel(m.locationName))}</div>${missionWinnerLine(m)}</div><div class="gr-status"><span class="gr-tag gr-time-tag">⏱ ${E(fmtTime(m.teeTime))}</span>${statusTag(m)}${leagueTag(m)}</div></div></summary><div class="gr-mission-accordion-body"><div class="gr-meta"><div class="gr-meta-cell"><span>Format</span><strong>${E(m.format||'TBD')}</strong></div><div class="gr-meta-cell"><span>My Time Players</span><strong>${people.length}</strong></div></div><div class="gr-players">${people.map(x=>`<span class="gr-player ${x.guest?'guest':''}">${E(x.name)}${x.guest?' (Guest)':''}</span>`).join('')}</div><div class="gr-summary gr-after-action">${missionSummaryMarkup(m)}</div>${missionActions(m,warId)}</div></details>`;
 }
 
@@ -1865,6 +1879,35 @@ window.grUploadScores=id=>{
   alert('Score import is unavailable.');
 };
 
+/** Halve absurd Mission gross/net (160→80) after a bad import. Format edits alone never fix this. */
+window.grRepairDoubledMission=async(id,btn)=>{
+  const p=loadPlatoonLocal(),m=(p.missions||[]).find(x=>String(x.id)===String(id));
+  if(!m)return;
+  if(typeof window.grRepairDoubledMissionTotals!=='function'){
+    alert('Repair is unavailable — refresh and try again.');
+    return;
+  }
+  if(!confirm(`Fix doubled totals on ${m.title||'this Mission'}?\n\nThis halves gross/net values that look like a bad import (e.g. 160 → 80). Points stay the same. Mis-labeled Best Ball is reset to Stroke play (net).`))return;
+  const old=btn?.textContent||'Fix doubled totals';
+  if(btn){btn.disabled=true;btn.textContent='Fixing…'}
+  try{
+    const out=window.grRepairDoubledMissionTotals(m,{fixFormat:true});
+    if(!out?.ok){
+      alert(out?.error||'Could not repair totals.');
+      if(btn){btn.disabled=false;btn.textContent=old}
+      return;
+    }
+    if(typeof window.grAttachScorecardSeeds==='function')window.grAttachScorecardSeeds(m,p);
+    savePlatoonLocal(p);
+    document.querySelectorAll('dialog[open]').forEach(d=>{try{d.close()}catch{}});
+    if(typeof render==='function')render();else renderGroups();
+    if(typeof window.grViewMission==='function')window.grViewMission(m.id);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent=old}
+    alert(`Repair failed: ${e?.message||e}`);
+  }
+};
+
 window.grDeleteMission=async(id,btn)=>{
   const p=loadPlatoonLocal(),m=(p.missions||[]).find(x=>x.id===id);if(!m)return;
   if(!confirm(`Delete ${m.title||'this Mission'}?\n\nThis permanently removes the Mission and its Platoon results. Your personal Golf Recon rounds are not deleted.`))return;
@@ -1922,7 +1965,15 @@ async function submitBlogComposer(form){
 }
 if(!document.body.dataset.grPlatoonShellBound){
   document.body.dataset.grPlatoonShellBound='1';
+  document.addEventListener('toggle',e=>{
+    const det=e.target;
+    if(!(det instanceof HTMLDetailsElement))return;
+    if(!det.classList.contains('gr-mission-accordion'))return;
+    rememberCompletedAccordion(det.getAttribute('data-mission-id'),det.open);
+  },true);
   document.addEventListener('click',e=>{
+    const repair=e.target.closest('[data-gr-repair-doubled]');
+    if(repair){e.preventDefault();e.stopPropagation();window.grRepairDoubledMission(repair.getAttribute('data-gr-repair-doubled'),repair);return}
     const tab=e.target.closest('[data-gr-subnav]');
     if(tab){e.preventDefault();goSubpage(tab.dataset.grSubnav||'home');return}
     if(e.target.closest('[data-platoon-home]')){platoonSubpage='home';renderGroups();return}

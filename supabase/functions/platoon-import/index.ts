@@ -235,11 +235,12 @@ For each visible player, return:
 - eagle_count only if the screenshot explicitly establishes an eagle count for that player, else null
 
 Leaderboard reading rules:
-- Gross (G) rows like +8(80) → gross 80
+- Gross (G) rows like +8(80) → gross 80. NEVER return Out+In sums or score-to-par+score (80+80=160 is wrong).
 - Net (N) rows like +2(73) → net 73 (the number in parentheses is the net score)
 - Stableford / points events: league or Stableford POINTS are raw_points. The net SCORE in parentheses is still net — do not leave net null just because the format is Stableford. Points and net are different fields.
 - Prefer Net (N) ranking for finish_position when that tab is visible.
-- Merge Gross + Net rows for the same player (name + T-HCP) across screenshots.
+- Merge Gross + Net rows for the same player (name + T-HCP) across screenshots — merge fields, do not add the two scores together.
+- Individual 18-hole gross is almost never >=120. If a value looks that high, re-read the parentheses score.
 
 Do NOT create hole-by-hole data. Do NOT create a Golf Recon personal round. This parser is only for a Platoon Mission leaderboard/result record.
 If the screenshots span multiple pages, merge duplicate player rows carefully and preserve only supported values.
@@ -292,13 +293,13 @@ Event fields:
 - date: YYYY-MM-DD when visible
 - tee_time: HH:MM in 24-hour local time when visible
 - course_name: course name exactly as visible
-- format: e.g. Stroke Play when visible
+- format: ONLY when the screenshot explicitly names a format (Stroke Play, Stableford, Best Ball / Fourball, Scramble, etc.). If format is not printed, return "Stroke Play". NEVER invent Best Ball / Fourball / Scramble from participant count alone.
 
 For each player return:
 - player_name exactly as shown (keep truncated forms like "Kevi..." if that is all that is visible; do not invent a full name)
 - handicap: tournament handicap (T-HCP) when visible, else null. CRITICAL when two players share the same truncated first name — use handicap + photo/context to keep them as SEPARATE players
-- gross: from the Gross (G) leaderboard score in parentheses, e.g. +8(78) → gross 78
-- net: from the Net (N) leaderboard score in parentheses when that tab is visible
+- gross: from the Gross (G) leaderboard score in parentheses, e.g. +8(78) → gross 78. NEVER sum Out+In nine totals when the parentheses 18-hole score is visible. NEVER add score-to-par (+8) to the score. A normal individual 18-hole gross is usually 65–110 — if you are about to return >=120, re-read the parentheses score.
+- net: from the Net (N) leaderboard score in parentheses when that tab is visible (same anti-doubling rules as gross)
 - raw_points: points from the net/points leaderboard when visible
 - finish_position: prefer Net (N) / points ranking when that screenshot is present. If ONLY Gross (G) screenshots are provided, use the gross rank. If both differ, DO NOT use gross rank when net rank is visible.
 - eagle_count: count of eagles visible from hole scores (score <= par-2) when hole data exists; else only when explicitly labeled; otherwise null
@@ -307,13 +308,13 @@ For each player return:
 Important merging rules:
 - Screenshots are all from the same event.
 - SCROLLED LISTS: if multiple screenshots show the same tab (G or N) at different scroll positions, UNION every distinct player row (name + T-HCP). Do not keep only the players from the first screenshot.
-- Merge Gross + Net for the same person when name + T-HCP match across tabs.
+- Merge Gross + Net for the same person when name + T-HCP match across tabs. Do NOT add Gross score + Net score together.
 - Merge abbreviations of the same visible player only when identity is clear from name + handicap + photo/context. Two "Kevi..." / "Kevin C." rows with DIFFERENT T-HCP values are DIFFERENT people — never merge them.
-- A score like +13(84) on Gross (G) means 84 gross; on Net (N) +2(73) means 73 net.
+- A score like +13(84) on Gross (G) means 84 gross; on Net (N) +2(73) means 73 net. The number BEFORE the parentheses is score-to-par, not a second score to add.
 - Stableford / points formats: raw_points are the points column; net is still the stroke net in parentheses when shown. Never leave net null when that parentheses score is visible.
 - Do not calculate missing net/gross from handicap unless the screenshot explicitly gives the score.
 - Preserve points exactly as shown.
-- Ignore "Out" / "In" total columns as hole numbers — only holes 1-18.
+- Ignore "Out" / "In" total columns as hole numbers — only holes 1-18. Never use Out+In column totals as the player's gross when a parentheses score exists.
 - Circles around scores usually mean birdie/eagle; squares usually mean bogey — still read the numeric score from the cell.
 - If anything conflicts or is ambiguous, prefer null / empty holes plus a warning rather than guessing.
 - Always return a non-empty results array when any leaderboard rows are readable.`

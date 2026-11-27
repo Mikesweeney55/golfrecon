@@ -275,6 +275,68 @@ function missionRoundFingerprint(mission,memberId,gross){
   ].join('|');
 }
 
+/** True when a leaderboard-only gross looks like a doubled / nonsense 18-hole total. */
+function missionResultLooksAbsurd(r){
+  if(!r)return false;
+  const holes=cleanHoles(r.holes||[]);
+  if(holes.some(h=>finite(h.score)))return false; // hole card can validate
+  const gross=finite(r.gross)?Number(r.gross):(finite(r.gross_score)?Number(r.gross_score):null);
+  if(gross==null)return false;
+  return gross>=120;
+}
+/** Most of the field has absurd totals (e.g. 160/173/178/209) — classic Out+In double-count import. */
+function missionResultsLookDoubled(mission){
+  const rows=Array.isArray(mission?.results)?mission.results:[];
+  const scored=rows.filter(r=>finite(r?.gross)||finite(r?.gross_score));
+  if(!scored.length)return false;
+  const bad=scored.filter(missionResultLooksAbsurd);
+  return bad.length>=Math.max(1,Math.ceil(scored.length/2));
+}
+/**
+ * Repair doubled Mission leaderboard totals in place.
+ * Halves absurd gross/net, clears bad personal-round seeds, and resets a mislabeled
+ * Best Ball format when the field looks like individual stroke results.
+ */
+function repairDoubledMissionTotals(mission,{fixFormat=true}={}){
+  if(!mission||!Array.isArray(mission.results))return {ok:false,error:'No results',fixed:0};
+  if(!missionResultsLookDoubled(mission))return {ok:false,error:'Totals do not look doubled',fixed:0};
+  let fixed=0;
+  for(const r of mission.results){
+    if(!missionResultLooksAbsurd(r))continue;
+    const gross=finite(r.gross)?Number(r.gross):(finite(r.gross_score)?Number(r.gross_score):null);
+    if(gross==null)continue;
+    const net=finite(r.net)?Number(r.net):(finite(r.net_score)?Number(r.net_score):null);
+    const hcp=finite(r.handicap)?Number(r.handicap)
+      :(finite(r.course_handicap)?Number(r.course_handicap)
+      :(finite(r.t_hcp)?Number(r.t_hcp)
+      :(gross!=null&&net!=null?Math.max(0,Math.round(gross-net)):null)));
+    const nextGross=Math.round(gross/2);
+    r.gross=nextGross;
+    if(finite(r.gross_score))r.gross_score=nextGross;
+    if(hcp!=null){
+      r.handicap=hcp;
+      const nextNet=Math.round(nextGross-hcp);
+      r.net=nextNet;
+      if(finite(r.net_score))r.net_score=nextNet;
+    }else if(net!=null&&net>=90){
+      const nextNet=Math.round(net/2);
+      r.net=nextNet;
+      if(finite(r.net_score))r.net_score=nextNet;
+    }
+    delete r.scorecard_seed;
+    delete r.personal_round_id;
+    r.totals_repaired_at=new Date().toISOString();
+    fixed++;
+  }
+  let formatFixed=false;
+  if(fixFormat&&/best\s*ball|fourball|four\s*ball/i.test(String(mission.format||''))){
+    mission.format='Stroke play (net)';
+    formatFixed=true;
+  }
+  mission.results=normalizeOfficialResults(mission.results);
+  return {ok:true,fixed,formatFixed,mission};
+}
+
 /**
  * Attach claimable scorecard seeds onto mission result rows (for personal DB merge).
  * Seeds from whatever official totals exist — hole-by-hole when present, otherwise
@@ -291,6 +353,11 @@ function attachScorecardSeeds(mission,p){
     const holes=Array.isArray(r.holes)?cleanHoles(r.holes):[];
     const priorHoles=Array.isArray(r.scorecard_seed?.holes)?cleanHoles(r.scorecard_seed.holes):[];
     const mergedHoles=holes.length?holes:priorHoles;
+    // Never seed absurd doubled totals (160+) into personal Rounds.
+    if(!mergedHoles.length&&missionResultLooksAbsurd(r)){
+      delete r.scorecard_seed;
+      continue;
+    }
     // Leaderboard-only rows (gross/net/points) still get a seed so cadets can claim Rounds.
     const hasTotals=finite(r.gross)||finite(r.net)||finite(r.raw_points)||mergedHoles.length>0;
     if(!hasTotals)continue;
@@ -771,6 +838,9 @@ window.grAttachScorecardSeeds=attachScorecardSeeds;
 window.grEnsurePlatoonScorecardSeeds=ensurePlatoonScorecardSeeds;
 window.grHydrateAllScorecardSeeds=hydrateAllScorecardSeeds;
 window.grClaimMissionScorecardsIntoPersonalDb=claimMissionScorecardsIntoPersonalDb;
+window.grMissionResultLooksAbsurd=missionResultLooksAbsurd;
+window.grMissionResultsLookDoubled=missionResultsLookDoubled;
+window.grRepairDoubledMissionTotals=repairDoubledMissionTotals;
 window.grMissionRoundFingerprint=missionRoundFingerprint;
 window.grBuildCompletedMissionFromImport=buildCompletedMissionFromImport;
 window.grReadOnlyMission=readOnlyMission;
