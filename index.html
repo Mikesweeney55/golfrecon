@@ -1723,7 +1723,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=227">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=228">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -4248,44 +4248,51 @@ function roundLooksCorrupt(r){
   if(holes===9&&gross>=70&&!roundHasHoleScores(r))return true;
   return false;
 }
-/** Empty shell left after scrubbing a bad Mission seed — no score, no holes. */
+/** Empty Mission-seeded shell — no holes and no real gross (null/undefined, not 0). */
+function roundHasFiniteGross(r){
+  return r!=null&&r.gross!=null&&r.gross!==''&&Number.isFinite(Number(r.gross));
+}
 function roundIsBlankShell(r){
-  if(!r||roundHasHoleScores(r))return false;
-  if(Number.isFinite(Number(r.gross)))return false;
-  const missionish=!!(r.limitedFromMission||r.corruptTotalCleared||r.corruptTotalWas!=null
-    ||/mission/i.test(String(r.source||'')));
-  return missionish||!!r.missionFingerprint||!!r.missionId;
+  if(!r||roundHasHoleScores(r)||roundHasFiniteGross(r))return false;
+  return !!(r.limitedFromMission||r.corruptTotalCleared||r.corruptTotalWas!=null
+    ||/mission/i.test(String(r.source||''))||r.missionFingerprint||r.missionId);
 }
 /** Gross shown in the round list — never flash a corrupt 160 as a real score. */
 function roundDisplayGross(r){
-  if(!r||roundLooksCorrupt(r)||roundIsBlankShell(r))return null;
-  return Number.isFinite(Number(r.gross))?Number(r.gross):null;
+  if(!r||roundLooksCorrupt(r)||roundIsBlankShell(r)||!roundHasFiniteGross(r))return null;
+  return Number(r.gross);
 }
 /**
- * Remove absurd totals-only / blank Mission-seeded rounds from the list
- * (and delete the cloud import when linked) so Sep 19 blank shells disappear.
+ * Soft-scrub only: clear absurd totals locally and drop blank shells from the
+ * in-memory list. No cloud deletes during bootstrap (that caused hang/wipe risk).
  */
 async function scrubCorruptRoundTotals(){
-  let removed=0;
+  let changed=0;
   const keep=[];
   for(const r of (db.rounds||[])){
     if(!r)continue;
-    const purge=roundLooksCorrupt(r)||roundIsBlankShell(r);
-    if(!purge){keep.push(r);continue}
-    removed++;
-    if(r.supabaseImportId&&typeof callImportFunction==='function'&&!window.grTestEnvActive){
-      try{
-        await callImportFunction({action:'delete',id:r.supabaseImportId});
-      }catch(e){
-        console.warn('Could not delete blank/corrupt round in cloud',r.id,e);
-      }
+    if(roundIsBlankShell(r)){
+      changed++;
+      try{if(String(state.selectedRoundId)===String(r.id))state.selectedRoundId=null}catch{}
+      continue;
     }
-    try{
-      if(String(state.selectedRoundId)===String(r.id))state.selectedRoundId=null;
-    }catch{}
+    if(roundLooksCorrupt(r)&&!r.corruptTotalCleared){
+      r.corruptTotalWas=Number(r.gross);
+      r.corruptTotalCleared=true;
+      r.gross=null;
+      r.net=null;
+      r.scoreToPar=null;
+      changed++;
+    }
+    if(roundIsBlankShell(r)){
+      changed++;
+      try{if(String(state.selectedRoundId)===String(r.id))state.selectedRoundId=null}catch{}
+      continue;
+    }
+    keep.push(r);
   }
-  if(removed)db.rounds=keep;
-  return removed;
+  if(changed)db.rounds=keep;
+  return changed;
 }
 function scoreDifferential(r){
  const c=course(r.courseId);
@@ -5853,7 +5860,7 @@ function fillBlankArray(dst,src){
   src.forEach((v,i)=>{if((out[i]==null||out[i]==='')&&v!=null&&v!=='')out[i]=v});
   return out;
 }
-/** Build the import payload used for Mission → Rounds claims (limited totals OK). */
+/** Build the import payload used for Mission → Rounds claims (hole scorecards only). */
 function missionSeedToParsed(seed){
   const holeRows=Array.isArray(seed?.holes)?seed.holes:[];
   const holes=holeRows.length||18;
@@ -5903,10 +5910,9 @@ function tagRoundFromMissionSeed(round,seed){
 function mergeMissionSeedIntoPersonal(seed,resultRow){
   if(!seed||typeof db==='undefined'||!Array.isArray(db.rounds))return {claimed:false};
   try{
-    // Don't seed absurd totals-only Mission rows into personal Rounds (blank card + gross 160).
-    const limited=!Array.isArray(seed.holes)||!seed.holes.some(h=>h&&Number.isFinite(Number(h.score)));
-    const g=Number(seed.gross);
-    if(limited&&Number.isFinite(g)&&g>=120)return {claimed:false,skipped:'corrupt-total'};
+    // Hole scores required — totals-only Mission rows stay on the Mission, not in Rounds.
+    const hasHoles=Array.isArray(seed.holes)&&seed.holes.some(h=>h&&Number.isFinite(Number(h.score)));
+    if(!hasHoles||seed.limited)return {claimed:false,skipped:'totals-only'};
     const fakeParsed=missionSeedToParsed(seed);
     let existing=findPersonalRoundForMissionSeed(seed);
     let created=false;
@@ -5981,7 +5987,7 @@ async function persistClaimedMissionRounds(created){
   return {saved};
 }
 
-/** Claim this member's Mission results into personal Rounds (limited totals OK) and persist. */
+/** Claim this member's Mission hole scorecards into personal Rounds and persist. */
 async function claimAndPersistMissionRounds(p,{currentMemberId=null}={}){
   if(!p||typeof window.grClaimMissionScorecardsIntoPersonalDb!=='function')return {claimed:0};
   if(missionClaimBusy)return {claimed:0,skipped:'busy'};
@@ -6353,10 +6359,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=227"></script>
-  <script src="platoon-mission-core.js?v=227"></script>
-  <script src="platoon-hq-records.js?v=227"></script>
-  <script src="platoons-v15-real.js?v=227"></script>
+  <script src="platoon-recap-shared.js?v=228"></script>
+  <script src="platoon-mission-core.js?v=228"></script>
+  <script src="platoon-hq-records.js?v=228"></script>
+  <script src="platoons-v15-real.js?v=228"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
