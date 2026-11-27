@@ -358,15 +358,17 @@ let blogComposerOpen=false;
 function openBlogComposer(){
   const p=loadPlatoonLocal();
   const me=currentBlogAuthor(p);
-  blogComposerOpen=true;
-  modal(`<div class="dialog-head"><div><div class="eyebrow">LOCKER</div><h2>Add a post</h2></div><button class="icon-button" type="button" data-blog-composer-close aria-label="Close">✕</button></div>
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">LOCKER</div><h2>Add a post</h2></div><button class="icon-button" type="button" data-blog-composer-close aria-label="Close">✕</button></div>
     <div class="gr-blog-composer gr-blog-composer-dialog">${blogComposerMarkup(me)}</div>`);
+  // Set after modal() — modal clears the flag for other dialogs.
+  blogComposerOpen=true;
+  d.dataset.blogComposer='1';
   queueMicrotask(()=>document.getElementById('grBlogBody')?.focus());
 }
 function refreshBlogComposerDialog(){
   if(!blogComposerOpen)return;
   const d=document.getElementById('grPlatoonDialog');
-  if(!d||!d.open){blogComposerOpen=false;return}
+  if(!d||!d.open||d.dataset.blogComposer!=='1'){blogComposerOpen=false;return}
   openBlogComposer();
 }
 function blogView(){
@@ -848,8 +850,23 @@ function groupsV15(){
   return withSubNav(home);
 }
 
-function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=document.createElement('dialog');d.id='grPlatoonDialog';document.body.appendChild(d)}d.className='';d.innerHTML=`<div class="dialog-card">${inner}</div>`;if(!d.open){try{d.showModal()}catch{}}return d}
-function closeModal(){blogComposerOpen=false;document.getElementById('grPlatoonDialog')?.close()}
+function modal(inner){
+  // Any non-locker dialog must clear composer state so a late photo attach can't hijack the modal.
+  blogComposerOpen=false;
+  let d=document.getElementById('grPlatoonDialog');
+  if(!d){
+    d=document.createElement('dialog');
+    d.id='grPlatoonDialog';
+    document.body.appendChild(d);
+    d.addEventListener('close',()=>{blogComposerOpen=false;delete d.dataset.blogComposer});
+  }
+  delete d.dataset.blogComposer;
+  d.className='';
+  d.innerHTML=`<div class="dialog-card">${inner}</div>`;
+  if(!d.open){try{d.showModal()}catch{}}
+  return d;
+}
+function closeModal(){blogComposerOpen=false;const d=document.getElementById('grPlatoonDialog');if(d){delete d.dataset.blogComposer;d.close()}}
 window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW MISSION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-choice-grid"><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenMissionEditor()"><strong>Single Mission</strong><span class="muted">One competitive round — league night, Saturday game, outing</span></button><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenWarEditor()"><strong>War</strong><span class="muted">Multiple Missions under one season / league series</span></button></div>`)};
 window.grCloseModal=closeModal;
 function looksLikeHeic(file){
