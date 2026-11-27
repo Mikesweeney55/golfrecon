@@ -339,8 +339,8 @@ function repairDoubledMissionTotals(mission,{fixFormat=true}={}){
 
 /**
  * Attach claimable scorecard seeds onto mission result rows (for personal DB merge).
- * Seeds from whatever official totals exist — hole-by-hole when present, otherwise
- * limited gross/net/points so Mission results can still land in personal Rounds.
+ * Only hole-by-hole scorecards become personal Rounds. Totals-only leaderboard rows
+ * stay on the Mission — seeding them caused the blank/160/scrub patch spiral.
  */
 function attachScorecardSeeds(mission,p){
   if(!mission||!Array.isArray(mission.results))return mission;
@@ -353,14 +353,11 @@ function attachScorecardSeeds(mission,p){
     const holes=Array.isArray(r.holes)?cleanHoles(r.holes):[];
     const priorHoles=Array.isArray(r.scorecard_seed?.holes)?cleanHoles(r.scorecard_seed.holes):[];
     const mergedHoles=holes.length?holes:priorHoles;
-    // Never seed absurd doubled totals (160+) into personal Rounds.
-    if(!mergedHoles.length&&missionResultLooksAbsurd(r)){
+    // No hole scores → no personal Round seed (Mission standings still show totals).
+    if(!mergedHoles.length){
       delete r.scorecard_seed;
       continue;
     }
-    // Leaderboard-only rows (gross/net/points) still get a seed so cadets can claim Rounds.
-    const hasTotals=finite(r.gross)||finite(r.net)||finite(r.raw_points)||mergedHoles.length>0;
-    if(!hasTotals)continue;
     const scoreKey=finite(r.gross)?Number(r.gross):(finite(r.net)?Number(r.net):(finite(r.raw_points)?Number(r.raw_points):''));
     const next={
       member_id:member.id,
@@ -375,7 +372,7 @@ function attachScorecardSeeds(mission,p){
       raw_points:finite(r.raw_points)?Number(r.raw_points):null,
       finish_position:finite(r.finish_position)?Number(r.finish_position):null,
       holes:mergedHoles,
-      limited:!mergedHoles.length,
+      limited:false,
       source:'mission_import',
       fingerprint:missionRoundFingerprint(mission,member.id,scoreKey),
       updated_at:new Date().toISOString()

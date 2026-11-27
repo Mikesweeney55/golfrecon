@@ -232,7 +232,7 @@ assert(friday.results[0].net===70, 'readOnlyMission does not mutate official res
 const badReopen = w.grReopenMissionDraft(p, friday.id);
 assert(!badReopen.ok, 'completed mission cannot reopen to draft');
 
-/* Limited Mission totals still become claimable scorecard seeds */
+/* Totals-only Mission rows do NOT seed personal Rounds (stability cut) */
 const limitedMission = {
   id:'mission-limited-totals',title:'Totals Only',date:'2026-05-01',
   type:'battle',status:'completed',locationName:'MyTime Masters',
@@ -245,14 +245,26 @@ const limitedMission = {
 };
 const limitedPlatoon = {id:'t',name:'My Time',members,missions:[structuredClone(limitedMission)]};
 w.grAttachScorecardSeeds(limitedPlatoon.missions[0], limitedPlatoon);
-const mikeSeed = limitedPlatoon.missions[0].results[0].scorecard_seed;
-const sullySeed = limitedPlatoon.missions[0].results[1].scorecard_seed;
-const nobodySeed = limitedPlatoon.missions[0].results[2].scorecard_seed;
-assert(!!mikeSeed?.fingerprint && mikeSeed.limited===true && mikeSeed.net===91, 'limited seed for Mike from net/points');
-assert(!!sullySeed?.fingerprint && sullySeed.member_id==='sully' && sullySeed.limited===true, 'limited seed for Sully');
-assert(!nobodySeed, 'no seed when result has no totals');
+assert(!limitedPlatoon.missions[0].results[0].scorecard_seed, 'no seed for totals-only Mike');
+assert(!limitedPlatoon.missions[0].results[1].scorecard_seed, 'no seed for totals-only Sully');
+assert(!limitedPlatoon.missions[0].results[2].scorecard_seed, 'no seed when result has no totals');
 const ensured = w.grEnsurePlatoonScorecardSeeds(limitedPlatoon);
-assert(ensured.seeded>=2, 'ensurePlatoonScorecardSeeds counts limited seeds');
+assert(ensured.seeded===0, 'ensurePlatoonScorecardSeeds skips totals-only');
+
+/* Hole-by-hole Mission rows still get claimable seeds */
+const holeMission = {
+  id:'mission-with-holes',title:'Holes Loaded',date:'2026-05-08',
+  type:'battle',status:'completed',locationName:'Four Oaks',
+  participants:['chief'],
+  results:[{
+    player_name:'Mike Sweeney',net:70,gross:82,raw_points:4,finish_position:1,
+    holes:[{hole:1,par:4,score:4},{hole:2,par:3,score:3}]
+  }]
+};
+const holePlatoon = {id:'t',name:'My Time',members,missions:[structuredClone(holeMission)]};
+w.grAttachScorecardSeeds(holePlatoon.missions[0], holePlatoon);
+const holeSeed = holePlatoon.missions[0].results[0].scorecard_seed;
+assert(!!holeSeed?.fingerprint && holeSeed.limited===false && holeSeed.holes.length===2, 'hole seed created for scorecard');
 
 const summary = {
   ok: failures.length===0,
