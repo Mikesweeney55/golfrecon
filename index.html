@@ -1715,7 +1715,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=232">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=233">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -5244,6 +5244,10 @@ function saveAuthSession(session){
   authSession=session||null;
   try{
     if(session){
+      // Password/refresh grants return expires_in, not always expires_at.
+      if(!Number(session.expires_at)&&Number(session.expires_in)){
+        session.expires_at=Math.floor(Date.now()/1000)+Number(session.expires_in);
+      }
       const nextUser=sessionUserId(session),prevUser=localStorage.getItem(AUTH_USER_KEY);
       if(nextUser&&prevUser&&prevUser!==nextUser)resetUserScopedData();
       localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify(session));
@@ -5309,15 +5313,20 @@ async function callImportFunction(payload,retry=true){
   }
   const session=await ensureAuthSession();
   if(!session?.access_token)throw new Error('Please sign in again.');
-  const res=await fetch(`${SUPABASE_URL}/functions/v1/golfiq-import`,{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'Authorization':`Bearer ${session.access_token}`,
-      'apikey':SUPABASE_PUBLISHABLE_KEY
-    },
-    body:JSON.stringify(payload)
-  });
+  let res;
+  try{
+    res=await fetch(`${SUPABASE_URL}/functions/v1/golfiq-import`,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${session.access_token}`,
+        'apikey':SUPABASE_PUBLISHABLE_KEY
+      },
+      body:JSON.stringify(payload)
+    });
+  }catch(e){
+    throw new Error(`Network error talking to GolfRecon (${e?.message||e}). Try Wi‑Fi and retry.`);
+  }
   const body=await res.json().catch(()=>({error:'Invalid server response'}));
   if(res.status===401 && retry && authSession?.refresh_token){
     try{await refreshAuthSession();return callImportFunction(payload,false)}catch{}
@@ -5372,23 +5381,19 @@ async function initializeAuth(){
   await bootstrapGolfRecon();
 }
 
-function withTimeout(promise,ms,label='Request'){
-  let t=null;
-  const timeout=new Promise((_,rej)=>{t=setTimeout(()=>rej(new Error(`${label} timed out`)),ms)});
-  return Promise.race([promise,timeout]).finally(()=>{if(t)clearTimeout(t)});
-}
 async function fetchBootstrapPayload(){
-  // One retry — cold edge functions + cellular often need a second try.
-  let lastErr=null;
-  for(const ms of [45000,60000]){
-    try{
-      return await withTimeout(callImportFunction({action:'bootstrap'}),ms,'Sync');
-    }catch(e){
-      lastErr=e;
-      console.warn('Bootstrap attempt failed',e);
-    }
+  // No artificial timeout — that caused "Sync timed out" on working but slow phone syncs.
+  // One retry only for clear network / 5xx failures.
+  try{
+    return await callImportFunction({action:'bootstrap'});
+  }catch(e){
+    const msg=String(e?.message||e||'');
+    const retryable=/failed to fetch|network|502|503|504|timed out|Load failed/i.test(msg);
+    if(!retryable)throw e;
+    console.warn('Bootstrap retry after',msg);
+    await new Promise(r=>setTimeout(r,1200));
+    return await callImportFunction({action:'bootstrap'});
   }
-  throw lastErr||new Error('Sync timed out');
 }
 function finishBootstrapUi(syncLabel='Synced',syncOk=true){
   applyStoredRoundDirectionPatches();
@@ -5434,11 +5439,19 @@ async function bootstrapGolfRecon(){
   if(hadCache){
     try{finishBootstrapUi('Syncing…',true)}catch{}
   }else{
-    app.innerHTML=`<div class="card bootstrap-card"><div class="bootstrap-spinner"></div><strong>Loading GolfRecon</strong><div class="muted">Syncing your golf database…</div></div>`;
+    app.innerHTML=`<div class="card bootstrap-card"><div class="bootstrap-spinner"></div><strong>Loading GolfRecon</strong><div class="muted" id="bootSyncHint">Syncing your golf database…</div></div>`;
   }
+  let progressTimer=null;
+  const started=Date.now();
   try{
     if(txt)txt.textContent='Syncing';
     if(pill)pill.classList.remove('ok','err');
+    progressTimer=setInterval(()=>{
+      const sec=Math.round((Date.now()-started)/1000);
+      const hint=document.getElementById('bootSyncHint');
+      if(hint)hint.textContent=sec<20?'Syncing your golf database…':sec<45?`Still syncing… ${sec}s`:`Almost there… ${sec}s — first sync can be slow on cellular`;
+      if(txt&&!hadCache)txt.textContent=`Syncing ${sec}s`;
+    },1000);
     const data=await fetchBootstrapPayload();
     db.player=data.player||db.player;
     db.swingThoughts=data.swingThoughts||db.swingThoughts;
@@ -5473,12 +5486,14 @@ async function bootstrapGolfRecon(){
     }
     if(pill)pill.classList.add('err');
     if(txt)txt.textContent='Database error';
-    app.innerHTML=`<div class="card bootstrap-card"><strong>Could not load GolfRecon</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:10px">Check your connection, then retry. First sync on cellular can take up to a minute.</div><button class="button primary" style="margin-top:14px" type="button" id="bootRetry">Retry</button> <button class="button secondary" style="margin-top:14px" type="button" id="bootSignOut">Sign out</button></div>`;
+    app.innerHTML=`<div class="card bootstrap-card"><strong>Could not load GolfRecon</strong><div class="bootstrap-error">${safeText(e.message)}</div><div class="muted" style="margin-top:10px">Stay on Wi‑Fi if you can, then retry. Do not leave this screen while it says Syncing.</div><button class="button primary" style="margin-top:14px" type="button" id="bootRetry">Retry</button> <button class="button secondary" style="margin-top:14px" type="button" id="bootSignOut">Sign out</button></div>`;
     try{
       document.getElementById('bootRetry')?.addEventListener('click',()=>bootstrapGolfRecon());
       document.getElementById('bootSignOut')?.addEventListener('click',()=>{try{saveAuthSession(null)}catch{};location.reload()});
     }catch{}
     return null;
+  }finally{
+    if(progressTimer)clearInterval(progressTimer);
   }
 }
 
@@ -6354,10 +6369,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=232"></script>
-  <script src="platoon-mission-core.js?v=232"></script>
-  <script src="platoon-hq-records.js?v=232"></script>
-  <script src="platoons-v15-real.js?v=232"></script>
+  <script src="platoon-recap-shared.js?v=233"></script>
+  <script src="platoon-mission-core.js?v=233"></script>
+  <script src="platoon-hq-records.js?v=233"></script>
+  <script src="platoons-v15-real.js?v=233"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
