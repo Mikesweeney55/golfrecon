@@ -1723,7 +1723,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=222">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=223">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -4160,9 +4160,28 @@ function groupsView(){
   </div>`;
 }
 
+/** True when at least one hole has a numeric score. */
+function roundHasHoleScores(r){
+  return (r?.scores||[]).some(s=>s!=null&&s!==''&&Number.isFinite(Number(s)));
+}
+/** Totals-only / absurd rows (e.g. gross 160 with empty holes) — not usable scorecards. */
+function roundIsTotalsOnly(r){
+  return !!(r&&!roundHasHoleScores(r)&&Number.isFinite(Number(r.gross)));
+}
+function roundLooksCorrupt(r){
+  if(!r||!Number.isFinite(Number(r.gross)))return false;
+  const holes=Number(r.holes)||18;
+  const gross=Number(r.gross);
+  // 18-hole gross past ~120 with no holes is almost always a bad import / double-counted nines.
+  if(holes>=18&&gross>=120&&!roundHasHoleScores(r))return true;
+  if(holes===9&&gross>=70&&!roundHasHoleScores(r))return true;
+  return false;
+}
 function scoreDifferential(r){
  const c=course(r.courseId);
  if(r.holes!==18 || !c)return null;
+ // Don't poison handicap with totals-only junk (empty scorecard + impossible gross).
+ if(roundIsTotalsOnly(r)||roundLooksCorrupt(r))return null;
  let rating=c.rating,slope=c.slope;
  if((!Number.isFinite(rating)||!Number.isFinite(slope)) && isCalusaName(c.name||c.baseName)){
    const tee=romanTee(c.tees);
@@ -4276,6 +4295,19 @@ function roundsChart(rounds,key){
 }
 function personalRoundScorecardHtml(r){
   const c=course(r.courseId);
+  if(roundIsTotalsOnly(r)){
+    const mission=!!(r.limitedFromMission||/mission/i.test(String(r.source||'')));
+    const corrupt=roundLooksCorrupt(r);
+    return `<div class="card" style="margin:8px 10px 12px;padding:12px 14px">
+      <strong>${corrupt?'Broken total — no hole scores':'Totals only — no hole scores'}</strong>
+      <div class="muted" style="margin-top:6px;line-height:1.45">
+        Stored gross is <strong>${safeText(r.gross)}</strong>${Number.isFinite(Number(r.net))?` · net <strong>${safeText(r.net)}</strong>`:''},
+        but every hole on the card is blank.${corrupt?' That total is not a believable 18-hole score (often a bad import that double-counted nines).':''}
+        ${mission?' This row was seeded from Mission results without a hole-by-hole card.':''}
+        Use <strong>Edit</strong> to fix the gross, or backfill from a scorecard screenshot.
+      </div>
+    </div>`;
+  }
   if(typeof window.grPersonalRoundScorecardMarkup!=='function'){
     const scores=(r.scores||[]).map(s=>s==null?'·':s).join(' · ');
     return `<div class="muted" style="padding:8px 10px">Hole scores: ${safeText(scores)||'—'}</div>`;
@@ -4664,6 +4696,13 @@ function missingRoundStats(r){
 }
 /** Round list badge: Complete when FH/GIR/putts are filled (miss arrows imputed from hit/miss). First-putt distances stay optional in backfill. */
 function roundCompletenessStatusHtml(r){
+  if(roundLooksCorrupt(r))return `<span class="round-status missing">Broken total</span>`;
+  if(roundIsTotalsOnly(r)){
+    if(r.limitedFromMission||/mission/i.test(String(r.source||''))){
+      return `<span class="round-status warn">Mission totals only</span>`;
+    }
+    return `<span class="round-status warn">No hole scores</span>`;
+  }
   // FH/GIR hit/miss already on the scorecard → treat blank arrows as short/hit so Candia-style rounds clear.
   if(ensureImpliedDirections(r))persistRoundDirectionPatch(r);
   const g=missingRoundStats(r);
@@ -5679,6 +5718,10 @@ function tagRoundFromMissionSeed(round,seed){
 function mergeMissionSeedIntoPersonal(seed,resultRow){
   if(!seed||typeof db==='undefined'||!Array.isArray(db.rounds))return {claimed:false};
   try{
+    // Don't seed absurd totals-only Mission rows into personal Rounds (blank card + gross 160).
+    const limited=!Array.isArray(seed.holes)||!seed.holes.some(h=>h&&Number.isFinite(Number(h.score)));
+    const g=Number(seed.gross);
+    if(limited&&Number.isFinite(g)&&g>=120)return {claimed:false,skipped:'corrupt-total'};
     const fakeParsed=missionSeedToParsed(seed);
     let existing=findPersonalRoundForMissionSeed(seed);
     let created=false;
@@ -5861,6 +5904,13 @@ function mergeImportedRound(parsed, importId){
     return h?.[key] ?? null;
   });
   const boolArr=(key)=>arr(key).map(v=>v===true?1:v===false?0:null);
+  const holeScores=arr('score');
+  const hasHoleScores=holeScores.some(s=>s!=null&&s!==''&&Number.isFinite(Number(s)));
+  const grossNum=Number(r.gross_score);
+  // Refuse absurd totals-only imports (e.g. 160 with blank holes — usually double-counted nines).
+  if(!hasHoleScores&&Number.isFinite(grossNum)&&((holes>=18&&grossNum>=120)||(holes===9&&grossNum>=70))){
+    return {added:false,reason:'corrupt-total',course:c,gross:grossNum};
+  }
 
   const nextId=String(Math.max(0,...db.rounds.map(x=>Number(x.id)||0))+1);
   const nr={
@@ -5871,7 +5921,7 @@ function mergeImportedRound(parsed, importId){
     net:r.net_score,
     scoreToPar:(r.gross_score!=null && Number.isFinite(c.par))?r.gross_score-c.par:null,
     holes,
-    scores:arr('score'),
+    scores:holeScores,
     fairways:boolArr('fairway_hit'),
     gir:boolArr('gir'),
     putts:arr('putts'),
@@ -6118,10 +6168,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=222"></script>
-  <script src="platoon-mission-core.js?v=222"></script>
-  <script src="platoon-hq-records.js?v=222"></script>
-  <script src="platoons-v15-real.js?v=222"></script>
+  <script src="platoon-recap-shared.js?v=223"></script>
+  <script src="platoon-mission-core.js?v=223"></script>
+  <script src="platoon-hq-records.js?v=223"></script>
+  <script src="platoons-v15-real.js?v=223"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
