@@ -383,7 +383,7 @@ function courseSelectMarkup(currentName,currentId){
   const opts=[];
   try{
     if(typeof db!=='undefined'&&Array.isArray(db.courses)){
-      const list=db.courses.slice().sort((a,b)=>courseMenuName(a).localeCompare(courseMenuName(b)));
+      const list=typeof sortedCourses==='function'?sortedCourses():db.courses.slice().sort((a,b)=>courseMenuName(a).localeCompare(courseMenuName(b)));
       for(const c of list){
         const selected=curId?String(c.id)===curId:(curName&&(c.name===curName||c.baseName===curName||courseMenuName(c)===curName));
         opts.push(`<option value="id:${E(c.id)}" ${selected?'selected':''}>${E(courseMenuName(c))}</option>`);
@@ -473,33 +473,34 @@ function ensureCourseInDb({name,tees,holes,par,rating,slope}){
   const expanded=typeof expandTeeOnlyCourseName==='function'
     ? expandTeeOnlyCourseName(name,tees)
     : {course_name:name,baseName:name,tees:tees||'Unknown'};
-  const label=expanded.course_name||name;
+  const club=expanded.baseName||expanded.course_name||name;
   const holesN=Number(holes)||18;
   const segment=holesN===18?'18 holes':'9 holes';
-  // Reuse an existing Atkinson/etc. row instead of forking Club - Tee duplicates.
+  // Reuse same club + tee (Butter Brook White ≠ Blue; naming variants collapse).
   if(typeof findCourseForImport==='function'){
-    const hit=findCourseForImport({course_name:label,tees:expanded.tees||tees,holes:holesN});
+    const hit=findCourseForImport({course_name:club,tees:expanded.tees||tees,holes:holesN});
     if(hit)return hit;
   }
-  const wantTee=String(expanded.tees||tees||'').trim().toLowerCase();
-  const wantClub=(typeof normalizeCourseName==='function'?normalizeCourseName:s=>String(s||'').toLowerCase())(expanded.baseName||label);
+  const wantTee=typeof teeIdentityKey==='function'?teeIdentityKey(expanded.tees||tees):String(expanded.tees||tees||'').trim().toLowerCase();
+  const wantClub=typeof clubIdentityKey==='function'?clubIdentityKey(club):(typeof normalizeCourseName==='function'?normalizeCourseName(club):String(club||'').toLowerCase());
   const existing=db.courses.find(c=>{
     if(!c)return false;
-    const club=(typeof normalizeCourseName==='function'?normalizeCourseName:s=>String(s||'').toLowerCase())(c.baseName||c.name||'');
-    const tee=String(c.tees||'').trim().toLowerCase();
-    const cHoles=Number((String(c.segment||'').match(/\d+/)||[])[0])||(c.holeNumbers||c.pars||[]).length||18;
-    return club===wantClub&&(!wantTee||wantTee==='unknown'||tee===wantTee)&&cHoles===holesN;
+    const cClub=typeof clubIdentityKey==='function'?clubIdentityKey(c.baseName||c.name):(typeof normalizeCourseName==='function'?normalizeCourseName(c.baseName||c.name):String(c.baseName||c.name||'').toLowerCase());
+    const cTee=typeof teeIdentityKey==='function'?teeIdentityKey(c.tees):String(c.tees||'').trim().toLowerCase();
+    const cHoles=typeof courseHoleCount==='function'?courseHoleCount(c):(Number((String(c.segment||'').match(/\d+/)||[])[0])||(c.holeNumbers||c.pars||[]).length||18);
+    return cClub===wantClub&&cHoles===holesN&&(wantTee==='unknown'||!wantTee||cTee===wantTee);
   });
   if(existing)return existing;
-  let id=slugifyCourse(`${label}-${expanded.tees||tees||'tees'}-${segment}`);
+  const teeSlug=wantTee||'tees';
+  let id=slugifyCourse(`${club}-${teeSlug}-${segment}`);
   let n=2,base=id;
   while(db.courses.some(c=>c.id===id))id=`${base}-${n++}`;
   const pars=Array(holesN).fill(null);
   const holeNumbers=Array.from({length:holesN},(_,i)=>i+1);
   const c={
     id,
-    name:label,
-    baseName:expanded.baseName||label,
+    name:club,
+    baseName:club,
     tees:expanded.tees||tees||'Unknown',
     yardage:0,
     slope:Number.isFinite(Number(slope))?Number(slope):null,
