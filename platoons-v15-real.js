@@ -6,7 +6,14 @@ function renderGroups(){try{if(typeof render==='function')render()}catch{}}
 function goSubpage(name){platoonSubpage=name||'home';renderGroups()}
 function subNav(){const tabs=[{id:'home',label:'Home'},{id:'calendar',label:'Calendar'},{id:'blog',label:'Locker'}];return `<nav class="gr-platoon-subnav" aria-label="Platoons sections">${tabs.map(t=>`<button type="button" class="gr-platoon-subtab ${platoonSubpage===t.id?'active':''}" data-gr-subnav="${t.id}">${E(t.label)}</button>`).join('')}</nav>`}
 function withSubNav(html){return `<div class="gr-platoons-shell">${html||''}${subNav()}</div>`}
-function subHead(title,sub){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${E(title)}</h2>${sub?`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">${E(sub)}</div>`:''}</div><button class="button secondary" type="button" data-platoon-home>Platoon HQ</button></div>`}
+function subHead(title,sub){
+  const p=typeof loadPlatoonLocal==='function'?loadPlatoonLocal():null;
+  const name=p?.name||'My Time';
+  const logo=p?.logoData
+    ?`<img class="gr-subhead-logo-img" src="${E(p.logoData)}" alt="${E(name)} logo">`
+    :`<span class="gr-subhead-logo-fallback" aria-hidden="true">${E(String(name).replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase()||'MT')}</span>`;
+  return `<div class="gr-subhead"><div><div class="eyebrow">PLATOONS</div><h2 style="margin:4px 0 0">${E(title)}</h2>${sub?`<div class="muted" style="font-size:var(--fs-data);margin-top:4px">${E(sub)}</div>`:''}</div><button class="gr-subhead-logo-btn" type="button" data-platoon-home title="${E(name)} Clubhouse" aria-label="${E(name)} Clubhouse">${logo}</button></div>`;
+}
 function monthStart(){if(calendarCursor)return new Date(calendarCursor.getFullYear(),calendarCursor.getMonth(),1);const now=new Date(),rows=(loadPlatoonLocal().missions||[]).filter(m=>m.date&&m.type!=='war').map(m=>new Date(m.date+'T12:00:00')).filter(d=>!isNaN(d));const next=rows.filter(d=>d>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a,b)=>a-b)[0];calendarCursor=new Date((next||now).getFullYear(),(next||now).getMonth(),1);return calendarCursor}
 const MISSION_FORMATS=[
   'Stroke play (gross)',
@@ -263,7 +270,8 @@ function blogToneLabel(tone){return (BLOG_TONES.find(t=>t.id===tone)||BLOG_TONES
 function blogPostsSorted(p){
   hydrateBlogPhotos(p);
   const posts=typeof window.grBlogPostsOf==='function'?window.grBlogPostsOf(p):(p?.hqMeta?.blogPosts||[]);
-  return (posts||[]).slice().sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  // Latest first — pinned keeps its badge but does not jump the stack.
+  return (posts||[]).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))||Number(!!b.pinned)-Number(!!a.pinned));
 }
 function saveBlogPosts(p,posts,{push=true}={}){
   p.hqMeta=p.hqMeta&&typeof p.hqMeta==='object'?p.hqMeta:{};
@@ -317,44 +325,64 @@ function blogPostCard(p,post,me){
     </form>`:''}
   </article>`;
 }
-function blogView(){
-  const p=loadPlatoonLocal();
-  const me=currentBlogAuthor(p);
-  const posts=blogPostsSorted(p);
+function blogComposerMarkup(me){
   const prompts=BLOG_PROMPTS.map(t=>`<button type="button" class="gr-blog-prompt" data-blog-prompt="${E(t)}">${E(t)}</button>`).join('');
   const tones=BLOG_TONES.map(t=>`<button type="button" class="gr-blog-tone ${blogComposerTone===t.id?'active':''}" data-blog-tone="${E(t.id)}">${E(t.label)}</button>`).join('');
-  const feed=posts.length
-    ? posts.map(post=>blogPostCard(p,post,me)).join('')
-    : `<div class="gr-blog-empty card"><strong>Locker’s quiet.</strong><span class="muted">Drop the first take — trash talk, a flex photo, or a prop bet. The platoon will answer.</span></div>`;
   const preview=blogPendingPhoto
     ?`<div class="gr-blog-pending"><img src="${String(blogPendingPhoto).replace(/"/g,'')}" alt="Pending upload"><button type="button" class="gr-blog-tool danger" data-blog-clear-photo>Remove photo</button></div>`
     :(blogPhotoBusy?`<div class="gr-blog-pending is-busy"><span class="muted">Attaching photo…</span></div>`:'');
   const draft=blogPendingBody||'';
+  return `<div class="gr-blog-composer-top">
+      <div class="gr-blog-avatar is-me" aria-hidden="true">${E(blogAuthorInitials(me.name))}</div>
+      <div>
+        <div class="eyebrow">POST TO THE LOCKER</div>
+        <div class="gr-blog-composer-as">as <strong>${E(me.name)}</strong></div>
+      </div>
+    </div>
+    <div class="gr-blog-tones" role="group" aria-label="Post tone">${tones}</div>
+    <form id="grBlogComposer">
+      <textarea id="grBlogBody" name="body" rows="4" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…">${E(draft)}</textarea>
+      ${preview}
+      <div class="gr-blog-composer-actions">
+        <label for="grBlogPhoto" class="button secondary gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}">📷 ${blogPhotoBusy?'Working…':'Photo'}</label>
+        <input id="grBlogPhoto" class="gr-blog-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}>
+        <button class="button primary" type="submit" ${blogPhotoBusy?'disabled':''}>${blogPhotoBusy?'Wait…':'Post'}</button>
+      </div>
+    </form>
+    <div class="gr-blog-prompts-wrap">
+      <div class="gr-blog-prompts-label">Spark it</div>
+      <div class="gr-blog-prompts">${prompts}</div>
+    </div>`;
+}
+let blogComposerOpen=false;
+function openBlogComposer(){
+  const p=loadPlatoonLocal();
+  const me=currentBlogAuthor(p);
+  const d=modal(`<div class="dialog-head"><div><div class="eyebrow">LOCKER</div><h2>Add a post</h2></div><button class="icon-button" type="button" data-blog-composer-close aria-label="Close">✕</button></div>
+    <div class="gr-blog-composer gr-blog-composer-dialog">${blogComposerMarkup(me)}</div>`);
+  // Set after modal() — modal clears the flag for other dialogs.
+  blogComposerOpen=true;
+  d.dataset.blogComposer='1';
+  queueMicrotask(()=>document.getElementById('grBlogBody')?.focus());
+}
+function refreshBlogComposerDialog(){
+  if(!blogComposerOpen)return;
+  const d=document.getElementById('grPlatoonDialog');
+  if(!d||!d.open||d.dataset.blogComposer!=='1'){blogComposerOpen=false;return}
+  openBlogComposer();
+}
+function blogView(){
+  const p=loadPlatoonLocal();
+  const me=currentBlogAuthor(p);
+  const posts=blogPostsSorted(p);
+  const feed=posts.length
+    ? posts.map(post=>blogPostCard(p,post,me)).join('')
+    : `<div class="gr-blog-empty card"><strong>Locker’s quiet.</strong><span class="muted">Hit Add post for the first take — trash talk, a flex photo, or a prop bet.</span></div>`;
   return `${subHead('Locker Room',(p.name||'My Time')+' · trash talk · photos · props')}
   <div class="gr-blog">
-    <section class="card gr-blog-composer">
-      <div class="gr-blog-composer-top">
-        <div class="gr-blog-avatar is-me" aria-hidden="true">${E(blogAuthorInitials(me.name))}</div>
-        <div>
-          <div class="eyebrow">POST TO THE LOCKER</div>
-          <div class="gr-blog-composer-as">as <strong>${E(me.name)}</strong></div>
-        </div>
-      </div>
-      <div class="gr-blog-tones" role="group" aria-label="Post tone">${tones}</div>
-      <form id="grBlogComposer">
-        <textarea id="grBlogBody" name="body" rows="3" maxlength="800" placeholder="Talk trash, drop a flex, or float a prop…">${E(draft)}</textarea>
-        ${preview}
-        <div class="gr-blog-composer-actions">
-          <label for="grBlogPhoto" class="button secondary gr-blog-photo-btn ${blogPhotoBusy?'is-busy':''}">📷 ${blogPhotoBusy?'Working…':'Photo'}</label>
-          <input id="grBlogPhoto" class="gr-blog-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" ${blogPhotoBusy?'disabled':''}>
-          <button class="button primary" type="submit" ${blogPhotoBusy?'disabled':''}>${blogPhotoBusy?'Wait…':'Post'}</button>
-        </div>
-      </form>
-      <div class="gr-blog-prompts-wrap">
-        <div class="gr-blog-prompts-label">Spark it</div>
-        <div class="gr-blog-prompts">${prompts}</div>
-      </div>
-    </section>
+    <div class="gr-blog-toolbar">
+      <button class="button primary" type="button" data-blog-open-composer>+ Add post</button>
+    </div>
     <section class="gr-blog-feed" aria-live="polite">
       <div class="gr-section-head"><div><div class="eyebrow">THE BOARD</div><h2>${posts.length?`${posts.length} post${posts.length===1?'':'s'}`:'Waiting on a take'}</h2></div></div>
       <div class="gr-blog-feed-list">${feed}</div>
@@ -822,8 +850,23 @@ function groupsV15(){
   return withSubNav(home);
 }
 
-function modal(inner){let d=document.getElementById('grPlatoonDialog');if(!d){d=document.createElement('dialog');d.id='grPlatoonDialog';document.body.appendChild(d)}d.className='';d.innerHTML=`<div class="dialog-card">${inner}</div>`;d.showModal();return d}
-function closeModal(){document.getElementById('grPlatoonDialog')?.close()}
+function modal(inner){
+  // Any non-locker dialog must clear composer state so a late photo attach can't hijack the modal.
+  blogComposerOpen=false;
+  let d=document.getElementById('grPlatoonDialog');
+  if(!d){
+    d=document.createElement('dialog');
+    d.id='grPlatoonDialog';
+    document.body.appendChild(d);
+    d.addEventListener('close',()=>{blogComposerOpen=false;delete d.dataset.blogComposer});
+  }
+  delete d.dataset.blogComposer;
+  d.className='';
+  d.innerHTML=`<div class="dialog-card">${inner}</div>`;
+  if(!d.open){try{d.showModal()}catch{}}
+  return d;
+}
+function closeModal(){blogComposerOpen=false;const d=document.getElementById('grPlatoonDialog');if(d){delete d.dataset.blogComposer;d.close()}}
 window.grOpenOperation=()=>{modal(`<div class="dialog-head"><div><div class="eyebrow">NEW MISSION</div><h2>What are you creating?</h2></div><button class="icon-button" onclick="grCloseModal()">✕</button></div><div class="gr-choice-grid"><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenMissionEditor()"><strong>Single Mission</strong><span class="muted">One competitive round — league night, Saturday game, outing</span></button><button class="card gr-choice" type="button" onclick="grCloseModal();grOpenWarEditor()"><strong>War</strong><span class="muted">Multiple Missions under one season / league series</span></button></div>`)};
 window.grCloseModal=closeModal;
 function looksLikeHeic(file){
@@ -1961,6 +2004,7 @@ async function submitBlogComposer(form){
   blogPendingPhoto=null;
   blogPendingBody='';
   blogPhotoBusy=false;
+  closeModal();
   saveBlogPosts(p,posts);
 }
 if(!document.body.dataset.grPlatoonShellBound){
@@ -1976,7 +2020,7 @@ if(!document.body.dataset.grPlatoonShellBound){
     if(repair){e.preventDefault();e.stopPropagation();window.grRepairDoubledMission(repair.getAttribute('data-gr-repair-doubled'),repair);return}
     const tab=e.target.closest('[data-gr-subnav]');
     if(tab){e.preventDefault();goSubpage(tab.dataset.grSubnav||'home');return}
-    if(e.target.closest('[data-platoon-home]')){platoonSubpage='home';renderGroups();return}
+    if(e.target.closest('[data-platoon-home]')){closeModal();platoonSubpage='home';renderGroups();return}
     if(e.target.closest('[data-cal-prev]')){const c=monthStart();calendarCursor=new Date(c.getFullYear(),c.getMonth()-1,1);renderGroups();return}
     if(e.target.closest('[data-cal-next]')){const c=monthStart();calendarCursor=new Date(c.getFullYear(),c.getMonth()+1,1);renderGroups();return}
     const missionChip=e.target.closest('[data-mission]');
@@ -1984,8 +2028,15 @@ if(!document.body.dataset.grPlatoonShellBound){
     const calDay=e.target.closest('[data-cal-iso]');
     if(calDay&&window.grOpenMissionEditor){e.preventDefault();window.grOpenMissionEditor('','',{date:calDay.dataset.calIso});return}
 
+    if(e.target.closest('[data-blog-open-composer]')){e.preventDefault();openBlogComposer();return}
+    if(e.target.closest('[data-blog-composer-close]')){e.preventDefault();closeModal();return}
     const toneBtn=e.target.closest('[data-blog-tone]');
-    if(toneBtn){blogComposerTone=toneBtn.getAttribute('data-blog-tone')||'trash';renderGroups();return}
+    if(toneBtn){
+      blogComposerTone=toneBtn.getAttribute('data-blog-tone')||'trash';
+      if(blogComposerOpen)refreshBlogComposerDialog();
+      else renderGroups();
+      return;
+    }
     const promptBtn=e.target.closest('[data-blog-prompt]');
     if(promptBtn){
       const ta=document.getElementById('grBlogBody');
@@ -1994,7 +2045,12 @@ if(!document.body.dataset.grPlatoonShellBound){
       if(ta){ta.value=text;ta.focus()}
       return;
     }
-    if(e.target.closest('[data-blog-clear-photo]')){blogPendingPhoto=null;blogPhotoBusy=false;renderGroups();return}
+    if(e.target.closest('[data-blog-clear-photo]')){
+      blogPendingPhoto=null;blogPhotoBusy=false;
+      if(blogComposerOpen)refreshBlogComposerDialog();
+      else renderGroups();
+      return;
+    }
     const replyToggle=e.target.closest('[data-blog-reply-toggle]');
     if(replyToggle){
       const id=replyToggle.getAttribute('data-blog-reply-toggle')||'';
@@ -2110,7 +2166,8 @@ if(!document.body.dataset.grPlatoonShellBound){
       const buf=await file.arrayBuffer();
       snapshot=new File([buf],file.name||'photo.jpg',{type:file.type||'application/octet-stream',lastModified:file.lastModified||Date.now()});
     }catch{/* keep original File */}
-    renderGroups();
+    if(blogComposerOpen)refreshBlogComposerDialog();
+    else renderGroups();
     try{
       // Warm HEIC converters while we start decode (iPhone Photos often sends HEIC).
       try{loadHeicTo()}catch{}
@@ -2124,7 +2181,8 @@ if(!document.body.dataset.grPlatoonShellBound){
       alert(err?.message||'Could not read that photo.');
     }finally{
       if(blogPhotoBusy===attachId)blogPhotoBusy=false;
-      renderGroups();
+      if(blogComposerOpen)refreshBlogComposerDialog();
+      else renderGroups();
     }
   };
   const onLockerPhotoPick=e=>{
