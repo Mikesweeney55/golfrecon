@@ -1723,7 +1723,7 @@ body::before,body::after{opacity:0!important}
 .game-key-pill{text-transform:capitalize!important}
 
 </style>
-  <link rel="stylesheet" href="platoons-v15-real.css?v=226">
+  <link rel="stylesheet" href="platoons-v15-real.css?v=227">
 </head>
 <body>
   <div class="gr-atmos" aria-hidden="true">
@@ -4248,40 +4248,44 @@ function roundLooksCorrupt(r){
   if(holes===9&&gross>=70&&!roundHasHoleScores(r))return true;
   return false;
 }
+/** Empty shell left after scrubbing a bad Mission seed — no score, no holes. */
+function roundIsBlankShell(r){
+  if(!r||roundHasHoleScores(r))return false;
+  if(Number.isFinite(Number(r.gross)))return false;
+  const missionish=!!(r.limitedFromMission||r.corruptTotalCleared||r.corruptTotalWas!=null
+    ||/mission/i.test(String(r.source||'')));
+  return missionish||!!r.missionFingerprint||!!r.missionId;
+}
 /** Gross shown in the round list — never flash a corrupt 160 as a real score. */
 function roundDisplayGross(r){
-  if(!r||roundLooksCorrupt(r))return null;
+  if(!r||roundLooksCorrupt(r)||roundIsBlankShell(r))return null;
   return Number.isFinite(Number(r.gross))?Number(r.gross):null;
 }
 /**
- * Clear absurd totals-only gross locally (and in cloud when linked) so the
- * summary stops showing 160 after sync.
+ * Remove absurd totals-only / blank Mission-seeded rounds from the list
+ * (and delete the cloud import when linked) so Sep 19 blank shells disappear.
  */
 async function scrubCorruptRoundTotals(){
-  let cleared=0;
+  let removed=0;
+  const keep=[];
   for(const r of (db.rounds||[])){
-    if(!r||r.corruptTotalCleared)continue;
-    if(!roundLooksCorrupt(r))continue;
-    const was=Number(r.gross);
-    r.corruptTotalWas=was;
-    r.corruptTotalCleared=true;
-    r.gross=null;
-    r.net=null;
-    r.scoreToPar=null;
-    cleared++;
+    if(!r)continue;
+    const purge=roundLooksCorrupt(r)||roundIsBlankShell(r);
+    if(!purge){keep.push(r);continue}
+    removed++;
     if(r.supabaseImportId&&typeof callImportFunction==='function'&&!window.grTestEnvActive){
       try{
-        await callImportFunction({
-          action:'update',
-          id:r.supabaseImportId,
-          changes:{gross_score:null,net_score:null}
-        });
+        await callImportFunction({action:'delete',id:r.supabaseImportId});
       }catch(e){
-        console.warn('Could not clear corrupt gross in cloud',r.id,e);
+        console.warn('Could not delete blank/corrupt round in cloud',r.id,e);
       }
     }
+    try{
+      if(String(state.selectedRoundId)===String(r.id))state.selectedRoundId=null;
+    }catch{}
   }
-  return cleared;
+  if(removed)db.rounds=keep;
+  return removed;
 }
 function scoreDifferential(r){
  const c=course(r.courseId);
@@ -4350,7 +4354,7 @@ const roundStatDefs={
 };
 function statValue(r,key){const d=roundStatDefs[key]||roundStatDefs.score,v=d.value(r);return Number.isFinite(v)?v:null}
 function filteredRounds(){
- let rs=db.rounds.slice();
+ let rs=db.rounds.slice().filter(r=>r&&!roundLooksCorrupt(r)&&!roundIsBlankShell(r));
  if(state.roundCourseId!=='all')rs=rs.filter(r=>r.courseId===state.roundCourseId);
  if(state.roundFilter==='18')rs=rs.filter(r=>r.holes===18);
  if(state.roundFilter==='9')rs=rs.filter(r=>r.holes===9);
@@ -6349,10 +6353,10 @@ if(typeof window.grInstallTestGuards==='function')window.grInstallTestGuards();
 initializeAuth();
 
 </script>
-  <script src="platoon-recap-shared.js?v=226"></script>
-  <script src="platoon-mission-core.js?v=226"></script>
-  <script src="platoon-hq-records.js?v=226"></script>
-  <script src="platoons-v15-real.js?v=226"></script>
+  <script src="platoon-recap-shared.js?v=227"></script>
+  <script src="platoon-mission-core.js?v=227"></script>
+  <script src="platoon-hq-records.js?v=227"></script>
+  <script src="platoons-v15-real.js?v=227"></script>
   <script src="mytime-masters-2026-seed.js?v=1"></script>
   <script src="dev-mobile-pregame-form-core.js?v=7"></script>
   <script src="dev-v15.5-results.js?v=190&x=181"></script>
